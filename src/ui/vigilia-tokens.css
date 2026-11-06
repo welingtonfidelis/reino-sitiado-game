@@ -1,0 +1,28 @@
+/* Vigília — generated from tokens.json */
+:root {
+  color-scheme: dark;
+  --bg: #14110e; --panel: #1d1914; --panel-2: #26211a; --line: #4a3d2b; --line-soft: #352c20;
+  --text: #efe6d2; --muted: #a99b82; --gold: #e9b949; --good: #8cc56a; --bad: #e2675a; --warn: #e6a050; --grief: #9fb4f0;
+  --hp: #c8483a; --morale: #8a7ae0; --xp: #c9a24a; --loyalty: #5aa0a0; --corruption: #9a4ad0; --enemy: #8a3a32;
+  --hud-top: #211b14; --hud-bottom: #17130e; --heading: #e8d6a8; --link: #f2d48a; --on-gold: #1a140c;
+  --primary: #6a4a1a; --primary-hover: #7d5a22; --primary-text: #fff3d8; --danger: #5a1f1a; --active: #33291c;
+  --tab-active: #3a2e1c; --tab-active-text: #fff0c8; --tag-bg: #2c251c; --tag-gold-line: #6a5326; --tag-bad-line: #6a2a24;
+  --field: #0f0d0a; --track: #0d0b09; --track-line: #3a3024; --stat-bg: #18140f; --status-text: #d8ccb4;
+  --abyss-bg: #120f12; --abyss-line: #3a2a44; --floor-bg: #1a1518; --floor-done-bg: #2a2214; --floor-open: #6a3a8a;
+  --party-bg: #19150f; --room-bg: #2a231a; --room-fog: #0d0b0a; --room-fog-text: #5a5040; --room-cleared: #2e2a1c;
+  --death-bg: #241312; --death-line: #5a2622; --injury-bg: #251c14; --injury-line: #6a4a2a;
+  --report-bg: #100e0b; --report-line: #5b4a30; --report-value: #e6d3a6; --elite: #f0a060;
+  --energy: #c8b04a; --fun: #d07a3a; --faith: #e8dcc0; --heal: #7ab35a; --epitaph: #e4d8bc; --epitaph-line: #8a7a5a;
+  --chronicle-bad: #f0b0a8; --chronicle-gold: #f2d48a; --chronicle-grief: #c4d0f4; --chronicle-good: #c4e4ae; --expedition: #c8a8f0;
+  --rank-E: #8a8a8a; --rank-D: #6aa84f; --rank-C: #4a86c8; --rank-B: #9a5ac8; --rank-A: #e08a2a; --rank-S: #f0c040; --ink-rank: #120e0a;
+  --overlay: rgba(20, 17, 14, 0.86); --toast-bg: rgba(24, 20, 16, 0.94); --nav-bg: rgba(29, 25, 20, 0.94);
+  --prompt-bg: rgba(30, 24, 16, 0.95); --scrim: rgba(5, 5, 5, 0.94);
+  --font-serif: Georgia, 'Times New Roman', serif;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --space-1: 0.15rem; --space-2: 0.25rem; --space-3: 0.35rem; --space-4: 0.4rem; --space-5: 0.5rem;
+  --space-6: 0.6rem; --space-7: 0.85rem; --space-8: 1rem; --space-9: 2rem;
+  --radius-bar: 0.35rem; --radius-sm: 0.4rem; --radius-md: 0.5rem; --radius-lg: 0.6rem; --radius-panel: 0.8rem;
+  --radius-pill: 1rem; --radius-prompt: 2rem;
+  --shadow-panel: 0 0.6rem 2.4rem rgba(0, 0, 0, 0.6); --shadow-prompt: 0 0.3rem 1.2rem rgba(0, 0, 0, 0.5);
+  --shadow-report: 0 18px 60px rgba(0, 0, 0, 0.7);
+}

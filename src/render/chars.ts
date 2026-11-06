@@ -1,0 +1,120 @@
+/**
+ * Personagem do KayKit em cena: clone com esqueleto próprio, armas nas mãos e mixer de
+ * animação. A troca de animação espera um instante para não piscar entre andar e parar.
+ */
+import * as THREE from 'three';
+import { LARGE, cloneChar, findBone } from './assets.ts';
+import type { Art, CharKey, WeaponKey } from './assets.ts';
+
+export type Pose = 'idle' | 'walk' | 'run' | 'attack' | 'shoot' | 'aim' | 'dig' | 'chop' | 'pick' | 'cast' | 'heal' | 'repair' | 'death';
+
+const MEDIUM: Record<Pose, string> = {
+  idle: 'Idle_A',
+  walk: 'Walking_A',
+  run: 'Running_A',
+  cast: 'Ranged_Magic_Shoot',
+  heal: 'Ranged_Magic_Raise',
+  repair: 'Hammering',
+  attack: 'Melee_1H_Attack_Chop',
+  shoot: 'Ranged_Bow_Release',
+  aim: 'Ranged_Bow_Aiming_Idle',
+  dig: 'Digging',
+  chop: 'Chopping',
+  pick: 'Pickaxing',
+  death: 'Death_A',
+};
+const BIG: Record<Pose, string> = {
+  idle: 'Idle_A',
+  walk: 'Walking_A',
+  run: 'Running_A',
+  cast: 'Idle_A',
+  heal: 'Idle_A',
+  repair: 'Idle_A',
+  attack: 'Melee_2H_Attack',
+  shoot: 'Melee_2H_Attack',
+  aim: 'Idle_A',
+  dig: 'Idle_A',
+  chop: 'Idle_A',
+  pick: 'Idle_A',
+  death: 'Death_A',
+};
+
+const GEAR: Partial<Record<CharKey, { r?: WeaponKey; l?: WeaponKey }>> = {
+  soldado: { r: 'espada', l: 'escudo' },
+  arqueiro: { l: 'arco' },
+  esqueleto: { r: 'lamina' },
+  orc: { r: 'machado' },
+  bruto: { r: 'machado' },
+  mago: { r: 'cajado' },
+  clerigo: { r: 'maca' },
+  cavaleiro: { r: 'martelo', l: 'escudoPaladino' },
+  engenheiro: { r: 'marreta' },
+  necromante: { r: 'cajadoOsso' },
+};
+
+export class CharView {
+  readonly root = new THREE.Group();
+  readonly kind: CharKey;
+  private mixer: THREE.AnimationMixer;
+  private actions = new Map<Pose, THREE.AnimationAction>();
+  private current: Pose | null = null;
+  private want: Pose | null = null;
+  private wantFor = 0;
+
+  constructor(art: Art, kind: CharKey) {
+    this.kind = kind;
+    const model = cloneChar(art, kind);
+    this.root.add(model);
+    this.mixer = new THREE.AnimationMixer(model);
+    const names = LARGE.has(kind) ? BIG : MEDIUM;
+    const clips = LARGE.has(kind) ? art.clipsLarge : art.clips;
+    for (const pose of Object.keys(names) as Pose[]) {
+      const clip = clips.get(names[pose]);
+      if (!clip) continue;
+      const a = this.mixer.clipAction(clip);
+      if (pose === 'death') {
+        a.setLoop(THREE.LoopOnce, 1);
+        a.clampWhenFinished = true;
+      }
+      this.actions.set(pose, a);
+    }
+    const gear = GEAR[kind];
+    if (gear?.r) findBone(model, ['handslotr', 'handslot.r'])?.add(art.weapons[gear.r].clone(true));
+    if (gear?.l) findBone(model, ['handslotl', 'handslot.l'])?.add(art.weapons[gear.l].clone(true));
+    this.mixer.setTime(Math.random() * 2);
+    this.play('idle');
+  }
+
+  play(pose: Pose, speed = 1): void {
+    const a = this.actions.get(pose) ?? this.actions.get('idle');
+    if (!a) return;
+    a.timeScale = speed;
+    if (this.current === pose) {
+      this.want = null;
+      return;
+    }
+    if (this.current && pose !== 'death') {
+      if (this.want !== pose) {
+        this.want = pose;
+        this.wantFor = 0;
+        return;
+      }
+      if (this.wantFor < 0.12) return;
+    }
+    this.want = null;
+    const prev = this.current ? this.actions.get(this.current) : undefined;
+    a.reset();
+    a.play();
+    if (prev && prev !== a) a.crossFadeFrom(prev, pose === 'death' ? 0.1 : 0.2, false);
+    this.current = pose;
+  }
+
+  update(dt: number): void {
+    this.wantFor += dt;
+    this.mixer.update(dt);
+  }
+
+  dispose(): void {
+    this.mixer.stopAllAction();
+  }
+}

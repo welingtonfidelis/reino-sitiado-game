@@ -1,0 +1,77 @@
+# Licenças da arte
+
+Toda a arte 3D é do **KayKit**, de Kay Lousberg (https://kaylousberg.com), sob **CC0 1.0**
+(domínio público). Os arquivos vêm da coleção local "The Complete KayKit Collection v6.1",
+copiados por `npm run art` conforme `tools/art-manifest.ts`.
+
+| Pack | Arquivos usados |
+| --- | --- |
+| KayKit Medieval Hexagon Pack 1.0.1 | hex_grass; castelo, casas A e B, quartel, campo de tiro, serraria, mina (azul e amarela), torre A, base de torre, moinho; plantação, andaime, ruína, muralha reta e com portão; árvores, montanhas, morro, pedras; bandeira; flecha; textura hexagons_medieval.png |
+| KayKit Adventurers 2.0 | Knight, Ranger; sword_1handed, shield_round_color, bow_withString e as texturas knight e ranger |
+| KayKit Skeletons 1.1 | Skeleton_Minion, Skeleton_Blade, skeleton_texture_A |
+| KayKit Mystery Monthly 4 | Werewolf_Wolf, OrcRaider, Orc_Axe; Paladin_with_Helmet, paladin_hammer, paladin_shield e a textura (o cavaleiro) |
+| KayKit Mystery Monthly 6 | Farmer_A, Farmer_B, OrcBrute; Cleric, Cleric_Mace e a textura |
+| KayKit Adventurers 2.0 (Etapa 5) | Mage, Engineer, staff e mage_texture |
+| KayKit Skeletons 1.1 (Etapa 6) | Necromancer, Skeleton_Golem, Skeleton_Staff |
+| KayKit Mystery Monthly 5 (Etapa 6) | Witch, FrostGolem |
+| KayKit Mystery Monthly 6 (Etapa 6) | Monstrosity (o troll) |
+| KayKit Medieval Hexagon Pack (Etapa 5) | torre B, igreja, estábulo, ferreiro, oficina; martelo |
+| KayKit Resource Bits 1.0 | Iron_Nuggets e a textura do pack |
+| KayKit Character Animations 1.1 | Rig_Medium (General, MovementBasic, CombatMelee, CombatRanged, Tools) e Rig_Large (General, MovementBasic, CombatMelee) |
+
+## pixelfx (Patch e Hugo Duprez) — MIT
+
+Os efeitos (Etapas 3, 5 e 6) estão em `public/assets/fx/*.png`: quadros gerados por `tools/bake-fx.ts` a partir
+do pixelfx, https://github.com/patch-gg/pixelfx (commit a84159688af3ca37a4be05a0d422b94451b2e24e).
+
+| Folha | Efeito do pixelfx |
+| --- | --- |
+| faisca | impacts/hit-spark (adapta o impact do Sprite Fusion, Hugo Duprez, MIT) |
+| pancada | impacts/blunt-hit |
+| espada | melee/sword-slash |
+| garra | melee/claw-swipe |
+| poof | spawn/poof |
+| explosao | explosions/dirt-explosion |
+| fogo | status/burning |
+| portal | arcane/portal |
+| nivel | ui/level-up (texto trocado para "NOVO NIVEL!") |
+| moedas | ui/coin-collect |
+| mana | arcane/mana-burst (impacto do feitiço do mago) |
+| cura | holy/heal (clérigo) |
+| golpe | melee/heavy-cleave (cavaleiro) |
+| morcego | critters/bat (o morcego gigante voando) |
+| alma | spawn/soul-rise (esqueleto levantado pelo necromante) |
+| bloom | nature/healing-bloom (cura da bruxa) |
+
+Mudanças nossas: ritmo de quadros menor nos efeitos longos e o texto do "subir de nível". O código
+do pixelfx não vai no jogo nem no repositório.
+
+```
+MIT License
+
+Copyright (c) 2026 Patch
+Copyright (c) 2026 Hugo Duprez
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+Os cristais dos veios azuis são feitos no próprio projeto (não há cristal no KayKit local).
+
+O código, a interface e as regras são do próprio projeto. A interface usa os tokens e
+componentes do design system do Vigília, outro projeto do mesmo autor.

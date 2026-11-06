@@ -1,0 +1,110 @@
+/**
+ * O que vem da coleção KayKit local (CC0) para public/assets/kaykit. Só estes arquivos são
+ * copiados (`npm run art`); a coleção fica fora do projeto. Os .bin e as texturas vêm do
+ * Git LFS da coleção (git lfs pull antes, senão o import recusa o ponteiro).
+ */
+export const KAYKIT_ROOT = '../kaykit-complete-v6-1-assets';
+
+const MH = 'KayKit Medieval Hexagon Pack 1.0.1/Assets/gltf';
+const ADV = 'KayKit Adventurers 2.0';
+const SK = 'KayKit Skeletons 1.1';
+const RB = 'KayKit Resource Bits 1.0/Assets/gltf';
+const CA = 'KayKit Character Animations 1.1/Animations/gltf';
+const MM4 = 'KayKit Mystery Monthly Series 4 (1.1)';
+const MM5 = 'KayKit Mystery Monthly Series 5 (1.1)';
+const MM6 = 'KayKit Mystery Monthly Series 6 (1.1)';
+
+/** Modelos do pack medieval: [pasta dentro de gltf/, nome]. Todos vão para medieval/. */
+export const MEDIEVAL: [string, string][] = [
+  ['tiles/base', 'hex_grass'],
+  ...['castle', 'home_A', 'home_B', 'barracks', 'archeryrange', 'lumbermill', 'mine', 'tower_A', 'tower_base', 'windmill', 'tower_B', 'church', 'stables', 'blacksmith', 'workshop'].map(
+    (n) => ['buildings/blue', `building_${n}_blue`] as [string, string],
+  ),
+  ['buildings/yellow', 'building_mine_yellow'],
+  ...['building_grain', 'building_scaffolding', 'building_destroyed', 'wall_straight', 'wall_straight_gate'].map(
+    (n) => ['buildings/neutral', n] as [string, string],
+  ),
+  ...[
+    'trees_A_large',
+    'trees_A_medium',
+    'trees_B_large',
+    'trees_B_medium',
+    'tree_single_A',
+    'tree_single_B',
+    'mountain_A',
+    'mountain_B',
+    'mountain_C',
+    'hill_single_A',
+    'hill_single_C',
+    'rock_single_A',
+    'rock_single_C',
+    'rock_single_E',
+  ].map((n) => ['decoration/nature', n] as [string, string]),
+  ['decoration/props', 'flag_blue'],
+  ['units/neutral', 'projectile_arrow'],
+  ['units/neutral', 'hammer'],
+];
+
+/** [origem relativa à coleção, destino relativo a public/assets/kaykit] */
+export const ART: [string, string][] = [
+  ...MEDIEVAL.flatMap(([dir, n]) => [
+    [`${MH}/${dir}/${n}.gltf`, `medieval/${n}.gltf`],
+    [`${MH}/${dir}/${n}.bin`, `medieval/${n}.bin`],
+  ] as [string, string][]),
+  [`${MH}/tiles/base/hexagons_medieval.png`, 'medieval/hexagons_medieval.png'],
+  // Personagens (o .glb já traz a textura).
+  [`${ADV}/Characters/gltf/Knight.glb`, 'chars/Knight.glb'],
+  [`${ADV}/Characters/gltf/Ranger.glb`, 'chars/Ranger.glb'],
+  [`${MM6}/12 - June 2026 - Farmers/characters/Farmer_A.glb`, 'chars/Farmer_A.glb'],
+  [`${MM6}/12 - June 2026 - Farmers/characters/Farmer_B.glb`, 'chars/Farmer_B.glb'],
+  [`${SK}/characters/gltf/Skeleton_Minion.glb`, 'chars/Skeleton_Minion.glb'],
+  [`${MM4}/4 - October 2023 - Werewolf/characters/gltf/Werewolf_Wolf.glb`, 'chars/Werewolf_Wolf.glb'],
+  [`${MM4}/1 - July 2023 - Orc Raider/character/OrcRaider.glb`, 'chars/OrcRaider.glb'],
+  [`${MM6}/2 - August 2025 - Orc Brute/characters/OrcBrute.glb`, 'chars/OrcBrute.glb'],
+  // Etapa 5: mago, clérigo, cavaleiro (o Paladino do KayKit) e engenheiro.
+  [`${ADV}/Characters/gltf/Mage.glb`, 'chars/Mage.glb'],
+  [`${ADV}/Characters/gltf/Engineer.glb`, 'chars/Engineer.glb'],
+  [`${MM6}/3 - September 2025 - Cleric/characters/Cleric.glb`, 'chars/Cleric.glb'],
+  [`${MM4}/10 - April 2024 - Paladin/characters/gltf/Paladin_with_Helmet.glb`, 'chars/Paladin.glb'],
+  // Etapa 6: bruxa, troll (a Monstruosidade), necromante e os dois golens chefes.
+  [`${MM5}/5 - November 2024 - Witch/characters/Witch.glb`, 'chars/Witch.glb'],
+  [`${MM6}/4 - October 2025 - Monstrosity/characters/Monstrosity.glb`, 'chars/Monstrosity.glb'],
+  [`${SK}/characters/gltf/Necromancer.glb`, 'chars/Necromancer.glb'],
+  [`${MM5}/7 - January 2025 - FrostGolem/characters/FrostGolem.glb`, 'chars/FrostGolem.glb'],
+  [`${SK}/characters/gltf/Skeleton_Golem.glb`, 'chars/Skeleton_Golem.glb'],
+  // Armas.
+  ...['sword_1handed', 'shield_round_color', 'bow_withString'].flatMap((n) => [
+    [`${ADV}/Assets/gltf/${n}.gltf`, `weapons/${n}.gltf`],
+    [`${ADV}/Assets/gltf/${n}.bin`, `weapons/${n}.bin`],
+  ] as [string, string][]),
+  [`${ADV}/Assets/gltf/knight_texture.png`, 'weapons/knight_texture.png'],
+  [`${ADV}/Assets/gltf/staff.gltf`, 'weapons/staff.gltf'],
+  [`${ADV}/Assets/gltf/staff.bin`, 'weapons/staff.bin'],
+  [`${ADV}/Assets/gltf/mage_texture.png`, 'weapons/mage_texture.png'],
+  [`${MM6}/3 - September 2025 - Cleric/assets/gltf/Cleric_Mace.gltf`, 'weapons/Cleric_Mace.gltf'],
+  [`${MM6}/3 - September 2025 - Cleric/assets/gltf/Cleric_Mace.bin`, 'weapons/Cleric_Mace.bin'],
+  [`${MM6}/3 - September 2025 - Cleric/assets/gltf/cleric_texture.png`, 'weapons/cleric_texture.png'],
+  ...['paladin_hammer', 'paladin_shield'].flatMap((n) => [
+    [`${MM4}/10 - April 2024 - Paladin/assets/gltf/${n}.gltf`, `weapons/${n}.gltf`],
+    [`${MM4}/10 - April 2024 - Paladin/assets/gltf/${n}.bin`, `weapons/${n}.bin`],
+  ] as [string, string][]),
+  [`${MM4}/10 - April 2024 - Paladin/assets/gltf/paladin_texture_A.png`, 'weapons/paladin_texture_A.png'],
+  [`${ADV}/Assets/gltf/ranger_texture.png`, 'weapons/ranger_texture.png'],
+  [`${SK}/assets/gltf/Skeleton_Blade.gltf`, 'weapons/Skeleton_Blade.gltf'],
+  [`${SK}/assets/gltf/Skeleton_Blade.bin`, 'weapons/Skeleton_Blade.bin'],
+  [`${SK}/assets/gltf/Skeleton_Staff.gltf`, 'weapons/Skeleton_Staff.gltf'],
+  [`${SK}/assets/gltf/Skeleton_Staff.bin`, 'weapons/Skeleton_Staff.bin'],
+  [`${SK}/assets/gltf/skeleton_texture_A.png`, 'weapons/skeleton_texture_A.png'],
+  [`${MM4}/1 - July 2023 - Orc Raider/assets/gltf/Orc_Axe.gltf.glb`, 'weapons/Orc_Axe.glb'],
+  // Minério da mina.
+  [`${RB}/Iron_Nuggets.gltf`, 'resource/Iron_Nuggets.gltf'],
+  [`${RB}/Iron_Nuggets.bin`, 'resource/Iron_Nuggets.bin'],
+  [`${RB}/resource_bits_texture.png`, 'resource/resource_bits_texture.png'],
+  // Animações (os personagens não trazem nenhuma).
+  ...['General', 'MovementBasic', 'CombatMelee', 'CombatRanged', 'Tools'].map(
+    (n) => [`${CA}/Rig_Medium/Rig_Medium_${n}.glb`, `anims/Rig_Medium_${n}.glb`] as [string, string],
+  ),
+  ...['General', 'MovementBasic', 'CombatMelee'].map(
+    (n) => [`${CA}/Rig_Large/Rig_Large_${n}.glb`, `anims/Rig_Large_${n}.glb`] as [string, string],
+  ),
+];
