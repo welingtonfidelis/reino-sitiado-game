@@ -68,14 +68,21 @@ export class HexIndex {
   }
 }
 
-/** Gerador pseudoaleatório com semente (mulberry32). */
-export function rng(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
+/** Gerador pseudoaleatório com semente (mulberry32), com o estado à vista para salvar. */
+export interface Rand {
+  (): number;
+  state: { a: number };
+}
+
+export function rng(seed: number, a0?: number): Rand {
+  const st = { a: a0 ?? seed >>> 0 };
+  const f = (() => {
+    st.a = (st.a + 0x6d2b79f5) >>> 0;
+    let t = st.a;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  }) as Rand;
+  f.state = st;
+  return f;
 }

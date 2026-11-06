@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "typecheck": "tsc",
     "test": "vitest run",
-    "art": "node tools/import-art.ts"
+    "art": "node tools/import-art.ts",
+    "balance": "node tools/balance.ts",
+    "fx": "node tools/bake-fx.ts ../pixelfx"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

@@ -18,6 +18,9 @@ import {
   refresh,
   chooseBlessing,
   forgeUpgrade,
+  loadWorld,
+  saveInfo,
+  saveWorld,
   repair,
   repairAll,
   setRally,
@@ -52,9 +55,15 @@ export class Game {
   toasts: Toast[] = [];
   /** Eventos do último quadro (a tela usa para flechas). */
   frame: SimEvent[] = [];
+  /** Abre o relatório a cada onda? Desligado, só abre quando há bênção para escolher. */
+  autoReport = readPref('reino.relatorio', true);
+  /** Som ligado? (preferência do navegador) */
+  sound = readPref('reino.som', true);
   /** Velocidade de antes do relatório (o jogo para enquanto ele está aberto). */
   private before = 1;
   private acc = 0;
+  /** Tempo desde o último salvamento automático. */
+  private saveT = 0;
   private toastId = 0;
   private listeners = new Set<() => void>();
 
@@ -64,6 +73,7 @@ export class Game {
   }
 
   restart(seed: number): void {
+    clearSave();
     this.world = createWorld(seed);
     refresh(this.world);
     this.mode = { kind: 'none' };
@@ -120,6 +130,14 @@ export class Game {
       else if (e.type === 'waveStart') this.toast(`Onda ${e.wave}: a horda saiu da fenda.`, 'bad');
       else if (e.type === 'lost') this.emit();
       else if (e.type === 'report') {
+        const r = this.world.report;
+        if (r && !this.autoReport && r.choices.length === 0) {
+          // Relatório desligado: só um aviso, e o jogo segue.
+          const fallen = r.fallen.length ? `, ${r.fallen.length} ${r.fallen.length === 1 ? 'caído' : 'caídos'}` : '';
+          chooseBlessing(this.world, null);
+          this.toast(`Onda ${r.wave} resistida: +${r.gold} de ouro${fallen}.`, 'gold');
+          continue;
+        }
         if (this.speed > 0) this.before = this.speed;
         this.speed = 0;
         this.mode = { kind: 'none' };
@@ -127,7 +145,52 @@ export class Game {
         this.emit();
       }
       else if (e.type === 'destroyed' && e.id === this.selected) this.selected = -1;
+      if (e.type === 'waveEnd') this.save();
+      if (e.type === 'lost') clearSave();
     }
+    // Salva sozinho a cada 30 s de jogo, além do fim de cada onda.
+    this.saveT += dt;
+    if (this.saveT > 30) this.save();
+  }
+
+  save(): void {
+    this.saveT = 0;
+    if (!this.started || this.world.lost) return;
+    try {
+      localStorage.setItem(SAVE_KEY, saveWorld(this.world));
+    } catch {
+      // sem armazenamento (aba privada): segue sem salvar
+    }
+  }
+
+  /** Partida salva neste navegador, se houver. */
+  static saved(): { wave: number } | null {
+    try {
+      const s = localStorage.getItem(SAVE_KEY);
+      return s ? saveInfo(s) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  continueSaved(): boolean {
+    let w = null;
+    try {
+      const s = localStorage.getItem(SAVE_KEY);
+      w = s ? loadWorld(s) : null;
+    } catch {
+      w = null;
+    }
+    if (!w) return false;
+    this.world = w;
+    refresh(w);
+    this.mode = { kind: 'none' };
+    this.selected = -1;
+    this.units = [];
+    this.started = true;
+    this.speed = w.report ? 0 : 1;
+    this.emit();
+    return true;
   }
 
   /** Resposta de uma ordem: null deu certo; senão vira aviso. */
@@ -288,6 +351,18 @@ export class Game {
   toggleShelter(): void {
     this.result(toggleShelter(this.world));
   }
+  setSound(on: boolean): void {
+    this.sound = on;
+    writePref('reino.som', on);
+    this.emit();
+  }
+
+  setAutoReport(on: boolean): void {
+    this.autoReport = on;
+    writePref('reino.relatorio', on);
+    this.emit();
+  }
+
   /** Fecha o relatório (com a bênção escolhida, quando há escolha) e volta a andar. */
   closeReport(id: BlessingId | null, thenCall = false): void {
     if (!this.result(chooseBlessing(this.world, id))) return;
@@ -309,5 +384,33 @@ export class Game {
   }
   nameOf(b: BuildingKind): string {
     return BUILDINGS[b].name;
+  }
+}
+
+/** Preferências do jogador (só neste navegador; se o armazenamento falhar, vale o padrão). */
+function readPref(key: string, fallback: boolean): boolean {
+  try {
+    const v = localStorage.getItem(key);
+    return v === null ? fallback : v === '1';
+  } catch {
+    return fallback;
+  }
+}
+
+function writePref(key: string, v: boolean): void {
+  try {
+    localStorage.setItem(key, v ? '1' : '0');
+  } catch {
+    // sem armazenamento: vale só nesta sessão
+  }
+}
+
+const SAVE_KEY = 'reino.partida';
+
+function clearSave(): void {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch {
+    // nada a limpar
   }
 }

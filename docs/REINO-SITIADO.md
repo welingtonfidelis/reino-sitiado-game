@@ -36,6 +36,8 @@ npm run build
 
 Na pasta de projetos, o `.claude/launch.json` tem `reino` (porta 5230) e `reino-rede` (5232, aberto para o iPhone na rede: http://192.168.0.16:5232/).
 
+Robô de equilíbrio: `npm run balance` (seção 10). Efeitos: `npm run fx` (lê a cópia local do pixelfx em `../pixelfx`).
+
 Parâmetros de teste na URL:
 - `?jogar` pula a tela de começo;
 - `?semente=N` fixa o mapa;
@@ -235,7 +237,40 @@ Regra do usuário: usar os efeitos do pixelfx sempre que der (https://patch-gg.g
 - **Nomes:** os da proposta foram adaptados aos modelos do KayKit local (bruxa no lugar do xamã goblin; golem de gelo e golem de ossos no lugar do golem de pedra e da serpe de cinzas, que não têm modelo).
 - **Peso dos efeitos:** com as folhas novas, os efeitos somam cerca de 34 MB na GPU. Vale medir no iPhone.
 
-## 10. Arquitetura
+## 10. Relatório opcional, salvar, sons e equilíbrio (Etapa 7)
+
+- **Relatório opcional** (pedido do usuário, 2026-11-06): uma caixa no relatório e no menu do castelo liga ou desliga "Relatório a cada onda vencida".
+  - Desligado, a onda vencida vira só um aviso ("Onda 5 resistida: +40 de ouro, 2 caídos.") e o jogo segue.
+  - O relatório ainda abre nas ondas com bênção, porque é preciso escolher.
+  - A preferência fica no navegador.
+- **Salvar e continuar:** a partida se salva sozinha no navegador no fim de cada onda, a cada 30 s de jogo e ao sair da aba.
+  - A tela de começo oferece "Continuar partida (onda N)" ou "Nova partida". Perder ou começar outra apaga o salvamento.
+  - O sorteio também é salvo: a partida carregada segue igual à original (há teste disso).
+  - `src/sim/save.ts`.
+- **Sons** (`src/audio/sound.ts`): feitos na hora com Web Audio, sem arquivos.
+  - flecha, golpe, morte de monstro, prédio pronto, corneta da onda, fim de onda, feitiço, cura, novo nível e prédio destruído.
+  - Cada som tem um intervalo mínimo, para não virar chiado.
+  - Botão de som no HUD, ao lado da velocidade; liga no primeiro toque (exigência do iPhone).
+- **Robô de equilíbrio:** `npm run balance [sementes] [onda máxima]` (`tools/balance.ts`; `VERBOSE=1` mostra o estado a cada onda). Joga partidas inteiras sem tela.
+  - "Nada": só o castelo atira.
+  - "Robô": ordem simples de construção, recruta, conserta e pega a primeira bênção.
+- **O que o robô mostrou e o que mudou:**
+  - Antes: sem fazer nada o castelo caía na onda 2 e o robô na 4. A madeira era o gargalo (14 por minuto) e o castelo nunca se recuperava.
+  - Ajustes:
+
+| O quê | De | Para |
+| --- | --- | --- |
+| Produção por trabalhador e minuto (comida / madeira / pedra / ferro / cristal) | 9 / 7 / 5 / 4 / 1,5 | 10 / 16 / 10 / 8 / 3 |
+| Começo | 200 de madeira, 120 de pedra | 250 de madeira, 150 de pedra |
+| Castelo | 1000 de vida, dano 6, alcance 8 | 1500 de vida, dano 10, alcance 9, e recupera 5 de vida por segundo entre as ondas |
+| Esqueleto | dano 5 | dano 4 |
+| Tamanho da onda | 5 + 3 por onda | 4 + 2,5 por onda |
+| Golem de gelo | 2500 de vida, golpe 60 | 1800 de vida, golpe 50 |
+
+  - Agora, com 6 sementes: sem fazer nada cai nas ondas 4 a 5 (média 4,5); o robô chega às ondas 15 a 22 (média 17).
+  - O primeiro chefe (onda 15) é a parede de quem só tem arqueiros: pede magos ou corpo a corpo.
+
+## 11. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
@@ -254,7 +289,7 @@ Regra do usuário: usar os efeitos do pixelfx sempre que der (https://patch-gg.g
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
 - `src/ui/App.tsx`: HUD, bandeja Construir, menu do prédio, avisos e telas de começo e fim.
 
-## 11. Etapas
+## 12. Etapas
 
 | Etapa | O que | Situação |
 | --- | --- | --- |
@@ -264,10 +299,10 @@ Regra do usuário: usar os efeitos do pixelfx sempre que der (https://patch-gg.g
 | 4 | Relatório de fim de onda e bênçãos a cada 4 ondas (seção 7) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 5 | Cristal; mago, clérigo, cavaleiro e engenheiro; torre do mago, capela, estábulo, forja e oficina (seção 8) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 6 | Morcego, bruxa, troll, necromante e dois chefes (seção 9) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
-| 7 | Salvar a partida, som, ajustes de equilíbrio com robô de teste | A fazer |
+| 7 | Relatório opcional, salvar e continuar, sons e equilíbrio com robô de teste (seção 10) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone (e ouvir os sons). |
 | 8 | Texturas próprias de grama, solo e água para o chão, para disfarçar ainda mais a grade (pedido do usuário, 2026-11-06). A plantação e as montanhas do pack ainda têm base hexagonal; rever junto. | A fazer |
 
-## 12. Arte e licenças
+## 13. Arte e licenças
 
 Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art` (lista em `tools/art-manifest.ts`). Detalhes em `LICENSES.md`.
 

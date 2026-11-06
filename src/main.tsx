@@ -9,6 +9,8 @@ import { loadArt } from './render/assets.ts';
 import { IsoCamera } from './render/camera.ts';
 import { World3D } from './render/world3d.ts';
 import { FxLayer } from './render/fx.ts';
+import { Sound } from './audio/sound.ts';
+import type { Sfx } from './audio/sound.ts';
 import { App } from './ui/App.tsx';
 
 const params = new URLSearchParams(location.search);
@@ -118,6 +120,14 @@ cam.onHover = (x, y) => {
 };
 
 render(<App game={game} cam={cam} touch={touch} />, ui);
+// Saindo da aba ou fechando: salva.
+addEventListener('pagehide', () => game.save());
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') game.save();
+});
+
+const sound = new Sound(!game.sound);
+const HIT_SFX: Record<string, Sfx> = { espada: 'golpe', golpe: 'golpe', garra: 'golpe', pancada: 'golpe', cura: 'cura', faisca: 'golpe' };
 
 let seenWorld = game.world;
 let last = performance.now();
@@ -136,6 +146,18 @@ function frame(now: number): void {
   view.pxPerMeter = innerHeight / cam.view;
   view.camYaw = cam.yaw;
   view.selectedUnits = game.units;
+  sound.muted = !game.sound;
+  for (const e of game.frame) {
+    if (e.type === 'shot') sound.play('arco');
+    else if (e.type === 'hit') sound.play(HIT_SFX[e.fx] ?? 'golpe');
+    else if (e.type === 'spell') sound.play('magia');
+    else if (e.type === 'death' && e.monster) sound.play('morte');
+    else if (e.type === 'built') sound.play('pronto');
+    else if (e.type === 'waveStart') sound.play('onda');
+    else if (e.type === 'waveEnd') sound.play('vitoria');
+    else if (e.type === 'upgrade') sound.play('nivel');
+    else if (e.type === 'destroyed') sound.play('castelo');
+  }
   view.syncStatic(w);
   view.syncDynamic(w, game.frame, game.started && game.speed > 0 && !w.lost ? dt * game.speed : 0);
   // Fantasma ao construir/mover, contorno no prédio selecionado.

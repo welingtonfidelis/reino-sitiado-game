@@ -6,7 +6,7 @@
 import { useEffect, useReducer, useState } from 'preact/hooks';
 import { BUILDINGS, BUILD_MENU, CONFIG, RES_ORDER, UNITS, castle, castleCap, housing, hexToWorld, troops, workers, recruitProblem, repairCost, repairProblem, missing, moveProblem, demolishProblem, upgradeCost, upgradeProblem, waveSize, MONSTERS, BLESSINGS, repairAllCost, levelProblem, forgeCost, forgeProblem } from '../sim/index.ts';
 import type { BlessingId, Building, Category, Cost, ForgeLine, MonsterKind, Res, UnitKind } from '../sim/index.ts';
-import type { Game } from '../game/game.ts';
+import { Game } from '../game/game.ts';
 import type { IsoCamera } from '../render/camera.ts';
 
 const ICONS: Record<string, string> = {
@@ -25,6 +25,8 @@ const ICONS: Record<string, string> = {
   lixo: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13',
   espadas: 'M4 4l11 11M15 15l2 2M14 18l4-4M20 4L9 15M9 15l-2 2M10 18l-4-4',
   bandeira: 'M5 21V4M5 4h11l-2 4 2 4H5',
+  som: 'M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11',
+  mudo: 'M4 9v6h4l5 4V5L8 9zM16 9l5 6M21 9l-5 6',
   caixa: 'M4 4h4M4 4v4M20 4h-4M20 4v4M4 20h4M4 20v-4M20 20h-4M20 20v-4',
 };
 
@@ -117,6 +119,9 @@ function Hud({ game }: { game: Game }) {
               <Icon name="caveira" style="color: var(--bad)" /> Onda {w.wave} · {left} monstros
             </span>
           )}
+          <button class="hud-mute" aria-label={game.sound ? 'Desligar o som' : 'Ligar o som'} style="margin-left: 0" onClick={() => game.setSound(!game.sound)}>
+            <Icon name={game.sound ? 'som' : 'mudo'} />
+          </button>
           <span class="speed">
             <button class={`spd${game.speed === 0 ? ' active' : ''}`} aria-label="Pausar" onClick={() => game.setSpeed(0)}>
               <Icon name="pausa" />
@@ -334,6 +339,12 @@ function BuildingMenu({ game, cam, b }: { game: Game; cam: IsoCamera; b: Buildin
           <ShelterButton game={game} />
         ) : null}
         {isCastle ? (
+          <label class="report-pref">
+            <input type="checkbox" checked={game.autoReport} onChange={(e) => game.setAutoReport((e.target as HTMLInputElement).checked)} />
+            Relatório a cada onda vencida
+          </label>
+        ) : null}
+        {isCastle ? (
           <button class="btn primary big" style="margin-top: 0.4rem" disabled={!!upgradeProblem(w)} onClick={() => game.upgrade()}>
             {up ? `Melhorar castelo (${costText(up)})` : 'Castelo no nível máximo'}
             {up && upgradeProblem(w) ? <small> · {upgradeProblem(w)}</small> : null}
@@ -535,6 +546,10 @@ function Report({ game }: { game: Game }) {
           <p class="sub" style="color: var(--warn)">{n}</p>
         ))}
         {rift ? <p class="sub" style="color: var(--bad)">Uma nova fenda se abre nesta onda.</p> : null}
+        <label class="report-pref">
+          <input type="checkbox" checked={game.autoReport} onChange={(e) => game.setAutoReport((e.target as HTMLInputElement).checked)} />
+          Abrir este relatório a cada onda (desligado, ele só abre quando há bênção para escolher)
+        </label>
         <div class="report-actions">
           {Object.keys(fix).length ? (
             <button class="btn ghost" disabled={!!missing(w, fix)} onClick={() => game.repairAll()}>
@@ -554,6 +569,7 @@ function Report({ game }: { game: Game }) {
 }
 
 function Intro({ game }: { game: Game }) {
+  const saved = Game.saved();
   return (
     <div class="overlay">
       <article class="report-card">
@@ -571,9 +587,20 @@ function Intro({ game }: { game: Game }) {
           <li>Arraste para mover o mapa e use a pinça ou a roda do mouse para o zoom.</li>
         </ul>
         <div class="report-actions">
-          <button class="btn primary" onClick={() => ((game.started = true), game.emit())}>
-            Começar
-          </button>
+          {saved ? (
+            <button class="btn" onClick={() => game.restart(Math.floor(Math.random() * 1e9))}>
+              Nova partida
+            </button>
+          ) : null}
+          {saved ? (
+            <button class="btn primary" onClick={() => game.continueSaved()}>
+              {saved.wave > 0 ? `Continuar partida (onda ${saved.wave})` : 'Continuar partida'}
+            </button>
+          ) : (
+            <button class="btn primary" onClick={() => ((game.started = true), game.emit())}>
+              Começar
+            </button>
+          )}
         </div>
       </article>
     </div>

@@ -666,7 +666,7 @@ function idle(w: World, u: Unit): void {
 
 export function waveSize(n: number): Record<MonsterKind, number> {
   const W = CONFIG.waves;
-  const total = W.base + W.perWave * n;
+  const total = Math.round(W.base + W.perWave * n);
   const at = (k: MonsterKind) => n >= MONSTERS[k].from;
   const bruto = at('bruto') ? Math.floor((n - 4) / 4) : 0;
   const orc = at('orc') ? Math.min(Math.round(total * 0.3), Math.round(total * (0.12 + 0.01 * (n - 4)))) : 0;
@@ -765,6 +765,9 @@ function summonSkeleton(w: World, owner: Monster): void {
 
 function waves(w: World): void {
   if (w.waveState === 'calm') {
+    // Entre as ondas o castelo se recupera devagar.
+    const c = castle(w);
+    if (c) c.hp = Math.min(c.maxHp, c.hp + CONFIG.castleRegen * DT);
     w.waveTimer -= DT;
     if (w.waveTimer <= 0) startWave(w);
     return;

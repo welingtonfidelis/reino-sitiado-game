@@ -330,3 +330,18 @@ body {
     top: calc(max(10px, env(safe-area-inset-top)) + 110px);
   }
 }
+
+.report-pref {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0.8rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.report-pref input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--gold);
+}

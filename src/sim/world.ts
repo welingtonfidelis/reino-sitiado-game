@@ -5,6 +5,7 @@
 import { BUILDINGS, CONFIG, UNITS } from './config.ts';
 import type { BuildingKind, Cost, MonsterKind, Res, UnitKind } from './config.ts';
 import { DIRS, HexIndex, hexDist, hexToWorld, rng } from './hex.ts';
+import type { Rand } from './hex.ts';
 import { baseMods, emptyStats, nameFor } from './blessings.ts';
 import type { BlessingId, Mods, Report, WaveStats } from './blessings.ts';
 
@@ -115,7 +116,7 @@ export type WaveState = 'calm' | 'spawning' | 'attack';
 
 export interface World {
   seed: number;
-  rand: () => number;
+  rand: Rand;
   tick: number;
   time: number;
   grid: HexIndex;

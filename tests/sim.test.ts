@@ -17,7 +17,9 @@ import {
   build,
   chooseBlessing,
   forgeUpgrade,
+  loadWorld,
   repairAll,
+  saveWorld,
   setRally,
   step,
   toggleShelter,
@@ -310,7 +312,7 @@ describe('onde dá para construir', () => {
 
 describe('ondas', () => {
   it('crescem sem fim e trazem monstros novos', () => {
-    expect(waveSize(1)).toEqual({ esqueleto: 8, lobisomem: 0, orc: 0, bruto: 0, morcego: 0, bruxa: 0, troll: 0, necromante: 0, golem: 0, golemOssos: 0 });
+    expect(waveSize(1)).toEqual({ esqueleto: 7, lobisomem: 0, orc: 0, bruto: 0, morcego: 0, bruxa: 0, troll: 0, necromante: 0, golem: 0, golemOssos: 0 });
     const w8 = waveSize(8);
     expect(w8.bruto).toBe(1);
     expect(w8.orc).toBeGreaterThan(0);
@@ -497,5 +499,25 @@ describe('monstros novos e chefes (Etapa 6)', () => {
     expect(o.hp).toBeGreaterThan(10);
     run(w, 1);
     expect([...w.monsters.values()].some((m) => m.owner === n.id)).toBe(true);
+  });
+});
+
+describe('salvar e continuar (Etapa 7)', () => {
+  it('a partida carregada continua igual à original', () => {
+    const w = createWorld(50);
+    w.waveTimer = 5;
+    run(w, 40);
+    const json = saveWorld(w);
+    const b = loadWorld(json)!;
+    expect(b).not.toBeNull();
+    expect(b.wave).toBe(w.wave);
+    expect(b.buildings.size).toBe(w.buildings.size);
+    expect(b.units.size).toBe(w.units.size);
+    expect(b.monsters.size).toBe(w.monsters.size);
+    run(w, 20);
+    run(b, 20);
+    // Mesmo sorteio e mesmos passos: o mesmo resultado.
+    expect(b.kills).toBe(w.kills);
+    expect(Math.round(b.res.comida)).toBe(Math.round(w.res.comida));
   });
 });
