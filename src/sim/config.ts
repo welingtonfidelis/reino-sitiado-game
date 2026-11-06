@@ -22,7 +22,10 @@ export type BuildingKind =
   | 'capela'
   | 'estabulo'
   | 'forja'
-  | 'oficina';
+  | 'oficina'
+  | 'catapulta'
+  | 'piche'
+  | 'estacas';
 
 export type Category = 'economia' | 'defesa' | 'militar' | 'moradia';
 export type UnitKind = 'trabalhador' | 'soldado' | 'arqueiro' | 'mago' | 'clerigo' | 'cavaleiro' | 'engenheiro';
@@ -50,6 +53,10 @@ export interface BuildingDef {
   breakCost: number;
   /** Nível do castelo exigido (Etapa 5). */
   needsLevel?: number;
+  /** Prédio pronto que precisa existir antes (a catapulta pede a forja). */
+  needsBuilding?: BuildingKind;
+  /** Armadilha no chão: não bloqueia ninguém e a horda não para para bater nela. */
+  trap?: boolean;
 }
 
 export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
@@ -68,11 +75,14 @@ export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
   capela: { name: 'Capela', category: 'militar', blurb: 'Treina clérigos. Feridos por perto se curam sozinhos.', cost: { pedra: 50, ouro: 20 }, hp: 300, build: 10, site: 'grass', recruits: 'clerigo', breakCost: 6 },
   estabulo: { name: 'Estábulo', category: 'militar', blurb: 'Treina cavaleiros: rápidos e fortes.', cost: { madeira: 70, ferro: 20 }, hp: 350, build: 12, site: 'grass', recruits: 'cavaleiro', breakCost: 6, needsLevel: 2 },
   forja: { name: 'Forja', category: 'militar', blurb: 'Melhora armas, armaduras e flechas.', cost: { pedra: 40, ferro: 30 }, hp: 300, build: 10, site: 'grass', breakCost: 6 },
+  catapulta: { name: 'Catapulta', category: 'defesa', blurb: 'Pedra pesada que cai em área, de 3 a 12 m. A resposta para trolls e golens; não acerta quem voa.', cost: { madeira: 50, ferro: 25 }, hp: 280, build: 10, site: 'grass', breakCost: 10, needsBuilding: 'forja' },
+  piche: { name: 'Fosso de piche', category: 'defesa', blurb: 'Quem passa anda pela metade. Aceso, queima quem estiver em cima.', cost: { pedra: 30 }, hp: 1, build: 4, site: 'grass', breakCost: 0, trap: true },
+  estacas: { name: 'Estacas', category: 'defesa', blurb: 'Ferem quem cruza e quebram depois de 20 golpes.', cost: { madeira: 15 }, hp: 20, build: 3, site: 'grass', breakCost: 0, trap: true },
   oficina: { name: 'Oficina', category: 'militar', blurb: 'Treina engenheiros, que consertam até no meio da onda.', cost: { madeira: 40, pedra: 20 }, hp: 250, build: 8, site: 'grass', recruits: 'engenheiro', breakCost: 6 },
 };
 
 /** O que aparece no menu Construir, em ordem. O portão vira de uma muralha. */
-export const BUILD_MENU: BuildingKind[] = ['casa', 'fazenda', 'serraria', 'pedreira', 'mina', 'muralha', 'portao', 'torre', 'quartel', 'campo', 'oficina', 'capela', 'forja', 'torreMago', 'estabulo'];
+export const BUILD_MENU: BuildingKind[] = ['casa', 'fazenda', 'serraria', 'pedreira', 'mina', 'muralha', 'portao', 'torre', 'catapulta', 'piche', 'estacas', 'quartel', 'campo', 'oficina', 'capela', 'forja', 'torreMago', 'estabulo'];
 
 export interface UnitDef {
   name: string;
@@ -184,6 +194,12 @@ export const CONFIG = {
   cleric: { heal: 12 },
   chapel: { radius: 3, perSec: 2 },
   engineer: { rate: 12, stonePerHp: 0.04, reach: 18 },
+  /** Etapa 9: defesas novas. */
+  catapult: { range: 12, min: 3, cd: 4, dmg: 60, radius: 1.4 },
+  pitch: { slow: 0.5, burn: 8, dps: 15, igniteCost: { madeira: 5 } as Cost },
+  spikes: { dmg: 10, every: 1 },
+  /** Modificadores de onda: um a cada 5 ondas, dois a partir da 30. */
+  waveMods: { every: 5, doubleFrom: 30, nightRange: 0.8, armor: 0.75, swarm: 1.6, fury: 1.3 },
   /** Cristal por trabalhador por minuto numa mina em veio azul. */
   crystalRate: 3,
   forge: {

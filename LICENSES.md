@@ -17,6 +17,7 @@ copiados por `npm run art` conforme `tools/art-manifest.ts`.
 | KayKit Mystery Monthly 5 (Etapa 6) | Witch, FrostGolem |
 | KayKit Mystery Monthly 6 (Etapa 6) | Monstrosity (o troll) |
 | KayKit Medieval Hexagon Pack (Etapa 5) | torre B, igreja, estábulo, ferreiro, oficina; martelo |
+| KayKit Medieval Hexagon Pack (Etapa 9) | torre com catapulta e a pedra da catapulta |
 | KayKit Resource Bits 1.0 | Iron_Nuggets e a textura do pack |
 | KayKit Character Animations 1.1 | Rig_Medium (General, MovementBasic, CombatMelee, CombatRanged, Tools) e Rig_Large (General, MovementBasic, CombatMelee) |
 
@@ -72,7 +73,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-Os cristais dos veios azuis, a plantação, as texturas de grama e solo e a água são feitos no próprio projeto.
+Os cristais dos veios azuis, a plantação, as texturas de grama e solo, a água, o fosso de piche e as estacas são feitos no próprio projeto.
 
 O código, a interface e as regras são do próprio projeto. A interface usa os tokens e
 componentes do design system do Vigília, outro projeto do mesmo autor.

@@ -92,6 +92,8 @@ function bot(w: World): void {
   if ((wave >= 5 && lvl < 2) || (wave >= 12 && lvl < 3) || (wave >= 20 && lvl < 4)) upgradeCastle(w);
   if (wave >= 6 && count(w, 'forja') < 1 && put(w, 'forja', 2, 5)) return;
   if (count(w, 'forja') > 0) for (const l of ['armaduras', 'armas', 'flechas'] as const) forgeUpgrade(w, l);
+  if (wave >= 8 && count(w, 'catapulta') < Math.min(2 + Math.floor(wave / 10), 4) && put(w, 'catapulta', 2, 4)) return;
+  if (wave >= 5 && count(w, 'estacas') < Math.min(wave, 12) && put(w, 'estacas', 5, 6)) return;
   if (wave >= 7 && count(w, 'capela') < 1 && put(w, 'capela', 2, 5)) return;
   if (units(w, 'clerigo') < 2) trainAt(w, 'capela');
   if (wave >= 6 && count(w, 'mina') < 2) {

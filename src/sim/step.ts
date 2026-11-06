@@ -8,7 +8,8 @@ import { hexDist, hexToWorld, worldToHex } from './hex.ts';
 import { allyPath, computeFlow, computeReach } from './path.ts';
 import { BLESSING_EVERY, BLESSING_IDS, emptyStats, epitaph } from './blessings.ts';
 import { addUnit, castle, castleCap, castleDoor, housing, population, tileAt, workers } from './world.ts';
-import type { Building, Monster, Unit, World } from './world.ts';
+import type { Building, Monster, Unit, WaveMod, World } from './world.ts';
+import { WAVE_MODS } from './world.ts';
 
 const DT = 1 / CONFIG.tps;
 
@@ -28,6 +29,15 @@ function tileIndexAt(w: World, x: number, z: number): number {
 
 function dist(ax: number, az: number, bx: number, bz: number): number {
   return Math.hypot(ax - bx, az - bz);
+}
+
+/** Noite sem lua: quem atira de longe alcança menos. */
+function rk(w: World): number {
+  return w.waveMods.includes('noite') ? CONFIG.waveMods.nightRange : 1;
+}
+
+function isTrap(b: Building | undefined): boolean {
+  return !!b && !!BUILDINGS[b.kind].trap;
 }
 
 // ---------------------------------------------------------------- prédios
@@ -344,15 +354,16 @@ function killUnit(w: World, u: Unit): void {
   if (u.kind !== 'trabalhador') toast(w, `Um ${UNITS[u.kind].name.toLowerCase()} caiu.`, 'bad');
 }
 
-export type DmgSrc = 'arrow' | 'magic' | 'melee';
+export type DmgSrc = 'arrow' | 'magic' | 'melee' | 'siege' | 'fire';
 
 function damageMonster(w: World, m: Monster, dmg: number, src: DmgSrc = 'melee'): void {
   if (m.state === 'dead') return;
   const def = MONSTERS[m.kind];
   if ((src === 'arrow' && def.immuneArrows) || (src === 'magic' && def.immuneMagic)) return;
   // Magia (e flecha em brasa) queima: o troll para de se curar.
-  if (src === 'magic' || (src === 'arrow' && w.blessings.includes('brasa'))) m.burnT = 0;
-  m.hp -= dmg;
+  if (src === 'magic' || src === 'fire' || (src === 'arrow' && w.blessings.includes('brasa'))) m.burnT = 0;
+  // Blindados (modificador de onda): a horda sente menos dano.
+  m.hp -= dmg * (w.waveMods.includes('blindados') ? CONFIG.waveMods.armor : 1);
   if (m.hp <= 0) {
     m.state = 'dead';
     m.deadT = 0;
@@ -386,6 +397,12 @@ function nearestMonster(w: World, x: number, z: number, range: number, needReach
 function shoot(w: World, x: number, y: number, z: number, m: Monster, dmg: number): void {
   w.events.push({ type: 'shot', x1: x, y1: y, z1: z, x2: m.x, y2: MONSTERS[m.kind].flying ? CONFIG.flyHeight : 0.35, z2: m.z });
   damageMonster(w, m, dmg * w.mods.arrowDmg * (1 + CONFIG.forge.step.flechas * w.forge.flechas), 'arrow');
+  // Flecha em brasa acende o piche em que o alvo está.
+  if (w.blessings.includes('brasa')) {
+    const ti = tileIndexAt(w, m.x, m.z);
+    const b = ti >= 0 ? w.buildings.get(w.tiles[ti]!.b) : undefined;
+    if (b && b.kind === 'piche' && b.built >= 1 && b.burn <= 0) b.burn = CONFIG.pitch.burn;
+  }
 }
 
 function unitsStep(w: World): void {
@@ -442,7 +459,7 @@ function unitsStep(w: World): void {
         else u.state = 'walk';
         continue;
       }
-      const m = nearestMonster(w, u.x, u.z, def.range, false, 'arrow');
+      const m = nearestMonster(w, u.x, u.z, def.range * rk(w), false, 'arrow');
       if (m) {
         u.state = 'fight';
         u.facing = Math.atan2(m.x - u.x, m.z - u.z);
@@ -510,7 +527,7 @@ function unitsStep(w: World): void {
 /** Mago: dano em área no monstro mais perto; cada feitiço gasta cristal. */
 function mageStep(w: World, u: Unit): void {
   const def = UNITS.mago;
-  const m = nearestMonster(w, u.x, u.z, def.range, false, 'magic');
+  const m = nearestMonster(w, u.x, u.z, def.range * rk(w), false, 'magic');
   if (!m) {
     guard(w, u);
     return;
@@ -692,9 +709,31 @@ export function openRifts(n: number): number {
   return CONFIG.waves.riftOpens.filter((k) => n >= k).length;
 }
 
+/** Modificadores da onda n: um a cada 5 ondas, dois a partir da 30; sorteio fixo pela semente. */
+export function modsForWave(seed: number, n: number): WaveMod[] {
+  const W = CONFIG.waveMods;
+  if (n % W.every !== 0) return [];
+  const all = Object.keys(WAVE_MODS) as WaveMod[];
+  let h = (seed ^ (n * 2654435761)) >>> 0;
+  const pick = () => {
+    h = (Math.imul(h ^ (h >>> 15), 2246822519) + 0x9e3779b9) >>> 0;
+    return all.splice(h % all.length, 1)[0]!;
+  };
+  return n >= W.doubleFrom ? [pick(), pick()] : [pick()];
+}
+
+/** Tamanho da onda já com os modificadores (Enxame traz mais esqueletos). */
+export function waveSizeWithMods(n: number, mods: WaveMod[]): ReturnType<typeof waveSize> {
+  const size = waveSize(n);
+  if (mods.includes('enxame')) size.esqueleto = Math.round(size.esqueleto * CONFIG.waveMods.swarm) + 3;
+  return size;
+}
+
 function startWave(w: World): void {
   w.wave++;
-  const size = waveSize(w.wave);
+  w.waveMods = modsForWave(w.seed, w.wave);
+  const size = waveSizeWithMods(w.wave, w.waveMods);
+  if (w.waveMods.length) toast(w, `Onda ${w.wave}: ${w.waveMods.map((k) => `${WAVE_MODS[k].name} (${WAVE_MODS[k].text.charAt(0).toLowerCase()}${WAVE_MODS[k].text.slice(1, -1)})`).join('; ')}.`, 'bad');
   const list: MonsterKind[] = [];
   for (const [k, n] of Object.entries(size) as [MonsterKind, number][]) for (let i = 0; i < n; i++) list.push(k);
   for (let i = list.length - 1; i > 0; i--) {
@@ -721,7 +760,7 @@ function spawnMonster(w: World, kind: MonsterKind): void {
     z: p.z + (w.rand() - 0.5) * 1.2,
     hp,
     maxHp: hp,
-    speed: def.speed * (0.9 + w.rand() * 0.2),
+    speed: def.speed * (0.9 + w.rand() * 0.2) * (w.waveMods.includes('furia') ? CONFIG.waveMods.fury : 1),
     dmg: def.dmg,
     cd: w.rand() * def.cd,
     state: 'walk',
@@ -808,7 +847,7 @@ function waves(w: World): void {
 function blockedFor(w: World, ti: number): boolean {
   if (ti < 0) return true;
   const t = w.tiles[ti]!;
-  return t.terrain === 'rock' || t.terrain === 'water' || t.b >= 0;
+  return t.terrain === 'rock' || t.terrain === 'water' || (t.b >= 0 && !isTrap(w.buildings.get(t.b)));
 }
 
 /** Morcego: voa reto até a casa (ou prédio) mais perto, ignorando muralhas. */
@@ -921,13 +960,13 @@ function monstersStep(w: World): void {
       const here = ti >= 0 ? w.tiles[ti]! : null;
       const next = ti >= 0 ? w.flow[ti]! : -1;
       let target: Building | undefined;
-      if (here && here.b >= 0) target = w.buildings.get(here.b);
+      if (here && here.b >= 0 && !isTrap(w.buildings.get(here.b))) target = w.buildings.get(here.b);
       if (!target && next >= 0) {
         const nt = w.tiles[next]!;
         const c = hexToWorld(nt.q, nt.r);
         if (nt.b >= 0) {
           const b = w.buildings.get(nt.b);
-          if (b && dist(m.x, m.z, c.x, c.z) < 1.0 + CONFIG.monsterReach * 0.6) target = b;
+          if (b && !isTrap(b) && dist(m.x, m.z, c.x, c.z) < 1.0 + CONFIG.monsterReach * 0.6) target = b;
         }
         tx = c.x;
         tz = c.z;
@@ -964,8 +1003,12 @@ function monstersStep(w: World): void {
     let vx = tx - m.x;
     let vz = tz - m.z;
     const d = Math.hypot(vx, vz) || 1;
-    vx = (vx / d) * m.speed;
-    vz = (vz / d) * m.speed;
+    // Piche: anda pela metade.
+    const ht = tileIndexAt(w, m.x, m.z);
+    const hb = ht >= 0 ? w.buildings.get(w.tiles[ht]!.b) : undefined;
+    const sp = m.speed * (hb && hb.kind === 'piche' && hb.built >= 1 ? CONFIG.pitch.slow : 1);
+    vx = (vx / d) * sp;
+    vz = (vz / d) * sp;
     // Separação: não se empilham.
     for (const o of ms) {
       if (o === m) continue;
@@ -1002,7 +1045,7 @@ function defenses(w: World): void {
     c.cd -= DT;
     const p = center(c);
     if (c.cd <= 0) {
-      const m = nearestMonster(w, p.x, p.z, CONFIG.castle.range + w.mods.castleRange, false, 'arrow');
+      const m = nearestMonster(w, p.x, p.z, (CONFIG.castle.range + w.mods.castleRange) * rk(w), false, 'arrow');
       if (m) {
         shoot(w, p.x, 3.4, p.z, m, CONFIG.castle.dmg * w.mods.castleDmg);
         c.cd = CONFIG.castle.cd;
@@ -1015,11 +1058,69 @@ function defenses(w: World): void {
     for (const id of b.archers) {
       const u = w.units.get(id);
       if (!u || u.state !== 'tower' || u.cd > 0) continue;
-      const m = nearestMonster(w, p.x, p.z, CONFIG.tower.range, false, 'arrow');
+      const m = nearestMonster(w, p.x, p.z, CONFIG.tower.range * rk(w), false, 'arrow');
       if (!m) break;
       u.facing = Math.atan2(m.x - p.x, m.z - p.z);
       shoot(w, p.x, 2.3, p.z, m, UNITS.arqueiro.dmg);
       u.cd = UNITS.arqueiro.cd;
+    }
+  }
+}
+
+/** Armadilhas (Etapa 9): estacas ferem quem cruza; piche aceso queima quem está em cima. */
+function traps(w: World): void {
+  for (const b of [...w.buildings.values()]) {
+    if (b.built < 1 || (b.kind !== 'estacas' && b.kind !== 'piche')) continue;
+    const ti = w.grid.idx(b.q, b.r);
+    if (b.kind === 'piche') {
+      if (b.burn <= 0) continue;
+      b.burn -= DT;
+      for (const m of w.monsters.values()) {
+        if (m.state === 'dead' || MONSTERS[m.kind].flying || tileIndexAt(w, m.x, m.z) !== ti) continue;
+        damageMonster(w, m, CONFIG.pitch.dps * DT, 'fire');
+      }
+      continue;
+    }
+    b.cd -= DT;
+    if (b.cd > 0) continue;
+    b.cd = CONFIG.spikes.every;
+    for (const m of w.monsters.values()) {
+      if (m.state === 'dead' || MONSTERS[m.kind].flying || tileIndexAt(w, m.x, m.z) !== ti) continue;
+      damageMonster(w, m, CONFIG.spikes.dmg, 'melee');
+      w.events.push({ type: 'hit', fx: 'faisca', x: m.x, z: m.z, dx: 0, dz: 1 });
+      b.hp -= 1;
+      if (b.hp <= 0) {
+        destroyBuilding(w, b, false);
+        w.events.push({ type: 'toast', text: 'Um trecho de estacas quebrou.', tone: 'info' });
+        break;
+      }
+    }
+  }
+}
+
+/** Catapulta: pedra no monstro com mais vida ao alcance (não voa), dano em área. */
+function catapults(w: World): void {
+  const C = CONFIG.catapult;
+  for (const b of w.buildings.values()) {
+    if (b.kind !== 'catapulta' || b.built < 1) continue;
+    b.cd -= DT;
+    if (b.cd > 0) continue;
+    const p = center(b);
+    let best: Monster | null = null;
+    for (const m of w.monsters.values()) {
+      if (m.state === 'dead' || MONSTERS[m.kind].flying) continue;
+      const d = dist(p.x, p.z, m.x, m.z);
+      if (d < C.min || d > C.range * rk(w)) continue;
+      if (!best || m.hp > best.hp) best = m;
+    }
+    if (!best) continue;
+    b.cd = C.cd;
+    w.events.push({ type: 'siege', x1: p.x, z1: p.z, x2: best.x, z2: best.z });
+    const tx = best.x;
+    const tz = best.z;
+    for (const m of w.monsters.values()) {
+      if (m.state === 'dead' || MONSTERS[m.kind].flying || dist(m.x, m.z, tx, tz) > C.radius) continue;
+      damageMonster(w, m, C.dmg * (1 + CONFIG.forge.step.armas * w.forge.armas), 'siege');
     }
   }
 }
@@ -1073,6 +1174,8 @@ export function step(w: World): void {
   monstersStep(w);
   unitsStep(w);
   defenses(w);
+  catapults(w);
+  traps(w);
   chapels(w);
   cleanup(w);
 }

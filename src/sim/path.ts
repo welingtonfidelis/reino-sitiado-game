@@ -102,7 +102,7 @@ export function allyPass(w: World, t: Tile, goal: number): boolean {
   if (t.b < 0 || t.i === goal) return true;
   const b = w.buildings.get(t.b);
   if (!b) return true;
-  return b.built >= 1 && (b.kind === 'portao' || b.kind === 'fazenda');
+  return b.built >= 1 && (b.kind === 'portao' || b.kind === 'fazenda' || !!BUILDINGS[b.kind].trap);
 }
 
 /** Busca em largura entre dois ladrilhos; devolve os índices depois do primeiro. */

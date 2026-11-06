@@ -4,7 +4,7 @@
  * avisos e as telas de começo e fim.
  */
 import { useEffect, useReducer, useState } from 'preact/hooks';
-import { BUILDINGS, BUILD_MENU, CONFIG, RES_ORDER, UNITS, castle, castleCap, housing, hexToWorld, troops, workers, recruitProblem, repairCost, repairProblem, missing, moveProblem, demolishProblem, upgradeCost, upgradeProblem, waveSize, MONSTERS, BLESSINGS, repairAllCost, levelProblem, forgeCost, forgeProblem } from '../sim/index.ts';
+import { BUILDINGS, BUILD_MENU, CONFIG, RES_ORDER, UNITS, castle, castleCap, housing, hexToWorld, troops, workers, recruitProblem, repairCost, repairProblem, missing, moveProblem, demolishProblem, upgradeCost, upgradeProblem, waveSize, MONSTERS, BLESSINGS, repairAllCost, levelProblem, forgeCost, forgeProblem, igniteProblem, modsForWave, waveSizeWithMods, WAVE_MODS } from '../sim/index.ts';
 import type { BlessingId, Building, Category, Cost, ForgeLine, MonsterKind, Res, UnitKind } from '../sim/index.ts';
 import { Game } from '../game/game.ts';
 import type { IsoCamera } from '../render/camera.ts';
@@ -112,11 +112,14 @@ function Hud({ game }: { game: Game }) {
         <div class="row">
           {calm ? (
             <button class="prompt wave-pill" title="Chamar a onda agora rende ouro pelo tempo que sobrou" onClick={() => game.callWave()}>
-              <Icon name="caveira" style="color: var(--bad)" /> Onda {w.wave + 1} em <span style="color: var(--warn); font-variant-numeric: tabular-nums">{clock(w.waveTimer)}</span>
+              <Icon name="caveira" style="color: var(--bad)" /> Onda {w.wave + 1}
+              {modsForWave(w.seed, w.wave + 1).length ? <span style="color: var(--warn)"> ({modsForWave(w.seed, w.wave + 1).map((k) => WAVE_MODS[k].name).join(', ')})</span> : null} em{' '}
+              <span style="color: var(--warn); font-variant-numeric: tabular-nums">{clock(w.waveTimer)}</span>
             </button>
           ) : (
             <span class="prompt wave-pill attack">
-              <Icon name="caveira" style="color: var(--bad)" /> Onda {w.wave} · {left} monstros
+              <Icon name="caveira" style="color: var(--bad)" /> Onda {w.wave}
+              {w.waveMods.length ? <span style="color: var(--warn)"> · {w.waveMods.map((k) => WAVE_MODS[k].name).join(' · ')}</span> : null} · {left} monstros
             </span>
           )}
           <button class="hud-mute" aria-label={game.sound ? 'Desligar o som' : 'Ligar o som'} style="margin-left: 0" onClick={() => game.setSound(!game.sound)}>
@@ -320,6 +323,20 @@ function BuildingMenu({ game, cam, b }: { game: Game; cam: IsoCamera; b: Buildin
         ) : null}
         {b.kind === 'torre' ? <p class="sub">Arqueiros treinados no campo de tiro sobem sozinhos.</p> : null}
         {b.kind === 'forja' && b.built >= 1 ? <ForgePanel game={game} /> : null}
+        {b.kind === 'catapulta' ? <p class="sub">Atira sozinha a cada 4 s no monstro com mais vida entre 3 e 12 m. Não acerta quem voa.</p> : null}
+        {b.kind === 'estacas' ? <p class="sub">Golpes que ainda aguenta: {Math.max(0, Math.ceil(b.hp))} de {def.hp}. Ninguém para aqui: a horda passa por cima e se fere.</p> : null}
+        {b.kind === 'piche' ? (
+          <>
+            <p class="sub">
+              {b.burn > 0
+                ? `Queimando: mais ${Math.ceil(b.burn)} s de fogo em quem estiver em cima.`
+                : 'Quem passa anda pela metade. Com a bênção Flechas em brasa, a primeira flecha acende sozinha.'}
+            </p>
+            <button class="btn primary big" style="margin-top: 0.4rem" disabled={!!igniteProblem(w, b)} onClick={() => game.ignite(b.id)}>
+              Acender o piche ({costText(CONFIG.pitch.igniteCost)}){igniteProblem(w, b) ? <small> · {igniteProblem(w, b)}</small> : null}
+            </button>
+          </>
+        ) : null}
         {recruits ? (
           <>
             <p class="sub" style="margin-top: 0.5rem">
@@ -484,7 +501,8 @@ function Report({ game }: { game: Game }) {
   const damage = [r.wallsLost ? count(r.wallsLost, 'trecho de muralha', 'trechos de muralha') : '', r.buildingsLost ? count(r.buildingsLost, 'prédio', 'prédios') : ''].filter(Boolean).join(' · ') || 'Nenhum';
   const works = (['madeira', 'pedra', 'ferro'] as Res[]).filter((k) => r.prod[k] >= 1).map((k) => `+${Math.floor(r.prod[k])} de ${RES_LABEL[k]}`).join(' · ') || 'Nada';
   const next = w.wave + 1;
-  const size = waveSize(next);
+  const nextMods = modsForWave(w.seed, next);
+  const size = waveSizeWithMods(next, nextMods);
   const news = (Object.keys(size) as MonsterKind[]).filter((k) => MONSTERS[k].from === next && size[k] > 0 && NEWS[k]).map((k) => NEWS[k]);
   for (const k of ['golem', 'golemOssos'] as MonsterKind[]) if (size[k] > 0) news.push(`Chefe nesta onda: ${MONSTERS[k].name}. ${MONSTERS[k].blurb.replace('Chefe. ', '')}`);
   const rift = CONFIG.waves.riftOpens.includes(next) && next > 1;
@@ -546,6 +564,11 @@ function Report({ game }: { game: Game }) {
           <p class="sub" style="color: var(--warn)">{n}</p>
         ))}
         {rift ? <p class="sub" style="color: var(--bad)">Uma nova fenda se abre nesta onda.</p> : null}
+        {nextMods.map((k) => (
+          <p class="sub" style="color: var(--warn)">
+            <b>{WAVE_MODS[k].name}:</b> {WAVE_MODS[k].text}
+          </p>
+        ))}
         <label class="report-pref">
           <input type="checkbox" checked={game.autoReport} onChange={(e) => game.setAutoReport((e.target as HTMLInputElement).checked)} />
           Abrir este relatório a cada onda (desligado, ele só abre quando há bênção para escolher)

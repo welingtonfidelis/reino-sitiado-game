@@ -46,9 +46,16 @@ export function placeProblem(w: World, kind: BuildingKind, q: number, r: number,
 
 /** Prédio que pede o castelo num nível mais alto (Etapa 5). */
 export function levelProblem(w: World, kind: BuildingKind): string | null {
-  const need = BUILDINGS[kind].needsLevel ?? 1;
+  const def = BUILDINGS[kind];
+  const need = def.needsLevel ?? 1;
   const lvl = castle(w)?.level ?? 1;
-  return lvl < need ? `Precisa do castelo nível ${need}` : null;
+  if (lvl < need) return `Precisa do castelo nível ${need}`;
+  if (def.needsBuilding) {
+    let ok = false;
+    for (const b of w.buildings.values()) if (b.kind === def.needsBuilding && b.built >= 1) ok = true;
+    if (!ok) return `Precisa de ${def.needsBuilding === 'forja' ? 'uma forja pronta' : BUILDINGS[def.needsBuilding].name}`;
+  }
+  return null;
 }
 
 export function canBuild(w: World, kind: BuildingKind, q: number, r: number): string | null {
@@ -372,5 +379,23 @@ export function forgeUpgrade(w: World, line: ForgeLine): string | null {
   }
   const name = { armas: 'Armas', armaduras: 'Armaduras', flechas: 'Flechas' }[line];
   w.events.push({ type: 'toast', text: `${name} melhoradas na forja (nível ${w.forge[line]}).`, tone: 'gold' });
+  return null;
+}
+
+export function igniteProblem(w: World, b: Building): string | null {
+  if (b.kind !== 'piche') return 'Só o fosso de piche acende';
+  if (b.built < 1) return 'Ainda em obra';
+  if (b.burn > 0) return 'Já está aceso';
+  return missing(w, CONFIG.pitch.igniteCost);
+}
+
+/** Acende o fosso de piche: queima quem estiver em cima por alguns segundos. */
+export function ignitePitch(w: World, id: number): string | null {
+  const b = w.buildings.get(id);
+  if (!b) return 'Não existe mais';
+  const why = igniteProblem(w, b);
+  if (why) return why;
+  pay(w, CONFIG.pitch.igniteCost);
+  b.burn = CONFIG.pitch.burn;
   return null;
 }

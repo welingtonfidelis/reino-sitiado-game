@@ -286,7 +286,35 @@ Pedido do usuário: texturas de grama, solo e água para disfarçar ainda mais a
 - **Rochas:** os rochedos agora são três pedras soltas do KayKit Forest Nature Pack (Rock 1 a 4), giradas e de tamanhos diferentes, no lugar das montanhas de base sextavada.
 - O salvamento guarda o terreno 'water'; partidas salvas antes desta etapa continuam abrindo.
 
-## 12. Arquitetura
+## 12. Defesas novas e ondas variadas (Etapa 9)
+
+Pedido do usuário: as defesas que faltavam da proposta e ondas mais variadas.
+
+| Defesa | Custo | Como age |
+| --- | --- | --- |
+| Catapulta | 50 madeira · 25 ferro; precisa de uma forja pronta | a cada 4 s, uma pedra no monstro com mais vida entre 3 e 12 m: 60 de dano num raio de 1,4 m. Fere os dois golens, não acerta quem voa; a forja (armas) aumenta o dano |
+| Fosso de piche | 30 pedra | armadilha no chão: quem passa anda pela metade. "Acender o piche" (5 de madeira) queima por 8 s, 15 de dano por segundo em quem estiver em cima; com a bênção Flechas em brasa, a primeira flecha num monstro sobre o piche acende sozinha |
+| Estacas | 15 madeira | armadilha no chão: a cada segundo, 10 de dano em cada monstro em cima; quebram depois de 20 golpes |
+
+- **Por que catapulta e não balista:** o KayKit local tem torre com catapulta e a pedra do disparo, mas não tem balista. Ela faz o papel que a proposta dava à balista (a resposta para trolls e golens), com dano em área no lugar de perfurar a fila.
+- **Armadilhas:** não bloqueiam ninguém. A horda passa por cima sem parar para bater, e a gente do reino também atravessa.
+- **Modificadores de onda:** um a cada 5 ondas (5, 10, 15…) e dois a partir da 30. O sorteio é fixo pela semente, então o relatório e a pílula da onda já avisam qual vem.
+
+| Modificador | Efeito |
+| --- | --- |
+| Noite sem lua | torres, castelo, catapultas, arqueiros e magos alcançam 20% menos; a luz da cena cai durante a onda |
+| Blindados | a horda sente 25% menos de todo dano |
+| Enxame | 60% mais esqueletos (e mais 3) |
+| Fúria | a horda anda 30% mais rápido |
+
+- **Onde aparece:**
+  - na pílula da onda, entre parênteses antes ("Onda 10 (Blindados) em 1:30") e durante ("Onda 10 · Blindados · 23 monstros");
+  - num aviso quando a onda começa;
+  - no relatório da onda anterior, com a explicação.
+- **Robô (6 sementes):** com os modificadores e sem usar as defesas novas, caiu para a média de 15,7. Usando catapultas e estacas, subiu para 19,5 (ondas 10 a 28). Sem fazer nada, o castelo cai na onda 4.
+- **Arte:** catapulta = torre com catapulta e pedra do pack medieval; piche e estacas são feitos no projeto; o impacto da pedra usa a explosão de terra do pixelfx, menor.
+
+## 13. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
@@ -305,7 +333,7 @@ Pedido do usuário: texturas de grama, solo e água para disfarçar ainda mais a
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
 - `src/ui/App.tsx`: HUD, bandeja Construir, menu do prédio, avisos e telas de começo e fim.
 
-## 13. Etapas
+## 14. Etapas
 
 | Etapa | O que | Situação |
 | --- | --- | --- |
@@ -316,9 +344,10 @@ Pedido do usuário: texturas de grama, solo e água para disfarçar ainda mais a
 | 5 | Cristal; mago, clérigo, cavaleiro e engenheiro; torre do mago, capela, estábulo, forja e oficina (seção 8) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 6 | Morcego, bruxa, troll, necromante e dois chefes (seção 9) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 7 | Relatório opcional, salvar e continuar, sons e equilíbrio com robô de teste (seção 10) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone (e ouvir os sons). |
+| 9 | Catapulta, fosso de piche, estacas e um modificador de onda a cada 5 ondas (seção 12) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 8 | Texturas de grama e solo, lagos com água animada, plantação e rochas sem base hexagonal (seção 11) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 
-## 14. Arte e licenças
+## 15. Arte e licenças
 
 Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art` (lista em `tools/art-manifest.ts`). Detalhes em `LICENSES.md`.
 

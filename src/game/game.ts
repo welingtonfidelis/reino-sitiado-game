@@ -18,6 +18,7 @@ import {
   refresh,
   chooseBlessing,
   forgeUpgrade,
+  ignitePitch,
   loadWorld,
   saveInfo,
   saveWorld,
@@ -369,6 +370,9 @@ export class Game {
     this.speed = this.before || 1;
     if (thenCall) this.callWave();
     this.emit();
+  }
+  ignite(id: number): void {
+    this.result(ignitePitch(this.world, id));
   }
   forge(line: ForgeLine): void {
     this.result(forgeUpgrade(this.world, line));

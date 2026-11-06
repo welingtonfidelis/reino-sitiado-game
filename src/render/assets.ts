@@ -26,6 +26,8 @@ export const STATIC_MODELS = {
   estabulo: 'medieval/building_stables_blue.gltf',
   forja: 'medieval/building_blacksmith_blue.gltf',
   oficina: 'medieval/building_workshop_blue.gltf',
+  catapulta: 'medieval/building_tower_catapult_blue.gltf',
+  pedraCerco: 'medieval/projectile_catapult.gltf',
   obra: 'medieval/building_scaffolding.gltf',
   ruina: 'medieval/building_destroyed.gltf',
   muro: 'medieval/wall_straight.gltf',

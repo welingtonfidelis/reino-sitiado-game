@@ -17,7 +17,10 @@ import {
   build,
   chooseBlessing,
   forgeUpgrade,
+  ignitePitch,
   loadWorld,
+  modsForWave,
+  waveSizeWithMods,
   repairAll,
   saveWorld,
   setRally,
@@ -27,7 +30,7 @@ import {
   waveSize,
   workers,
 } from '../src/sim/index.ts';
-import { MONSTERS } from '../src/sim/index.ts';
+import { MONSTERS, UNITS } from '../src/sim/index.ts';
 import type { MonsterKind, World } from '../src/sim/index.ts';
 
 function run(w: World, seconds: number, stop?: (w: World) => boolean): void {
@@ -519,5 +522,87 @@ describe('salvar e continuar (Etapa 7)', () => {
     // Mesmo sorteio e mesmos passos: o mesmo resultado.
     expect(b.kills).toBe(w.kills);
     expect(Math.round(b.res.comida)).toBe(Math.round(w.res.comida));
+  });
+});
+
+describe('defesas novas e ondas variadas (Etapa 9)', () => {
+  function monster(w: World, kind: MonsterKind, x: number, z: number, speed = 0) {
+    const def = MONSTERS[kind];
+    const m = { id: w.nextId++, kind, x, z, hp: def.hp, maxHp: def.hp, speed, dmg: def.dmg, cd: 99, state: 'walk' as const, facing: 0, deadT: 0, burnT: 99, healT: 99, summonT: 99, owner: -1 };
+    w.monsters.set(m.id, m);
+    return m;
+  }
+
+  it('a catapulta pede a forja e acerta o golem que a flecha não fere', () => {
+    const w = createWorld(60);
+    calm(w);
+    castle(w)!.cd = 1e9;
+    w.res.ferro = 100;
+    const [p, f] = freeGrass(w, 2, 2, 3);
+    expect(build(w, 'catapulta', p!.q, p!.r)).toBe('Precisa de uma forja pronta');
+    addBuilding(w, 'forja', f!.q, f!.r, 1);
+    const cat = addBuilding(w, 'catapulta', p!.q, p!.r, 1);
+    const c = hexToWorld(cat.q, cat.r);
+    const g = monster(w, 'golem', c.x + 6, c.z);
+    run(w, 1);
+    expect(g.hp).toBeLessThan(MONSTERS.golem.hp);
+  });
+
+  it('piche deixa a horda lenta e, aceso, queima', () => {
+    const w = createWorld(61);
+    calm(w);
+    castle(w)!.cd = 1e9;
+    const [p] = freeGrass(w, 1, 3, 4);
+    const pitch = addBuilding(w, 'piche', p!.q, p!.r, 1);
+    const c = hexToWorld(p!.q, p!.r);
+    const m = monster(w, 'orc', c.x, c.z);
+    expect(ignitePitch(w, pitch.id)).toBeNull();
+    run(w, 3);
+    expect(m.hp).toBeLessThan(MONSTERS.orc.hp - 30);
+  });
+
+  it('estacas ferem quem cruza e quebram com o uso', () => {
+    const w = createWorld(62);
+    calm(w);
+    castle(w)!.cd = 1e9;
+    const [p] = freeGrass(w, 1, 3, 4);
+    const sp = addBuilding(w, 'estacas', p!.q, p!.r, 1);
+    const c = hexToWorld(p!.q, p!.r);
+    for (let i = 0; i < 4; i++) monster(w, 'troll', c.x + i * 0.1, c.z);
+    run(w, 6);
+    expect(w.buildings.has(sp.id)).toBe(false);
+  });
+
+  it('armadilhas não bloqueiam o caminho da horda', () => {
+    const w = createWorld(63);
+    for (const t of w.list) {
+      if (hexDist(t.q, t.r, 0, 0) !== 3 || t.terrain === 'rock' || t.terrain === 'water') continue;
+      if (t.b >= 0) w.buildings.delete(t.b);
+      t.terrain = 'grass';
+      t.b = -1;
+      addBuilding(w, 'estacas', t.q, t.r, 1);
+    }
+    step(w);
+    const rift = w.rifts[0]!;
+    const open = w.flowDist[rift]!;
+    // Mesmo cercado de estacas, o caminho custa só o terreno (sem custo de derrubar).
+    expect(open).toBeLessThan(40);
+  });
+
+  it('um modificador a cada 5 ondas, dois a partir da 30, e cada um muda a onda', () => {
+    expect(modsForWave(1, 4)).toEqual([]);
+    expect(modsForWave(1, 5).length).toBe(1);
+    expect(modsForWave(1, 30).length).toBe(2);
+    expect(waveSizeWithMods(10, ['enxame']).esqueleto).toBeGreaterThan(waveSizeWithMods(10, []).esqueleto);
+    const w = createWorld(64);
+    calm(w);
+    castle(w)!.cd = 1e9;
+    w.waveMods = ['blindados'];
+    const m = monster(w, 'orc', 6, 6);
+    const s = addUnit(w, 'soldado', 6.5, 6);
+    s.postX = 6.5;
+    s.postZ = 6;
+    run(w, 0.5);
+    expect(m.hp).toBe(MONSTERS.orc.hp - UNITS.soldado.dmg * 0.75);
   });
 });

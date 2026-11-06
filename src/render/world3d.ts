@@ -134,10 +134,35 @@ const HOME: Record<BuildingKind, StaticKey> = {
   estabulo: 'estabulo',
   forja: 'forja',
   oficina: 'oficina',
+  catapulta: 'catapulta',
+  piche: 'obra',
+  estacas: 'obra',
 };
 
 /** Altura do topo de cada prédio (para barras e para o arqueiro na torre). */
-const TOP: Partial<Record<BuildingKind, number>> = { castelo: 4.1, torre: 2.2, quartel: 1.7, campo: 1.8, muralha: 1.2, portao: 1.4, torreMago: 2.4, capela: 1.9, estabulo: 1.3, forja: 1.4, oficina: 1.3 };
+const TOP: Partial<Record<BuildingKind, number>> = { catapulta: 1.6, piche: 0.3, estacas: 0.6, castelo: 4.1, torre: 2.2, quartel: 1.7, campo: 1.8, muralha: 1.2, portao: 1.4, torreMago: 2.4, capela: 1.9, estabulo: 1.3, forja: 1.4, oficina: 1.3 };
+
+/** Fosso de piche (Etapa 9): mancha escura e lustrosa no chão. */
+function pitchModel(): StaticModel {
+  const parts: THREE.BufferGeometry[] = [new THREE.CylinderGeometry(0.62, 0.68, 0.04, 20).translate(0, 0.02, 0)];
+  for (const [x, z, r] of [[0.3, 0.2, 0.09], [-0.25, -0.3, 0.07], [-0.4, 0.25, 0.06]] as const) parts.push(new THREE.SphereGeometry(r, 8, 6).scale(1, 0.5, 1).translate(x, 0.04, z));
+  const geometry = mergeGeometries(parts.map((g) => g.toNonIndexed()))!;
+  return { parts: [{ geometry, material: new THREE.MeshPhongMaterial({ color: '#2a2018', specular: '#8a7a60', shininess: 60 }) }], box: new THREE.Box3(new THREE.Vector3(-0.86, 0, -0.86), new THREE.Vector3(0.86, 0.1, 0.86)) };
+}
+
+/** Estacas (Etapa 9): uma roda de pontas de madeira inclinadas para fora. */
+function spikesModel(): StaticModel {
+  const parts: THREE.BufferGeometry[] = [];
+  for (let k = 0; k < 9; k++) {
+    const a = (k / 9) * Math.PI * 2;
+    const r = k % 2 ? 0.55 : 0.3;
+    const g = new THREE.ConeGeometry(0.06, 0.6, 5).translate(0, 0.3, 0);
+    g.rotateZ(0.45).rotateY(-a).translate(Math.cos(a) * r, 0, Math.sin(a) * r);
+    parts.push(g.toNonIndexed());
+  }
+  const geometry = mergeGeometries(parts)!;
+  return { parts: [{ geometry, material: new THREE.MeshLambertMaterial({ color: '#8a6238', flatShading: true }) }], box: new THREE.Box3(new THREE.Vector3(-0.7, 0, -0.7), new THREE.Vector3(0.7, 0.6, 0.7)) };
+}
 
 /** Plantação sem base hexagonal (Etapa 8): canteiro de terra com fileiras de trigo. */
 function farmModel(): StaticModel {
@@ -213,6 +238,12 @@ export class World3D {
   private grid: THREE.LineSegments | null = null;
   private water: THREE.Mesh | null = null;
   private farms!: Instanced;
+  private pitch!: Instanced;
+  private spikes!: Instanced;
+  private rocksInFlight: Flight[] = [];
+  private pitchFire = new Map<number, number[]>();
+  private hemi!: THREE.HemisphereLight;
+  private night = 0;
 
   constructor(scene: THREE.Scene, art: Art) {
     this.scene = scene;
@@ -222,6 +253,10 @@ export class World3D {
     for (const k of ['castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina'] as StaticKey[]) big(k, 200);
     this.crystals = new Instanced(scene, crystalModel(), 200, true, false);
     this.farms = new Instanced(scene, farmModel(), 120, true, true);
+    this.pitch = new Instanced(scene, pitchModel(), 120, false, true);
+    this.spikes = new Instanced(scene, spikesModel(), 160, true, false);
+    big('catapulta', 100);
+    big('pedraCerco', 40, false);
     for (const k of ['rochaA', 'rochaB', 'rochaC', 'rochaD'] as StaticKey[]) big(k, 300);
     const orbGeo = new THREE.SphereGeometry(0.11, 10, 8);
     this.orbs = new THREE.InstancedMesh(orbGeo, new THREE.MeshBasicMaterial({ color: '#b48cff' }), 64);
@@ -235,6 +270,7 @@ export class World3D {
 
     const hemi = new THREE.HemisphereLight('#f4f6ff', '#6a5a44', 1.35);
     scene.add(hemi);
+    this.hemi = hemi;
     const sun = new THREE.DirectionalLight('#fff4e4', 1.9);
     sun.position.set(-18, 34, 14);
     sun.castShadow = true;
@@ -355,9 +391,11 @@ export class World3D {
   syncStatic(w: World): void {
     if (w.ver === this.ver) return;
     this.ver = w.ver;
-    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina'];
+    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'catapulta'];
     for (const k of keys) this.sets.get(k)!.begin();
     this.crystals.begin();
+    this.pitch.begin();
+    this.spikes.begin();
     this.farms.begin();
     const sixth = Math.PI / 3;
     for (const t of w.list) {
@@ -399,6 +437,12 @@ export class World3D {
       let key = HOME[b.kind];
       if (b.kind === 'casa' && b.id % 2) key = 'casaB';
       const rot = b.kind === 'castelo' ? 0 : ((b.id * 7) % 6) * sixth;
+      if (b.kind === 'piche' || b.kind === 'estacas') {
+        this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), b.id * 0.7);
+        this.tmp.compose(this.p.set(p.x, 0, p.z), this.q, this.s.setScalar(1));
+        (b.kind === 'piche' ? this.pitch : this.spikes).push(this.tmp, b.id);
+        continue;
+      }
       if (b.kind === 'fazenda') {
         // Plantação própria, girada livre (Etapa 8), com o moinho num canto.
         const r2 = (b.id * 0.9) % Math.PI;
@@ -422,6 +466,8 @@ export class World3D {
     }
     this.crystals.end();
     this.farms.end();
+    this.pitch.end();
+    this.spikes.end();
   }
 
   private wallPiece(w: World, b: Building, x: number, z: number): void {
@@ -491,9 +537,10 @@ export class World3D {
   pickBuilding(ray: THREE.Raycaster): number {
     let best = -1;
     let bd = Infinity;
-    for (const m of this.farms.meshes)
+    for (const set of [this.farms, this.pitch, this.spikes])
+    for (const m of set.meshes)
       for (const h of ray.intersectObject(m, false)) {
-        const id = h.instanceId !== undefined ? (this.farms.ids[h.instanceId] ?? -1) : -1;
+        const id = h.instanceId !== undefined ? (set.ids[h.instanceId] ?? -1) : -1;
         if (id >= 0 && h.distance < bd) {
           bd = h.distance;
           best = id;
@@ -532,6 +579,9 @@ export class World3D {
       if (e.type === 'shot') {
         const d = Math.hypot(e.x2 - e.x1, e.z2 - e.z1);
         this.flights.push({ ...e, t: 0, dur: 0.12 + d / 22 });
+      } else if (e.type === 'siege') {
+        const d = Math.hypot(e.x2 - e.x1, e.z2 - e.z1);
+        this.rocksInFlight.push({ x1: e.x1, y1: 1.5, z1: e.z1, x2: e.x2, y2: 0.2, z2: e.z2, t: 0, dur: 0.5 + d / 14 });
       } else if (e.type === 'spell') {
         const d = Math.hypot(e.x2 - e.x1, e.z2 - e.z1);
         this.spells.push({ x1: e.x1, y1: 0.7, z1: e.z1, x2: e.x2, y2: 0.3, z2: e.z2, t: 0, dur: 0.15 + d / 12 });
@@ -656,6 +706,24 @@ export class World3D {
       arrows.push(this.tmp);
     }
     arrows.end();
+    // Pedras da catapulta: arco alto e explosão de terra onde caem.
+    const rocks = this.sets.get('pedraCerco')!;
+    rocks.begin();
+    this.rocksInFlight = this.rocksInFlight.filter((f) => {
+      f.t += dt;
+      if (f.t >= f.dur) {
+        fx?.play('explosao', f.x2, 0, f.z2, { scale: 0.45 });
+        return false;
+      }
+      const k = f.t / f.dur;
+      const d = Math.hypot(f.x2 - f.x1, f.z2 - f.z1);
+      this.q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), f.t * 9);
+      this.p.set(f.x1 + (f.x2 - f.x1) * k, f.y1 + (f.y2 - f.y1) * k + Math.sin(k * Math.PI) * (1.5 + d * 0.25), f.z1 + (f.z2 - f.z1) * k);
+      this.tmp.compose(this.p, this.q, this.s.setScalar(1.3));
+      rocks.push(this.tmp);
+      return true;
+    });
+    rocks.end();
     // Feitiços do mago: esfera que voa e explode em mana no alvo.
     let n2 = 0;
     this.spells = this.spells.filter((f) => {
@@ -694,6 +762,12 @@ export class World3D {
     }
     this.bars.end();
     if (this.water) (this.water.material as THREE.ShaderMaterial).uniforms.uTime!.value = this.time;
+    // Noite sem lua (modificador de onda): a luz cai devagar e volta no fim da onda.
+    const nightGoal = w.waveState !== 'calm' && w.waveMods.includes('noite') ? 1 : 0;
+    this.night += (nightGoal - this.night) * Math.min(1, dt * 1.5);
+    this.sun.intensity = 1.9 * (1 - 0.65 * this.night);
+    this.hemi.intensity = 1.35 * (1 - 0.45 * this.night);
+    this.hemi.color.setRGB(0.96 - 0.4 * this.night, 0.97 - 0.32 * this.night, 1);
     if (fx) {
       // Fogo nos prédios com menos da metade da vida.
       const alive = new Set<number>();
@@ -714,6 +788,25 @@ export class World3D {
         if (alive.has(id)) continue;
         fx.stop('fogo', i);
         this.burning.delete(id);
+      }
+      // Piche aceso: três chamas no fosso enquanto queima.
+      for (const b of w.buildings.values()) {
+        if (b.kind !== 'piche') continue;
+        const on = this.pitchFire.get(b.id);
+        if (b.burn > 0 && !on) {
+          const p = hexToWorld(b.q, b.r);
+          this.pitchFire.set(b.id, [
+            fx.play('fogo', p.x - 0.35, 0.02, p.z + 0.1, { loop: true, scale: 1.1 }),
+            fx.play('fogo', p.x + 0.3, 0.02, p.z - 0.15, { loop: true, scale: 0.9, flip: true }),
+            fx.play('fogo', p.x, 0.02, p.z + 0.4, { loop: true }),
+          ]);
+        }
+      }
+      for (const [id, slots] of this.pitchFire) {
+        const b = w.buildings.get(id);
+        if (b && b.burn > 0) continue;
+        for (const i of slots) fx.stop('fogo', i);
+        this.pitchFire.delete(id);
       }
       // Portais nas fendas abertas.
       const openNow = openRifts(Math.max(1, w.wave + (w.waveState === 'calm' ? 1 : 0)));

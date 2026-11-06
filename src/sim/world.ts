@@ -43,6 +43,8 @@ export interface Building {
   warned: boolean;
   /** Ponto de encontro: onde as tropas treinadas aqui ficam esperando. */
   rally: { x: number; z: number } | null;
+  /** Fosso de piche aceso: segundos de fogo que faltam (Etapa 9). */
+  burn: number;
 }
 
 export type UnitState = 'idle' | 'walk' | 'work' | 'fight' | 'tower' | 'shelter' | 'dead';
@@ -105,6 +107,7 @@ export type SimEvent =
   | { type: 'hit'; fx: 'espada' | 'garra' | 'pancada' | 'golpe' | 'faisca' | 'cura'; x: number; z: number; dx: number; dz: number }
   | { type: 'spell'; x1: number; z1: number; x2: number; z2: number }
   | { type: 'monsterFx'; fx: 'bloom' | 'alma'; x: number; z: number }
+  | { type: 'siege'; x1: number; z1: number; x2: number; z2: number }
   | { type: 'death'; x: number; z: number; monster: boolean }
   | { type: 'upgrade'; level: number }
   | { type: 'waveStart'; wave: number }
@@ -113,6 +116,14 @@ export type SimEvent =
   | { type: 'lost'; wave: number };
 
 export type WaveState = 'calm' | 'spawning' | 'attack';
+
+export type WaveMod = 'noite' | 'blindados' | 'enxame' | 'furia';
+export const WAVE_MODS: Record<WaveMod, { name: string; text: string }> = {
+  noite: { name: 'Noite sem lua', text: 'Torres, castelo, catapultas, arqueiros e magos alcançam 20% menos.' },
+  blindados: { name: 'Blindados', text: 'A horda sente 25% menos de todo dano.' },
+  enxame: { name: 'Enxame', text: 'Vêm 60% mais esqueletos.' },
+  furia: { name: 'Fúria', text: 'A horda anda 30% mais rápido.' },
+};
 
 export interface World {
   seed: number;
@@ -157,6 +168,8 @@ export interface World {
   /** O que aconteceu desde o último relatório, e o relatório aberto (o jogo espera o jogador). */
   stats: WaveStats;
   report: Report | null;
+  /** Modificadores da onda em andamento (Etapa 9). */
+  waveMods: WaveMod[];
   /** Melhorias da forja (Etapa 5), de 0 a 3 cada. */
   forge: { armas: number; armaduras: number; flechas: number };
   events: SimEvent[];
@@ -256,6 +269,7 @@ export function addBuilding(w: World, kind: BuildingKind, q: number, r: number, 
     level: 1,
     warned: false,
     rally: null,
+    burn: 0,
   };
   w.buildings.set(b.id, b);
   const t = tileAt(w, q, r)!;
@@ -385,6 +399,7 @@ export function createWorld(seed = 1): World {
     stats: emptyStats(),
     report: null,
     forge: { armas: 0, armaduras: 0, flechas: 0 },
+    waveMods: [],
     events: [],
   };
   for (const t of list) t.deco = Math.floor(w.rand() * 1000);

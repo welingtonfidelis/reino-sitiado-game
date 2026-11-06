@@ -13,7 +13,7 @@ const TERRAINS: Terrain[] = ['grass', 'forest', 'rock', 'ore', 'crystal', 'rift'
 /** Campos simples copiados como estão. */
 const PLAIN = [
   'tick', 'time', 'nextId', 'res', 'housesBuilt', 'arriveT', 'wave', 'waveState', 'waveTimer', 'spawnQueue', 'spawnT',
-  'hungry', 'shelter', 'lost', 'kills', 'flags', 'blessings', 'mods', 'stats', 'report', 'forge',
+  'hungry', 'shelter', 'lost', 'kills', 'flags', 'blessings', 'mods', 'stats', 'report', 'forge', 'waveMods',
 ] as const;
 
 export interface SaveInfo {

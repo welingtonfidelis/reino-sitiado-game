@@ -18,7 +18,7 @@ const MM6 = 'KayKit Mystery Monthly Series 6 (1.1)';
 /** Modelos do pack medieval: [pasta dentro de gltf/, nome]. Todos vão para medieval/. */
 export const MEDIEVAL: [string, string][] = [
   ['tiles/base', 'hex_grass'],
-  ...['castle', 'home_A', 'home_B', 'barracks', 'archeryrange', 'lumbermill', 'mine', 'tower_A', 'tower_base', 'windmill', 'tower_B', 'church', 'stables', 'blacksmith', 'workshop'].map(
+  ...['castle', 'home_A', 'home_B', 'barracks', 'archeryrange', 'lumbermill', 'mine', 'tower_A', 'tower_base', 'windmill', 'tower_B', 'church', 'stables', 'blacksmith', 'workshop', 'tower_catapult'].map(
     (n) => ['buildings/blue', `building_${n}_blue`] as [string, string],
   ),
   ['buildings/yellow', 'building_mine_yellow'],
@@ -44,6 +44,7 @@ export const MEDIEVAL: [string, string][] = [
   ['decoration/props', 'flag_blue'],
   ['units/neutral', 'projectile_arrow'],
   ['units/neutral', 'hammer'],
+  ['buildings/neutral', 'projectile_catapult'],
 ];
 
 /** [origem relativa à coleção, destino relativo a public/assets/kaykit] */
