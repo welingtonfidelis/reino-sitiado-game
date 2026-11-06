@@ -9,7 +9,7 @@ import type { Rand } from './hex.ts';
 import { baseMods, emptyStats, nameFor } from './blessings.ts';
 import type { BlessingId, Mods, Report, WaveStats } from './blessings.ts';
 
-export type Terrain = 'grass' | 'forest' | 'rock' | 'ore' | 'crystal' | 'rift';
+export type Terrain = 'grass' | 'forest' | 'rock' | 'ore' | 'crystal' | 'rift' | 'water';
 
 export interface Tile {
   i: number;
@@ -416,6 +416,23 @@ export function createWorld(seed = 1): World {
     const ns = neighbors(w, t).filter((n) => n.terrain === 'grass');
     for (const n of ns.slice(0, 2)) n.terrain = k % 2 === 1 ? 'crystal' : 'ore';
   });
+  // Etapa 8: um ou dois lagos a meia distância (ninguém atravessa nem constrói na água).
+  const lakes = 1 + Math.floor(w.rand() * 2);
+  for (let k = 0; k < lakes; k++) {
+    const t = tileAtAngle(w, Math.PI * (0.1 + w.rand() * 0.8) + (k ? Math.PI : 0), 6 + w.rand() * 4);
+    // Lago cresce em volta do centro (não em linha), para sair redondo.
+    const want = 5 + Math.floor(w.rand() * 4);
+    const lake = [t];
+    t.terrain = 'water';
+    for (let i = 0; i < 40 && lake.length < want; i++) {
+      const from = lake[Math.floor(w.rand() * lake.length)]!;
+      const ns = neighbors(w, from).filter((n) => n.terrain !== 'water' && n.terrain !== 'rift' && hexDist(n.q, n.r, 0, 0) >= 5 && hexDist(n.q, n.r, 0, 0) < R - 1);
+      const n = ns[Math.floor(w.rand() * ns.length)];
+      if (!n) continue;
+      n.terrain = 'water';
+      lake.push(n);
+    }
+  }
   // Ninguém nasce emparedado: as fendas e o miolo ficam livres.
   for (const i of w.rifts) for (const n of neighbors(w, tiles[i]!)) if (n.terrain !== 'grass') n.terrain = 'grass';
   for (const t of list) if (hexDist(t.q, t.r, 0, 0) <= 2) t.terrain = 'grass';

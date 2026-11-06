@@ -8,7 +8,7 @@ import { createWorld } from './world.ts';
 import type { Building, Monster, Terrain, Unit, World } from './world.ts';
 
 const VERSION = 1;
-const TERRAINS: Terrain[] = ['grass', 'forest', 'rock', 'ore', 'crystal', 'rift'];
+const TERRAINS: Terrain[] = ['grass', 'forest', 'rock', 'ore', 'crystal', 'rift', 'water'];
 
 /** Campos simples copiados como estão. */
 const PLAIN = [

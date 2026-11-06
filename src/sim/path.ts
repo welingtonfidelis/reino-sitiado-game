@@ -10,7 +10,7 @@ import { castle, tileAt } from './world.ts';
 import type { Tile, World } from './world.ts';
 
 function terrainCost(t: Tile): number {
-  if (t.terrain === 'rock') return Infinity;
+  if (t.terrain === 'rock' || t.terrain === 'water') return Infinity;
   return t.terrain === 'forest' ? 1.5 : 1;
 }
 
@@ -85,7 +85,7 @@ export function computeFlow(w: World): void {
     const step = enterCost(w, t);
     for (const [dq, dr] of DIRS) {
       const n = tileAt(w, t.q + dq, t.r + dr);
-      if (!n || n.terrain === 'rock') continue;
+      if (!n || n.terrain === 'rock' || n.terrain === 'water') continue;
       const nd = d + step;
       if (nd < w.flowDist[n.i]!) {
         w.flowDist[n.i] = nd;
@@ -98,7 +98,7 @@ export function computeFlow(w: World): void {
 
 /** A gente do reino passa por aqui? (o destino sempre aceita, para chegar ao trabalho) */
 export function allyPass(w: World, t: Tile, goal: number): boolean {
-  if (t.terrain === 'rock') return false;
+  if (t.terrain === 'rock' || t.terrain === 'water') return false;
   if (t.b < 0 || t.i === goal) return true;
   const b = w.buildings.get(t.b);
   if (!b) return true;

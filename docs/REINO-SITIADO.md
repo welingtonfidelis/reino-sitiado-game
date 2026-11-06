@@ -270,7 +270,23 @@ Regra do usuário: usar os efeitos do pixelfx sempre que der (https://patch-gg.g
   - Agora, com 6 sementes: sem fazer nada cai nas ondas 4 a 5 (média 4,5); o robô chega às ondas 15 a 22 (média 17).
   - O primeiro chefe (onda 15) é a parede de quem só tem arqueiros: pede magos ou corpo a corpo.
 
-## 11. Arquitetura
+## 11. Chão com textura, lagos, plantação e rochas (Etapa 8)
+
+Pedido do usuário: texturas de grama, solo e água para disfarçar ainda mais a grade.
+
+- **Grama e solo:** texturas feitas na hora em canvas (folhinhas de grama em cinco verdes; terra com pedrinhas), sem arquivo.
+  - São projetadas pela posição no mundo (um quadro a cada 3,5 m), então não seguem a grade.
+  - O peso do solo em cada vértice mistura: os terrenos em volta (rocha, veios, fendas e margem de lago puxam para a terra); manchas de ruído pelo campo; e um pátio de terra batida em volta do castelo.
+  - O tom do terreno (floresta mais escura, fenda arroxeada) vai por cima.
+- **Lagos:** terreno novo, 'water', com um ou dois lagos de 5 a 8 ladrilhos a meia distância, crescendo em volta do centro.
+  - Ninguém atravessa (horda e gente) nem constrói na água ("Na água, não"); o morcego voa por cima.
+  - O chão afunda aos poucos a partir da margem.
+  - A água tem contorno ondulado (a margem passa onde há metade de água em volta, com um pouco de ruído), cor que escurece para o fundo, brilho correndo e espuma na beira.
+- **Plantação:** a fazenda virou um canteiro de terra retangular com cinco fileiras de trigo, girado livre, com o moinho num canto. O campo sextavado do pack saiu.
+- **Rochas:** os rochedos agora são três pedras soltas do KayKit Forest Nature Pack (Rock 1 a 4), giradas e de tamanhos diferentes, no lugar das montanhas de base sextavada.
+- O salvamento guarda o terreno 'water'; partidas salvas antes desta etapa continuam abrindo.
+
+## 12. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
@@ -289,7 +305,7 @@ Regra do usuário: usar os efeitos do pixelfx sempre que der (https://patch-gg.g
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
 - `src/ui/App.tsx`: HUD, bandeja Construir, menu do prédio, avisos e telas de começo e fim.
 
-## 12. Etapas
+## 13. Etapas
 
 | Etapa | O que | Situação |
 | --- | --- | --- |
@@ -300,9 +316,9 @@ Regra do usuário: usar os efeitos do pixelfx sempre que der (https://patch-gg.g
 | 5 | Cristal; mago, clérigo, cavaleiro e engenheiro; torre do mago, capela, estábulo, forja e oficina (seção 8) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 6 | Morcego, bruxa, troll, necromante e dois chefes (seção 9) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 7 | Relatório opcional, salvar e continuar, sons e equilíbrio com robô de teste (seção 10) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone (e ouvir os sons). |
-| 8 | Texturas próprias de grama, solo e água para o chão, para disfarçar ainda mais a grade (pedido do usuário, 2026-11-06). A plantação e as montanhas do pack ainda têm base hexagonal; rever junto. | A fazer |
+| 8 | Texturas de grama e solo, lagos com água animada, plantação e rochas sem base hexagonal (seção 11) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 
-## 13. Arte e licenças
+## 14. Arte e licenças
 
 Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art` (lista em `tools/art-manifest.ts`). Detalhes em `LICENSES.md`.
 

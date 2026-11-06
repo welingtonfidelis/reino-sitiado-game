@@ -139,6 +139,21 @@ const HOME: Record<BuildingKind, StaticKey> = {
 /** Altura do topo de cada prédio (para barras e para o arqueiro na torre). */
 const TOP: Partial<Record<BuildingKind, number>> = { castelo: 4.1, torre: 2.2, quartel: 1.7, campo: 1.8, muralha: 1.2, portao: 1.4, torreMago: 2.4, capela: 1.9, estabulo: 1.3, forja: 1.4, oficina: 1.3 };
 
+/** Plantação sem base hexagonal (Etapa 8): canteiro de terra com fileiras de trigo. */
+function farmModel(): StaticModel {
+  const plot = new THREE.BoxGeometry(1.5, 0.06, 1.2).translate(0, 0.03, 0);
+  const rows: THREE.BufferGeometry[] = [];
+  for (let k = 0; k < 5; k++) rows.push(new THREE.BoxGeometry(1.3, 0.16, 0.13).translate(0, 0.12, -0.44 + k * 0.22));
+  const crop = mergeGeometries(rows)!;
+  return {
+    parts: [
+      { geometry: plot, material: new THREE.MeshLambertMaterial({ color: '#7a5a3a' }) },
+      { geometry: crop, material: new THREE.MeshLambertMaterial({ color: '#c9a646' }) },
+    ],
+    box: new THREE.Box3(new THREE.Vector3(-0.75, 0, -0.6), new THREE.Vector3(0.75, 0.2, 0.6)),
+  };
+}
+
 /** Cristais de um veio azul (não há modelo de cristal no KayKit local): prismas de seis faces. */
 function crystalModel(): StaticModel {
   const parts: THREE.BufferGeometry[] = [];
@@ -196,6 +211,8 @@ export class World3D {
   private portals: number[] = [];
   private ground: THREE.Mesh | null = null;
   private grid: THREE.LineSegments | null = null;
+  private water: THREE.Mesh | null = null;
+  private farms!: Instanced;
 
   constructor(scene: THREE.Scene, art: Art) {
     this.scene = scene;
@@ -204,6 +221,8 @@ export class World3D {
     for (const k of ['arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina'] as StaticKey[]) big(k, 400);
     for (const k of ['castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina'] as StaticKey[]) big(k, 200);
     this.crystals = new Instanced(scene, crystalModel(), 200, true, false);
+    this.farms = new Instanced(scene, farmModel(), 120, true, true);
+    for (const k of ['rochaA', 'rochaB', 'rochaC', 'rochaD'] as StaticKey[]) big(k, 300);
     const orbGeo = new THREE.SphereGeometry(0.11, 10, 8);
     this.orbs = new THREE.InstancedMesh(orbGeo, new THREE.MeshBasicMaterial({ color: '#b48cff' }), 64);
     this.orbs.count = 0;
@@ -283,15 +302,17 @@ export class World3D {
   /** Chão, fendas: só uma vez por partida. */
   buildTerrain(w: World): void {
     // Chão contínuo: a grade hexagonal fica só na lógica (e aparece ao construir).
-    for (const o of [this.ground, this.grid]) {
+    for (const o of [this.ground, this.grid, this.water]) {
       if (!o) continue;
       this.scene.remove(o);
       o.geometry.dispose();
     }
-    const { ground, grid } = buildGround(w);
+    const { ground, grid, water } = buildGround(w);
     this.ground = ground;
     this.grid = grid;
+    this.water = water;
     this.scene.add(ground, grid);
+    if (water) this.scene.add(water);
     for (const m of this.rifts) this.scene.remove(m);
     this.rifts = [];
     w.rifts.forEach((i) => {
@@ -334,9 +355,10 @@ export class World3D {
   syncStatic(w: World): void {
     if (w.ver === this.ver) return;
     this.ver = w.ver;
-    const keys: StaticKey[] = ['arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina'];
+    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina'];
     for (const k of keys) this.sets.get(k)!.begin();
     this.crystals.begin();
+    this.farms.begin();
     const sixth = Math.PI / 3;
     for (const t of w.list) {
       const p = hexToWorld(t.q, t.r);
@@ -344,7 +366,13 @@ export class World3D {
       if (t.b >= 0) continue;
       if (t.ruin) this.place('ruina', p.x, 0, p.z, rot, 0.9);
       if (t.terrain === 'forest') this.place((['arvoreA', 'arvoreB', 'arvoreC', 'arvoreD'] as StaticKey[])[t.deco % 4]!, p.x, 0, p.z, rot);
-      else if (t.terrain === 'rock') this.place((['montanhaA', 'montanhaB', 'montanhaC'] as StaticKey[])[t.deco % 3]!, p.x, 0, p.z, rot);
+      else if (t.terrain === 'rock') {
+        // Rochedo de pedras soltas (Forest Nature Pack): sem a base sextavada das montanhas.
+        const big = (['rochaC', 'rochaA'] as StaticKey[])[t.deco % 2]!;
+        this.place(big, p.x + ((t.deco % 5) - 2) * 0.08, 0, p.z + ((t.deco % 3) - 1) * 0.1, (t.deco % 13) * 0.5, 1.9 + (t.deco % 4) * 0.15);
+        this.place((['rochaB', 'rochaD'] as StaticKey[])[t.deco % 2]!, p.x + 0.55, 0, p.z - 0.35, t.deco * 0.7, 1.3);
+        this.place('rochaA', p.x - 0.5, 0, p.z + 0.45, t.deco * 1.3, 0.9 + (t.deco % 3) * 0.2);
+      }
       else if (t.terrain === 'crystal') {
         this.place('pedraA', p.x - 0.4, 0, p.z + 0.25, rot, 2.4);
         this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rot);
@@ -371,8 +399,16 @@ export class World3D {
       let key = HOME[b.kind];
       if (b.kind === 'casa' && b.id % 2) key = 'casaB';
       const rot = b.kind === 'castelo' ? 0 : ((b.id * 7) % 6) * sixth;
+      if (b.kind === 'fazenda') {
+        // Plantação própria, girada livre (Etapa 8), com o moinho num canto.
+        const r2 = (b.id * 0.9) % Math.PI;
+        this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r2);
+        this.tmp.compose(this.p.set(p.x, 0, p.z), this.q, this.s.setScalar(1));
+        this.farms.push(this.tmp, b.id);
+        this.place('moinho', p.x + Math.cos(r2) * 0.8, 0, p.z - Math.sin(r2) * 0.8, r2, 0.8, b.id);
+        continue;
+      }
       this.place(key, p.x, 0, p.z, rot, 1, b.id);
-      if (b.kind === 'fazenda') this.place('moinho', p.x + 0.55, 0, p.z - 0.45, rot, 0.55, b.id);
       if (b.kind === 'castelo') this.place('bandeira', p.x, 4.0, p.z, 0, 1.2, b.id);
       if (b.kind === 'mina') this.place('minerio', p.x + 0.6, 0, p.z + 0.5, 0, 0.35, b.id);
     }
@@ -385,6 +421,7 @@ export class World3D {
       this.crystals.push(this.tmp);
     }
     this.crystals.end();
+    this.farms.end();
   }
 
   private wallPiece(w: World, b: Building, x: number, z: number): void {
@@ -454,6 +491,14 @@ export class World3D {
   pickBuilding(ray: THREE.Raycaster): number {
     let best = -1;
     let bd = Infinity;
+    for (const m of this.farms.meshes)
+      for (const h of ray.intersectObject(m, false)) {
+        const id = h.instanceId !== undefined ? (this.farms.ids[h.instanceId] ?? -1) : -1;
+        if (id >= 0 && h.distance < bd) {
+          bd = h.distance;
+          best = id;
+        }
+      }
     for (const [k, set] of this.sets) {
       if (k === 'flecha') continue;
       for (const m of set.meshes) {
@@ -648,6 +693,7 @@ export class World3D {
       this.bars.add(m.x, h, m.z, big ? 1.4 : 0.5, m.hp / m.maxHp, '#e2675a');
     }
     this.bars.end();
+    if (this.water) (this.water.material as THREE.ShaderMaterial).uniforms.uTime!.value = this.time;
     if (fx) {
       // Fogo nos prédios com menos da metade da vida.
       const alive = new Set<number>();

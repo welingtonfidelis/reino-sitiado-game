@@ -808,7 +808,7 @@ function waves(w: World): void {
 function blockedFor(w: World, ti: number): boolean {
   if (ti < 0) return true;
   const t = w.tiles[ti]!;
-  return t.terrain === 'rock' || t.b >= 0;
+  return t.terrain === 'rock' || t.terrain === 'water' || t.b >= 0;
 }
 
 /** Morcego: voa reto até a casa (ou prédio) mais perto, ignorando muralhas. */

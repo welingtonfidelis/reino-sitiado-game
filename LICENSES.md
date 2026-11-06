@@ -12,6 +12,7 @@ copiados por `npm run art` conforme `tools/art-manifest.ts`.
 | KayKit Mystery Monthly 4 | Werewolf_Wolf, OrcRaider, Orc_Axe; Paladin_with_Helmet, paladin_hammer, paladin_shield e a textura (o cavaleiro) |
 | KayKit Mystery Monthly 6 | Farmer_A, Farmer_B, OrcBrute; Cleric, Cleric_Mace e a textura |
 | KayKit Adventurers 2.0 (Etapa 5) | Mage, Engineer, staff e mage_texture |
+| KayKit Forest Nature Pack 1.0 (Etapa 8) | Rock_1_A a Rock_4_A (Color1) e forest_texture |
 | KayKit Skeletons 1.1 (Etapa 6) | Necromancer, Skeleton_Golem, Skeleton_Staff |
 | KayKit Mystery Monthly 5 (Etapa 6) | Witch, FrostGolem |
 | KayKit Mystery Monthly 6 (Etapa 6) | Monstrosity (o troll) |
@@ -71,7 +72,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-Os cristais dos veios azuis são feitos no próprio projeto (não há cristal no KayKit local).
+Os cristais dos veios azuis, a plantação, as texturas de grama e solo e a água são feitos no próprio projeto.
 
 O código, a interface e as regras são do próprio projeto. A interface usa os tokens e
 componentes do design system do Vigília, outro projeto do mesmo autor.

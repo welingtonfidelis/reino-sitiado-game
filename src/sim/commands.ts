@@ -28,6 +28,7 @@ export function placeProblem(w: World, kind: BuildingKind, q: number, r: number,
   if (!t) return 'Fora do mapa';
   if (hexDist(q, r, 0, 0) >= w.grid.R) return 'Perto demais da borda';
   if (t.terrain === 'rift') return 'Em cima da fenda, não';
+  if (t.terrain === 'water') return 'Na água, não';
   const def = BUILDINGS[kind];
   if (def.site === 'wall') {
     const b = t.b >= 0 ? w.buildings.get(t.b) : undefined;
@@ -211,7 +212,7 @@ export function freeWorkersOf(w: World, b: Building): void {
 function groundOk(w: World, x: number, z: number): number {
   const h = worldToHex(x, z);
   const t = tileAt(w, h.q, h.r);
-  if (!t || t.terrain === 'rock') return -1;
+  if (!t || t.terrain === 'rock' || t.terrain === 'water') return -1;
   return t.i;
 }
 

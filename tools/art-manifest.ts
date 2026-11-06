@@ -12,6 +12,7 @@ const RB = 'KayKit Resource Bits 1.0/Assets/gltf';
 const CA = 'KayKit Character Animations 1.1/Animations/gltf';
 const MM4 = 'KayKit Mystery Monthly Series 4 (1.1)';
 const MM5 = 'KayKit Mystery Monthly Series 5 (1.1)';
+const FN = 'KayKit Forest Nature Pack 1.0/Assets/gltf/Color1';
 const MM6 = 'KayKit Mystery Monthly Series 6 (1.1)';
 
 /** Modelos do pack medieval: [pasta dentro de gltf/, nome]. Todos vão para medieval/. */
@@ -96,6 +97,12 @@ export const ART: [string, string][] = [
   [`${SK}/assets/gltf/Skeleton_Staff.bin`, 'weapons/Skeleton_Staff.bin'],
   [`${SK}/assets/gltf/skeleton_texture_A.png`, 'weapons/skeleton_texture_A.png'],
   [`${MM4}/1 - July 2023 - Orc Raider/assets/gltf/Orc_Axe.gltf.glb`, 'weapons/Orc_Axe.glb'],
+  // Etapa 8: rochas sem base hexagonal (Forest Nature Pack) no lugar das montanhas do pack medieval.
+  ...[1, 2, 3, 4].flatMap((n) => [
+    [`${FN}/Rock_${n}_A_Color1.gltf`, `forest/Rock_${n}_A_Color1.gltf`],
+    [`${FN}/Rock_${n}_A_Color1.bin`, `forest/Rock_${n}_A_Color1.bin`],
+  ] as [string, string][]),
+  [`${FN}/forest_texture.png`, 'forest/forest_texture.png'],
   // Minério da mina.
   [`${RB}/Iron_Nuggets.gltf`, 'resource/Iron_Nuggets.gltf'],
   [`${RB}/Iron_Nuggets.bin`, 'resource/Iron_Nuggets.bin'],
