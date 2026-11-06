@@ -4,7 +4,7 @@ Tower defense sem fim em 2.5D isométrico. O jogador ergue um reino em volta do 
 
 Nome provisório. Proposta visual (canvas, design system Vigília): https://claude.ai/artifact/E2kdbKNuRkqvb9bmsePrsy
 
-Repositório: https://github.com/welingtonfidelis/reino-sitiado-game (criado pelo usuário em 2026-11-06). As etapas 1 a 6 estão na `main` (commit 7ff4b86). Commit e push só quando o usuário pedir.
+Repositório: https://github.com/welingtonfidelis/reino-sitiado-game (criado pelo usuário em 2026-11-06). As etapas 1 a 9 estão na `main` (a 9 no commit 2851f64). Commit e push só quando o usuário pedir.
 
 ## 1. Decisões
 
@@ -344,8 +344,8 @@ Pedido do usuário: as defesas que faltavam da proposta e ondas mais variadas.
 | 5 | Cristal; mago, clérigo, cavaleiro e engenheiro; torre do mago, capela, estábulo, forja e oficina (seção 8) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 6 | Morcego, bruxa, troll, necromante e dois chefes (seção 9) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 7 | Relatório opcional, salvar e continuar, sons e equilíbrio com robô de teste (seção 10) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone (e ouvir os sons). |
-| 9 | Catapulta, fosso de piche, estacas e um modificador de onda a cada 5 ondas (seção 12) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 8 | Texturas de grama e solo, lagos com água animada, plantação e rochas sem base hexagonal (seção 11) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
+| 9 | Catapulta, fosso de piche, estacas e um modificador de onda a cada 5 ondas (seção 12) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 
 ## 15. Arte e licenças
 
