@@ -4,7 +4,7 @@ Tower defense sem fim em 2.5D isométrico. O jogador ergue um reino em volta do 
 
 Nome provisório. Proposta visual (canvas, design system Vigília): https://claude.ai/artifact/E2kdbKNuRkqvb9bmsePrsy
 
-Repositório: https://github.com/welingtonfidelis/reino-sitiado-game (criado pelo usuário em 2026-11-06). As etapas 1 a 9 estão na `main` (a 9 no commit 2851f64). Commit e push só quando o usuário pedir.
+Repositório: https://github.com/welingtonfidelis/reino-sitiado-game (criado pelo usuário em 2026-11-06). As etapas 1 a 10 estão na `main`; cada etapa tem o seu commit ("Etapa N: …" no `git log`). Commit e push só quando o usuário pedir.
 
 ## 1. Decisões
 
