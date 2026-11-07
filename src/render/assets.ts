@@ -82,6 +82,10 @@ const CHAR_FILES: Record<CharKey, string> = {
   necromante: 'chars/Necromancer.glb',
   golem: 'chars/FrostGolem.glb',
   golemOssos: 'chars/Skeleton_Golem.glb',
+  barbaro: 'chars/Barbarian.glb',
+  atiradora: 'chars/Rogue_Hooded.glb',
+  druida: 'chars/Druid.glb',
+  cavaleiroNegro: 'chars/BlackKnight.glb',
 };
 /** Altura de cada personagem no mundo (um hexágono tem 2 m; a casa tem ~1 m). */
 export const CHAR_HEIGHT: Record<CharKey, number> = {
@@ -102,6 +106,11 @@ export const CHAR_HEIGHT: Record<CharKey, number> = {
   necromante: 0.66,
   golem: 1.8,
   golemOssos: 1.9,
+  // Heróis um pouco maiores que as tropas, para a criança achar de longe.
+  barbaro: 0.74,
+  atiradora: 0.7,
+  druida: 0.7,
+  cavaleiroNegro: 0.78,
 };
 /** Personagens do rig grande (animações do Rig_Large). */
 export const LARGE: ReadonlySet<CharKey> = new Set(['bruto', 'troll', 'golem', 'golemOssos']);
@@ -123,6 +132,11 @@ const WEAPONS = {
   picareta: 'tools/pickaxe.gltf',
   pa: 'tools/shovel.gltf',
   cajadoOsso: 'weapons/Skeleton_Staff.gltf',
+  machadoGrande: 'weapons/axe_2handed.gltf',
+  cajadoDruida: 'weapons/druid_staff.gltf',
+  besta: 'weapons/crossbow_2handed.gltf',
+  espadaNegra: 'weapons/BlackKnight_Sword.gltf',
+  escudoNegro: 'weapons/BlackKnight_Shield.gltf',
 } as const;
 export type WeaponKey = keyof typeof WEAPONS;
 

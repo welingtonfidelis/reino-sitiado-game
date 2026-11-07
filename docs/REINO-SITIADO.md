@@ -431,7 +431,31 @@ Pedido do usuário em 2026-11-07 ("enfeites"). Antes, o castelo sumia e o diálo
 - A simulação para no instante da derrota; o jogo chama `refresh` na hora, para o castelo sair do desenho e os escombros entrarem (antes ele continuaria desenhado).
 - Código: `startFall`/`stepFall` em `src/render/world3d.ts` (uma cópia do modelo do castelo e da bandeira); `fallT`/`fallAt` no `Game`; a câmera no laço de `src/main.tsx`.
 
-## 17. Arquitetura
+## 17. Heróis (Etapa 14)
+
+Pedido do usuário em 2026-11-07: para o jogo não ficar repetitivo quando sobra recurso e exército, heróis especiais comprados no castelo, caros, para o fim do jogo.
+
+- **Por quê ouro:** o robô de equilíbrio mostrou que, no fim, sobra ouro (~800 na onda 16, ~2.600 na 28) e falta ferro (quase zero). Os heróis custam ouro e um pouco de cristal, nunca ferro.
+- **Onde:** no anel do castelo, a casa de baixo à esquerda (o castelo não tem Destruir) vira "Heróis", que abre um submenu com os quatro, como a forja. Libera com o castelo **nível 2**.
+  - Primeiro pensei no nível 3, mas ele pede ferro e o robô só chegava lá pela onda 28; no 2, o primeiro herói vem por volta da onda 16.
+- **Preço:** 600 de ouro e 30 de cristal; +50% a cada herói que o reino já tem (900, 1.350, 2.025). Um de cada.
+- **Não morre:** com a vida a zero, desmaia, some para dentro do castelo e volta pela porta 45 s depois, de vida cheia. Ninguém perde a compra.
+- **Nível 1 a 5:** sobe pelo dano que causa (400, 1.000, 2.000 e 3.600 de dano no total); cada nível dá +20% de vida e de dano. Ao subir, aparece "NOVO NÍVEL" em cima dele e um aviso.
+- **Golpe especial automático** (sem precisar mandar):
+
+| Herói | Modelo e arma | Ataque | Golpe especial | Recarga |
+| --- | --- | --- | --- | --- |
+| Bárbaro | Barbarian, machado de duas mãos | corpo a corpo forte (30) | giro do machado: o triplo do dano em todos a até 1,9 m | 8 s |
+| Atiradora | Rogue_Hooded, besta | de longe (9,5 m) | chuva de virotes onde a horda está mais junta (até 12 m): 35 em todos a 2,3 m; acerta quem voa | 10 s |
+| Druida | Druid, cajado | magia (6,5 m) | raízes prendem a horda a até 4 m por 3 s, e quem é do reino ali se cura 30 | 10 s |
+| Cavaleiro Negro | BlackKnight, espada e escudo | corpo a corpo (40), o dobro nos chefes | pisão: 45 (o dobro nos chefes) e atordoa todos a até 2,5 m por 2 s | 9 s |
+
+- **Na tela:** anel dourado no chão e barra de vida dourada sempre à vista; o Bárbaro gira na animação durante o golpe; a Atiradora e o Bárbaro usam as animações de duas mãos. Efeitos do pixelfx: giro (melee/spin-slash), chuva (arcane/star-fall), raízes (nature/root-snare, em cada monstro preso), pisão (impacts/heavy-landing) e um cone de luz (holy/blessing) quando o herói chega ou volta.
+- **Escolher:** no submenu, herói comprado aparece com o nível no número dourado; tocar nele escolhe o herói para mandar para um lugar. Os heróis também entram no Selecionar.
+- **Robô (6 sementes):** com heróis, 22,5 ondas em média; sem heróis (`HEROIS=0 npm run balance`), 22,3. Eles chegam no fim e ajudam sem tirar o desafio; o ouro deixa de se acumular.
+- **Código:** `HERO_KINDS`, `HERO_INFO` e `CONFIG.heroes` em `src/sim/config.ts`; comportamento, golpes, nível e desmaio em `src/sim/step.ts` (`heroStep`, `heroSpecial`, `knockDown`); compra em `src/sim/commands.ts` (`buyHero`, `heroCost`, `heroProblem`); submenu em `src/ui/Radial.tsx` (`heroActs`).
+
+## 18. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
@@ -450,7 +474,7 @@ Pedido do usuário em 2026-11-07 ("enfeites"). Antes, o castelo sumia e o diálo
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
 - `src/ui/App.tsx`: HUD, ⋯, botões flutuantes, avisos e telas de começo e fim. O menu do prédio e o leque do Construir ficam em `src/ui/Radial.tsx` (seções 14 e 15).
 
-## 18. Etapas
+## 19. Etapas
 
 | Etapa | O que | Situação |
 | --- | --- | --- |
@@ -467,8 +491,9 @@ Pedido do usuário em 2026-11-07 ("enfeites"). Antes, o castelo sumia e o diálo
 | 11 | Menu circular do prédio no lugar do painel quadrado, no computador e no celular (seção 14) | Pronta em 2026-11-06. Vista no navegador do Mac, em tamanho de computador e de celular; falta jogar no iPhone. |
 | 12 | HUD novo: topo em pilha, ritmo em dois botões, ⋯ com diário, avisos fora da tela no celular, botões flutuantes e Construir em leque (seção 15) | Pronta em 2026-11-06. Vista no navegador do Mac em 1024×768, 375×812, 844×390 e 360×640; falta jogar no iPhone. |
 | 13 | Queda do castelo antes do diálogo de derrota (seção 16) | Pronta em 2026-11-07. Vista no navegador do Mac (tremor, meio da queda e fim); falta jogar no iPhone e ouvir o estrondo. |
+| 14 | Heróis: Bárbaro, Atiradora, Druida e Cavaleiro Negro, comprados no castelo (seção 17) | Pronta em 2026-11-07. Vista no navegador do Mac (compra, giro, os quatro modelos, submenu); falta jogar no iPhone. |
 
-## 19. Arte e licenças
+## 20. Arte e licenças
 
 Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art` (lista em `tools/art-manifest.ts`). Detalhes em `LICENSES.md`.
 
@@ -481,5 +506,6 @@ Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art`
 | Resource Bits | minério |
 | RPG Tools Bits | pá, machado, picareta e martelo |
 | Character Animations | todas as animações |
+| Heróis (Etapa 14) | Barbarian, Rogue_Hooded e Druid (Adventurers) com machado de duas mãos, besta e cajado; BlackKnight (Mystery Monthly 5) com espada e escudo |
 
 Os efeitos vêm do pixelfx (MIT); detalhes na seção 6 e em `LICENSES.md`.

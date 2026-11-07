@@ -37,6 +37,16 @@ export const FX_SHEETS = {
   alma: { file: 'alma.png', w: 1976, h: 256, cols: 26, cw: 76, ch: 128, frames: 47, fps: 15, loop: false, ox: 38, oy: 113 },
   /** Healing bloom (pixelfx `nature/healing-bloom`). */
   bloom: { file: 'bloom.png', w: 2014, h: 357, cols: 19, cw: 106, ch: 119, frames: 49, fps: 15, loop: false, ox: 52, oy: 106 },
+  /** Spin slash (pixelfx `melee/spin-slash`). */
+  giro: { file: 'giro.png', w: 1925, h: 94, cols: 11, cw: 175, ch: 94, frames: 11, fps: 15, loop: false, ox: 75, oy: 73 },
+  /** Star fall (pixelfx `arcane/star-fall`). */
+  chuva: { file: 'chuva.png', w: 2028, h: 310, cols: 12, cw: 169, ch: 155, frames: 23, fps: 10, loop: false, ox: 95, oy: 132 },
+  /** Root snare (pixelfx `nature/root-snare`). */
+  raizes: { file: 'raizes.png', w: 2034, h: 162, cols: 18, cw: 113, ch: 54, frames: 40, fps: 15, loop: false, ox: 57, oy: 37 },
+  /** Heavy landing (pixelfx `impacts/heavy-landing`). */
+  pisao: { file: 'pisao.png', w: 1918, h: 84, cols: 14, cw: 137, ch: 42, frames: 22, fps: 15, loop: false, ox: 70, oy: 28 },
+  /** Blessing (pixelfx `holy/blessing`). */
+  bencao: { file: 'bencao.png', w: 1410, h: 125, cols: 30, cw: 47, ch: 125, frames: 30, fps: 10, loop: true, ox: 23, oy: 109 },
 } as const;
 
 export type FxKey = keyof typeof FX_SHEETS;

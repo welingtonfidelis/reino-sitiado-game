@@ -256,6 +256,10 @@ function SelectionBar({ game, touch }: { game: Game; touch: boolean }) {
     clerigo: ['clérigo', 'clérigos'],
     cavaleiro: ['cavaleiro', 'cavaleiros'],
     engenheiro: ['engenheiro', 'engenheiros'],
+    barbaro: ['Bárbaro', 'Bárbaros'],
+    atiradora: ['Atiradora', 'Atiradoras'],
+    druida: ['Druida', 'Druidas'],
+    cavaleiroNegro: ['Cavaleiro Negro', 'Cavaleiros Negros'],
   };
   const tally = new Map<UnitKind, number>();
   for (const id of game.units) {

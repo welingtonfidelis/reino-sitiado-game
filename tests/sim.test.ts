@@ -32,8 +32,8 @@ import {
   waveSize,
   workers,
 } from '../src/sim/index.ts';
-import { MONSTERS, UNITS } from '../src/sim/index.ts';
-import type { MonsterKind, World } from '../src/sim/index.ts';
+import { MONSTERS, UNITS, buyHero, heroCost, heroOf, heroProblem } from '../src/sim/index.ts';
+import type { Monster, MonsterKind, World } from '../src/sim/index.ts';
 
 function run(w: World, seconds: number, stop?: (w: World) => boolean): void {
   for (let i = 0; i < seconds * CONFIG.tps; i++) {
@@ -687,5 +687,107 @@ describe('arqueiros e torres', () => {
     run(w, 25, () => us.every((u) => u.state === 'tower'));
     expect(us.every((u) => u.state === 'tower')).toBe(true);
     expect(callArchers(w, t.id)).toContain('Nenhum arqueiro no chão');
+  });
+});
+
+describe('heróis (Etapa 14)', () => {
+  function monster(w: World, kind: MonsterKind, x: number, z: number, hp?: number) {
+    const def = MONSTERS[kind];
+    const h = hp ?? def.hp;
+    const m: Monster = { id: w.nextId++, kind, x, z, hp: h, maxHp: h, speed: def.speed, dmg: def.dmg, cd: 0, state: 'walk', facing: 0, deadT: 0, burnT: 99, healT: 0, summonT: 0, owner: -1 };
+    w.monsters.set(m.id, m);
+    return m;
+  }
+  /** Reino rico e castelo nível 3 (os heróis liberam no 2). */
+  function rich(seed: number): World {
+    const w = createWorld(seed);
+    calm(w);
+    castle(w)!.level = 3;
+    w.res.ouro = 10000;
+    w.res.cristal = 1000;
+    return w;
+  }
+
+  it('pede castelo nível 2, um de cada, e o preço sobe 50% por herói', () => {
+    const w = createWorld(70);
+    w.res.ouro = 10000;
+    w.res.cristal = 1000;
+    expect(heroProblem(w, 'barbaro')).toContain('nível 2');
+    castle(w)!.level = 2;
+    expect(heroCost(w)).toEqual({ cristal: 30, ouro: 600 });
+    expect(buyHero(w, 'barbaro')).toBeNull();
+    expect(w.res.ouro).toBe(9400);
+    expect(heroProblem(w, 'barbaro')).toBe('Já está no reino');
+    expect(heroCost(w)).toEqual({ cristal: 45, ouro: 900 });
+    expect(buyHero(w, 'druida')).toBeNull();
+    expect(heroCost(w).ouro).toBe(1350);
+  });
+
+  it('o herói não morre: desmaia e volta ao castelo com a vida cheia', () => {
+    const w = rich(71);
+    buyHero(w, 'cavaleiroNegro');
+    const h = heroOf(w, 'cavaleiroNegro')!;
+    const m = monster(w, 'orc', h.x, h.z + 0.3);
+    m.dmg = 100000;
+    run(w, 3, () => (h.downT ?? 0) > 0);
+    expect(h.state).toBe('shelter');
+    expect(h.downT).toBeGreaterThan(0);
+    w.monsters.clear();
+    run(w, CONFIG.heroes.downTime + 2);
+    expect(h.state).not.toBe('dead');
+    expect(h.state).not.toBe('shelter');
+    expect(h.hp).toBe(h.maxHp);
+  });
+
+  it('o giro do bárbaro acerta todos em volta de uma vez', () => {
+    const w = rich(72);
+    buyHero(w, 'barbaro');
+    const h = heroOf(w, 'barbaro')!;
+    h.specialT = 0;
+    const ms = [0, 1, 2].map((i) => monster(w, 'esqueleto', h.x + Math.cos(i * 2) * 1.2, h.z + Math.sin(i * 2) * 1.2, 500));
+    for (const m of ms) m.speed = 0;
+    run(w, 0.2);
+    for (const m of ms) expect(m.hp).toBeLessThanOrEqual(500 - UNITS.barbaro.dmg * CONFIG.heroes.barbaro.mult + 1);
+  });
+
+  it('as raízes da druida prendem a horda em volta', () => {
+    const w = rich(73);
+    buyHero(w, 'druida');
+    const h = heroOf(w, 'druida')!;
+    h.specialT = 0;
+    const m = monster(w, 'orc', h.x + 2.5, h.z, 5000);
+    const x0 = m.x;
+    run(w, 0.1);
+    expect(m.stunT ?? 0).toBeGreaterThan(2);
+    const x1 = m.x;
+    run(w, 2);
+    expect(Math.abs(m.x - x1)).toBeLessThan(0.01);
+    void x0;
+  });
+
+  it('o herói sobe de nível pelo dano que causa e ganha vida', () => {
+    const w = rich(74);
+    buyHero(w, 'atiradora');
+    const h = heroOf(w, 'atiradora')!;
+    const hp1 = h.maxHp;
+    for (let i = 0; i < 12; i++) monster(w, 'orc', h.x + 3 + (i % 4) * 0.3, h.z + Math.floor(i / 4) * 0.3, 200).speed = 0;
+    run(w, 40, () => (h.level ?? 1) >= 2);
+    expect(h.level).toBeGreaterThanOrEqual(2);
+    expect(h.maxHp).toBeGreaterThan(hp1);
+  });
+
+  it('o jogo salvo guarda o herói, o nível e o desmaio', () => {
+    const w = rich(75);
+    buyHero(w, 'barbaro');
+    const h = heroOf(w, 'barbaro')!;
+    h.level = 3;
+    h.xp = 1200;
+    h.downT = 10;
+    h.state = 'shelter';
+    const b = loadWorld(saveWorld(w))!;
+    const h2 = heroOf(b, 'barbaro')!;
+    expect(h2.level).toBe(3);
+    expect(h2.xp).toBe(1200);
+    expect(h2.downT).toBe(10);
   });
 });

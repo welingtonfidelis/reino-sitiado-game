@@ -22,6 +22,11 @@ import {
   hexToWorld,
   housing,
   igniteProblem,
+  HERO_INFO,
+  HERO_KINDS,
+  heroCost,
+  heroOf,
+  heroProblem,
   callArchersProblem,
   towerSlots,
   levelProblem,
@@ -35,7 +40,7 @@ import {
   upgradeProblem,
   workers,
 } from '../sim/index.ts';
-import type { Building, BuildingKind, Category, Cost, ForgeLine } from '../sim/index.ts';
+import type { Building, BuildingKind, Category, Cost, ForgeLine, HeroKind } from '../sim/index.ts';
 import type { Game } from '../game/game.ts';
 import type { IsoCamera } from '../render/camera.ts';
 import { Icon, costText } from './common.tsx';
@@ -62,6 +67,10 @@ const FAN = [-90, -45, 0, -180, -135];
 /** Submenu da forja: três linhas em volta, Voltar no meio. */
 const SUB_RING = [-90, 30, 150];
 const SUB_FAN = [-90, 0, -180];
+/** Submenu dos heróis: quatro em volta (ou em leque perto da borda). */
+const HERO_RING = [-90, 0, 90, 180];
+const HERO_FAN = [-180, -120, -60, 0];
+const HERO_ICON: Record<HeroKind, string> = { barbaro: 'machado', atiradora: 'arco', druida: 'folha', cavaleiroNegro: 'escudo' };
 
 const FORGE: [ForgeLine, string, string, string][] = [
   ['armas', 'Armas', 'espadas', '+20% de dano corpo a corpo e dos magos'],
@@ -69,7 +78,7 @@ const FORGE: [ForgeLine, string, string, string][] = [
   ['flechas', 'Pontas', 'flecha', '+15% de dano das flechas'],
 ];
 
-function mainActs(game: Game, b: Building, openForge: () => void): Act[] {
+function mainActs(game: Game, b: Building, openForge: () => void, openHeroes: () => void): Act[] {
   const w = game.world;
   const def = BUILDINGS[b.kind];
   const name = def.name.toLowerCase();
@@ -182,6 +191,20 @@ function mainActs(game: Game, b: Building, openForge: () => void): Act[] {
     why: repairProblem(w, b),
     run: () => game.repair(b.id),
   });
+  if (b.kind === 'castelo') {
+    // Etapa 14: o castelo não se derruba, e a casa de baixo à esquerda vira a dos heróis.
+    const lvl = CONFIG.heroes.castleLevel;
+    acts.push({
+      id: 'herois',
+      slot: 3,
+      icon: 'coroa',
+      label: 'Heróis',
+      tone: 'primary',
+      hint: `Heróis especiais, um de cada, com golpe especial automático. O próximo custa ${costText(heroCost(w))}.`,
+      why: b.level < lvl ? `Precisa do castelo nível ${lvl}` : null,
+      run: openHeroes,
+    });
+  }
   // O castelo não se derruba nem sai do lugar: essas casas ficam vazias (ou com outra ação).
   if (!demolishProblem(w, b)) {
     acts.push({
@@ -221,6 +244,36 @@ function mainActs(game: Game, b: Building, openForge: () => void): Act[] {
     });
   }
   return acts;
+}
+
+function heroActs(game: Game): Act[] {
+  const w = game.world;
+  const cost = heroCost(w);
+  return HERO_KINDS.map((k, i) => {
+    const h = heroOf(w, k);
+    const info = HERO_INFO[k];
+    const down = !!h && (h.downT ?? 0) > 0;
+    return {
+      id: k,
+      slot: i,
+      icon: HERO_ICON[k],
+      label: info.short,
+      tone: (h ? 'on' : 'primary') as Tone,
+      badge: h ? `${h.level ?? 1}` : undefined,
+      hint: h
+        ? `${UNITS[k].name}, nível ${h.level ?? 1} de 5. ${info.special}: ${info.text}${down ? '' : ' Toque para escolher e mandar ele para um lugar.'}`
+        : `${UNITS[k].name} · ${costText(cost)}. ${info.special}: ${info.text}`,
+      why: h ? (down ? `Desmaiado: volta em ${Math.ceil(h.downT ?? 0)} s` : null) : heroProblem(w, k),
+      run: () => {
+        if (!h) {
+          game.buyHero(k);
+          return;
+        }
+        game.selected = -1;
+        game.selectUnits([h.id]);
+      },
+    };
+  });
 }
 
 function forgeActs(game: Game): Act[] {
@@ -323,7 +376,7 @@ export const clamp = (v: number, lo: number, hi: number) => (lo > hi ? (lo + hi)
 export function RadialMenu({ game, cam, b, touch }: { game: Game; cam: IsoCamera; b: Building; touch: boolean }) {
   // Redesenha a cada quadro enquanto aberto: o anel acompanha o prédio ao arrastar e dar zoom.
   const [, frame] = useReducer((n: number) => n + 1, 0);
-  const [sub, setSub] = useState<'forja' | null>(null);
+  const [sub, setSub] = useState<'forja' | 'herois' | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
   const press = useRef<{ id: string; long: boolean; timer: number } | null>(null);
@@ -352,7 +405,17 @@ export function RadialMenu({ game, cam, b, touch }: { game: Game; cam: IsoCamera
 
   const w = game.world;
   const def = BUILDINGS[b.kind];
-  const acts = sub === 'forja' ? forgeActs(game) : mainActs(game, b, () => (setSub('forja'), setFocus(null)));
+  const acts =
+    sub === 'forja'
+      ? forgeActs(game)
+      : sub === 'herois'
+        ? heroActs(game)
+        : mainActs(
+            game,
+            b,
+            () => (setSub('forja'), setFocus(null)),
+            () => (setSub('herois'), setFocus(null)),
+          );
 
   // Onde fica: em volta do prédio, sem sair da tela.
   const vw = window.innerWidth;
@@ -383,7 +446,7 @@ export function RadialMenu({ game, cam, b, touch }: { game: Game; cam: IsoCamera
   const above = fan || roomAbove >= cardH || (roomBelow < cardH && roomAbove > roomBelow);
   const cardLeft = clamp(cx - cardW / 2, 8, vw - cardW - 8);
 
-  const angles = sub ? (fan ? SUB_FAN : SUB_RING) : fan ? FAN : RING;
+  const angles = sub === 'herois' ? (fan ? HERO_FAN : HERO_RING) : sub ? (fan ? SUB_FAN : SUB_RING) : fan ? FAN : RING;
   const shownId = focus ?? (confirm ? 'destruir' : (acts.find((a) => a.slot === 0)?.id ?? null));
   const shown = acts.find((a) => a.id === shownId) ?? null;
 

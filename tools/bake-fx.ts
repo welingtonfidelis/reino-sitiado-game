@@ -42,6 +42,12 @@ const EFFECTS: { key: string; file: string; fps: number; opts?: Record<string, u
   { key: 'morcego', file: 'critters/bat', fps: 15 },
   { key: 'alma', file: 'spawn/soul-rise', fps: 15 },
   { key: 'bloom', file: 'nature/healing-bloom', fps: 15 },
+  // Etapa 14: golpes dos heróis e o cone de luz quando um herói chega ou volta.
+  { key: 'giro', file: 'melee/spin-slash', fps: 20 },
+  { key: 'chuva', file: 'arcane/star-fall', fps: 12 },
+  { key: 'raizes', file: 'nature/root-snare', fps: 15 },
+  { key: 'pisao', file: 'impacts/heavy-landing', fps: 15 },
+  { key: 'bencao', file: 'holy/blessing', fps: 12 },
 ];
 
 const MAX_W = 2048;

@@ -74,6 +74,11 @@ export const ART: [string, string][] = [
   [`${SK}/characters/gltf/Necromancer.glb`, 'chars/Necromancer.glb'],
   [`${MM5}/7 - January 2025 - FrostGolem/characters/FrostGolem.glb`, 'chars/FrostGolem.glb'],
   [`${SK}/characters/gltf/Skeleton_Golem.glb`, 'chars/Skeleton_Golem.glb'],
+  // Etapa 14: heróis (a atiradora é a ladina encapuzada, de besta).
+  [`${ADV}/Characters/gltf/Barbarian.glb`, 'chars/Barbarian.glb'],
+  [`${ADV}/Characters/gltf/Rogue_Hooded.glb`, 'chars/Rogue_Hooded.glb'],
+  [`${ADV}/Characters/gltf/Druid.glb`, 'chars/Druid.glb'],
+  [`${MM5}/3 - September 2024 - Black Knight/characters/BlackKnight.glb`, 'chars/BlackKnight.glb'],
   // Armas.
   ...['sword_1handed', 'shield_round_color', 'bow_withString'].flatMap((n) => [
     [`${ADV}/Assets/gltf/${n}.gltf`, `weapons/${n}.gltf`],
@@ -98,6 +103,17 @@ export const ART: [string, string][] = [
   [`${SK}/assets/gltf/Skeleton_Staff.bin`, 'weapons/Skeleton_Staff.bin'],
   [`${SK}/assets/gltf/skeleton_texture_A.png`, 'weapons/skeleton_texture_A.png'],
   [`${MM4}/1 - July 2023 - Orc Raider/assets/gltf/Orc_Axe.gltf.glb`, 'weapons/Orc_Axe.glb'],
+  // Armas dos heróis (Etapa 14).
+  ...['axe_2handed', 'druid_staff', 'crossbow_2handed'].flatMap((n) => [
+    [`${ADV}/Assets/gltf/${n}.gltf`, `weapons/${n}.gltf`],
+    [`${ADV}/Assets/gltf/${n}.bin`, `weapons/${n}.bin`],
+  ] as [string, string][]),
+  ...['barbarian_texture.png', 'druid_texture.png', 'rogue_texture.png'].map((n) => [`${ADV}/Assets/gltf/${n}`, `weapons/${n}`] as [string, string]),
+  ...['BlackKnight_Sword', 'BlackKnight_Shield'].flatMap((n) => [
+    [`${MM5}/3 - September 2024 - Black Knight/assets/gltf/${n}.gltf`, `weapons/${n}.gltf`],
+    [`${MM5}/3 - September 2024 - Black Knight/assets/gltf/${n}.bin`, `weapons/${n}.bin`],
+  ] as [string, string][]),
+  [`${MM5}/3 - September 2024 - Black Knight/assets/gltf/blackknight_texture.png`, 'weapons/blackknight_texture.png'],
   // Ferramentas dos trabalhadores (RPG Tools Bits): machado na serraria, picareta na pedreira e na mina, pá na fazenda;
   // o martelo vai para o engenheiro (o do pack medieval ficava minúsculo na mão).
   ...['axe', 'pickaxe', 'shovel', 'hammer'].flatMap((n) => [

@@ -26,8 +26,14 @@ export const FX_SCALE: Record<FxKey, number> = {
   morcego: 0.012,
   alma: 0.011,
   bloom: 0.012,
+  // Heróis (Etapa 14): o tamanho na tela casa com o raio do golpe (com SPECIAL_SCALE do world3d).
+  giro: 0.018,
+  chuva: 0.02,
+  raizes: 0.009,
+  pisao: 0.02,
+  bencao: 0.012,
 };
-const CAP: Record<FxKey, number> = { faisca: 96, pancada: 64, espada: 48, garra: 64, poof: 64, explosao: 8, fogo: 48, portal: 4, nivel: 2, moedas: 2, mana: 32, cura: 48, golpe: 32, morcego: 128, alma: 32, bloom: 24 };
+const CAP: Record<FxKey, number> = { faisca: 96, pancada: 64, espada: 48, garra: 64, poof: 64, explosao: 8, fogo: 48, portal: 4, nivel: 2, moedas: 2, mana: 32, cura: 48, golpe: 32, morcego: 128, alma: 32, bloom: 24, giro: 8, chuva: 8, raizes: 24, pisao: 8, bencao: 8 };
 
 const VERT = /* glsl */ `
 attribute vec4 aPos;   // xyz âncora, w = escala (m por px)

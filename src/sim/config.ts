@@ -28,7 +28,11 @@ export type BuildingKind =
   | 'estacas';
 
 export type Category = 'economia' | 'defesa' | 'militar' | 'moradia';
-export type UnitKind = 'trabalhador' | 'soldado' | 'arqueiro' | 'mago' | 'clerigo' | 'cavaleiro' | 'engenheiro';
+export type UnitKind = 'trabalhador' | 'soldado' | 'arqueiro' | 'mago' | 'clerigo' | 'cavaleiro' | 'engenheiro' | HeroKind;
+/** Etapa 14: heróis comprados no castelo (um de cada, caros, golpe especial automático). */
+export type HeroKind = 'barbaro' | 'atiradora' | 'druida' | 'cavaleiroNegro';
+export const HERO_KINDS: HeroKind[] = ['barbaro', 'atiradora', 'druida', 'cavaleiroNegro'];
+export const isHero = (k: UnitKind): k is HeroKind => (HERO_KINDS as UnitKind[]).includes(k);
 export type MonsterKind = 'esqueleto' | 'lobisomem' | 'orc' | 'bruto' | 'morcego' | 'bruxa' | 'troll' | 'necromante' | 'golem' | 'golemOssos';
 /** Onde o prédio pode ficar: chão livre, vizinho da floresta, vizinho da rocha, em cima do veio, em cima de muralha. */
 export type Site = 'grass' | 'nearForest' | 'nearRock' | 'ore' | 'wall';
@@ -102,6 +106,11 @@ export const UNITS: Record<UnitKind, UnitDef> = {
   clerigo: { name: 'Clérigo', hp: 45, speed: 1.5, dmg: 0, cd: 2.0, range: 3.5, cost: { comida: 25, ouro: 10 }, train: 10 },
   cavaleiro: { name: 'Cavaleiro', hp: 130, speed: 3.2, dmg: 20, cd: 1.2, range: 0.9, cost: { comida: 40, ferro: 25, ouro: 10 }, train: 12 },
   engenheiro: { name: 'Engenheiro', hp: 35, speed: 1.8, dmg: 0, cd: 1, range: 1.3, cost: { comida: 15, pedra: 10 }, train: 8 },
+  // Heróis (Etapa 14): o preço está em CONFIG.heroes; a vida e o dano crescem com o nível.
+  barbaro: { name: 'Bárbaro', hp: 420, speed: 2.0, dmg: 30, cd: 1.0, range: 0.9, cost: {}, train: 0 },
+  atiradora: { name: 'Atiradora', hp: 220, speed: 1.9, dmg: 22, cd: 0.8, range: 9.5, cost: {}, train: 0 },
+  druida: { name: 'Druida', hp: 260, speed: 1.7, dmg: 16, cd: 1.2, range: 6.5, cost: {}, train: 0 },
+  cavaleiroNegro: { name: 'Cavaleiro Negro', hp: 650, speed: 1.8, dmg: 40, cd: 1.3, range: 0.95, cost: {}, train: 0 },
 };
 
 export interface MonsterDef {
@@ -187,6 +196,23 @@ export const CONFIG = {
   flyHeight: 1.8,
   /** Chefes: um golem a cada 15 ondas (gelo nas ímpares, ossos nas pares). */
   bossEvery: 15,
+  /**
+   * Heróis (Etapa 14): castelo nível 2 (o 3 pede ferro, que falta, e os heróis chegavam só lá pela onda 28); preço em ouro e cristal (o ferro já falta), +50% a cada
+   * herói que o reino tem. Caído, o herói desmaia e volta ao castelo depois de downTime.
+   * Nível 1 a 5 pelo dano causado (xp); cada nível dá +20% de vida e de dano.
+   */
+  heroes: {
+    castleLevel: 2,
+    cost: { ouro: 600, cristal: 30 } as Cost,
+    growth: 1.5,
+    downTime: 45,
+    xp: [0, 400, 1000, 2000, 3600],
+    perLevel: 0.2,
+    barbaro: { every: 8, trigger: 1.6, radius: 1.9, mult: 3 },
+    atiradora: { every: 10, range: 12, radius: 2.3, dmg: 35 },
+    druida: { every: 10, radius: 4, root: 3, heal: 30, dmg: 10 },
+    cavaleiroNegro: { every: 9, trigger: 1.6, radius: 2.5, dmg: 45, stun: 2, bossMult: 2 },
+  },
   monsterReach: 0.75,
   soldierEngage: 11,
   /** Etapa 5. */
@@ -214,4 +240,12 @@ export const CONFIG = {
   },
   /** Raio em que a tropa mandada para um ponto ainda sai para lutar. */
   holdEngage: 5,
+};
+
+/** Golpe especial de cada herói, como aparece no menu do castelo. */
+export const HERO_INFO: Record<HeroKind, { short: string; special: string; text: string }> = {
+  barbaro: { short: 'Bárbaro', special: 'Giro do machado', text: 'Gira o machado e acerta todos em volta, com o triplo do dano. Segura a linha de frente.' },
+  atiradora: { short: 'Atiradora', special: 'Chuva de virotes', text: 'Atira de longe e, de tempos em tempos, faz chover virotes onde a horda está mais junta. Acerta quem voa.' },
+  druida: { short: 'Druida', special: 'Raízes', text: 'Faz raízes prenderem a horda em volta por 3 s e cura quem é do reino ali perto.' },
+  cavaleiroNegro: { short: 'C. Negro', special: 'Pisão', text: 'Bate no chão: fere e atordoa todos em volta por 2 s. Dá o dobro de dano nos chefes.' },
 };

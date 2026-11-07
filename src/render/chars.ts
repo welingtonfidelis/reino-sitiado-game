@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { LARGE, cloneChar, findBone } from './assets.ts';
 import type { Art, CharKey, WeaponKey } from './assets.ts';
 
-export type Pose = 'idle' | 'walk' | 'run' | 'attack' | 'shoot' | 'aim' | 'dig' | 'chop' | 'pick' | 'cast' | 'heal' | 'repair' | 'death';
+export type Pose = 'idle' | 'walk' | 'run' | 'attack' | 'shoot' | 'aim' | 'dig' | 'chop' | 'pick' | 'cast' | 'heal' | 'repair' | 'death' | 'shoot2' | 'chop2' | 'spin';
 
 const MEDIUM: Record<Pose, string> = {
   idle: 'Idle_A',
@@ -22,6 +22,10 @@ const MEDIUM: Record<Pose, string> = {
   chop: 'Chopping',
   pick: 'Pickaxing',
   death: 'Death_A',
+  // Heróis (Etapa 14): besta e machado de duas mãos, e o giro do Bárbaro.
+  shoot2: 'Ranged_2H_Shoot',
+  chop2: 'Melee_2H_Attack_Chop',
+  spin: 'Melee_2H_Attack_Spin',
 };
 const BIG: Record<Pose, string> = {
   idle: 'Idle_A',
@@ -37,6 +41,9 @@ const BIG: Record<Pose, string> = {
   chop: 'Idle_A',
   pick: 'Idle_A',
   death: 'Death_A',
+  shoot2: 'Melee_2H_Attack',
+  chop2: 'Melee_2H_Attack',
+  spin: 'Melee_2H_Attack',
 };
 
 const GEAR: Partial<Record<CharKey, { r?: WeaponKey; l?: WeaponKey }>> = {
@@ -50,6 +57,10 @@ const GEAR: Partial<Record<CharKey, { r?: WeaponKey; l?: WeaponKey }>> = {
   cavaleiro: { r: 'martelo', l: 'escudoPaladino' },
   engenheiro: { r: 'marreta' },
   necromante: { r: 'cajadoOsso' },
+  barbaro: { r: 'machadoGrande' },
+  atiradora: { r: 'besta' },
+  druida: { r: 'cajadoDruida' },
+  cavaleiroNegro: { r: 'espadaNegra', l: 'escudoNegro' },
 };
 
 export class CharView {

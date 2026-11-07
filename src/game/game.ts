@@ -32,8 +32,9 @@ import {
   garrison,
   callArchers,
   hexToWorld,
+  buyHero,
 } from '../sim/index.ts';
-import type { BlessingId, BuildingKind, ForgeLine, SimEvent, World } from '../sim/index.ts';
+import type { BlessingId, BuildingKind, ForgeLine, HeroKind, SimEvent, World } from '../sim/index.ts';
 
 export type Mode = { kind: 'none' } | { kind: 'build'; b: BuildingKind } | { kind: 'move'; id: number } | { kind: 'rally'; id: number };
 export type Tone = 'good' | 'bad' | 'warn' | 'gold' | 'info';
@@ -445,6 +446,9 @@ export class Game {
     this.speed = this.before || 1;
     if (thenCall) this.callWave();
     this.emit();
+  }
+  buyHero(kind: HeroKind): void {
+    this.result(buyHero(this.world, kind));
   }
   callArchers(id: number): void {
     this.result(callArchers(this.world, id));

@@ -2,10 +2,10 @@
  * Ordens do jogador. Cada uma confere se pode e devolve o motivo quando não pode, em
  * português, para a tela mostrar no próprio botão ("Sem pedra", "Só entre as ondas").
  */
-import { BUILDINGS, CONFIG, RES_ORDER, UNITS } from './config.ts';
-import type { BuildingKind, Cost, Res } from './config.ts';
+import { BUILDINGS, CONFIG, HERO_KINDS, RES_ORDER, UNITS } from './config.ts';
+import type { BuildingKind, Cost, HeroKind, Res } from './config.ts';
 import { DIRS, hexDist, hexToWorld } from './hex.ts';
-import { addBuilding, buildCost, castle, pay, refundTo, tileAt } from './world.ts';
+import { addBuilding, addUnit, buildCost, castle, pay, refundTo, tileAt } from './world.ts';
 import type { Building, World } from './world.ts';
 import { destroyBuilding, formation, releaseFromBuilding, towerSlots } from './step.ts';
 import { castleDoor } from './world.ts';
@@ -460,5 +460,54 @@ export function ignitePitch(w: World, id: number): string | null {
   if (why) return why;
   pay(w, CONFIG.pitch.igniteCost);
   b.burn = CONFIG.pitch.burn;
+  return null;
+}
+
+// ---------------------------------------------------------------- heróis (Etapa 14)
+
+/** O herói desse tipo no reino (de pé ou desmaiado), se houver. */
+export function heroOf(w: World, kind: HeroKind) {
+  for (const u of w.units.values()) if (u.kind === kind && u.state !== 'dead') return u;
+  return undefined;
+}
+
+/** Preço do próximo herói: +50% para cada herói que o reino já tem. */
+export function heroCost(w: World): Cost {
+  const n = HERO_KINDS.filter((k) => heroOf(w, k)).length;
+  const f = Math.pow(CONFIG.heroes.growth, n);
+  const out: Cost = {};
+  for (const r of RES_ORDER) {
+    const v = CONFIG.heroes.cost[r];
+    if (v) out[r] = Math.round((v * f) / 5) * 5;
+  }
+  return out;
+}
+
+export function heroProblem(w: World, kind: HeroKind): string | null {
+  const c = castle(w);
+  if (!c) return 'Sem castelo';
+  const h = heroOf(w, kind);
+  if (h) return (h.downT ?? 0) > 0 ? `Desmaiado: volta em ${Math.ceil(h.downT ?? 0)} s` : 'Já está no reino';
+  if (c.level < CONFIG.heroes.castleLevel) return `Precisa do castelo nível ${CONFIG.heroes.castleLevel}`;
+  return missing(w, heroCost(w));
+}
+
+/** Compra um herói: nasce na porta do castelo, nível 1. */
+export function buyHero(w: World, kind: HeroKind): string | null {
+  const why = heroProblem(w, kind);
+  if (why) return why;
+  pay(w, heroCost(w));
+  const p = castleDoor(w);
+  const u = addUnit(w, kind, p.x, p.z);
+  const hp = Math.round(UNITS[kind].hp * (1 + CONFIG.forge.step.armaduras * w.forge.armaduras));
+  u.hp = hp;
+  u.maxHp = hp;
+  u.xp = 0;
+  u.level = 1;
+  u.downT = 0;
+  u.specialT = 2;
+  u.name = UNITS[kind].name;
+  w.events.push({ type: 'heroBack', x: u.x, z: u.z });
+  w.events.push({ type: 'toast', text: `${UNITS[kind].name} chegou ao reino!`, tone: 'gold' });
   return null;
 }

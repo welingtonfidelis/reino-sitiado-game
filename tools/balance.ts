@@ -1,7 +1,7 @@
 /**
  * Robô de equilíbrio (Etapa 7): joga partidas inteiras sem tela e diz em que onda o castelo caiu.
  *
- *   node tools/balance.ts [sementes] [onda máxima]   (RAIO=13 usa o mapa antigo)
+ *   node tools/balance.ts [sementes] [onda máxima]   (RAIO=13 usa o mapa antigo; HEROIS=0, sem heróis)
  *
  * "nada" não faz nada (só o castelo atira); "robô" segue uma ordem simples de construção,
  * recruta, conserta e escolhe a primeira bênção. Serve para comparar números da configuração.
@@ -21,6 +21,9 @@ import {
   recruit,
   repairAll,
   step,
+  HERO_KINDS,
+  buyHero,
+  heroOf,
   towerSlots,
   upgradeCastle,
   workers,
@@ -28,6 +31,8 @@ import {
 import type { BuildingKind, UnitKind, World } from '../src/sim/index.ts';
 
 const SEEDS = Number(process.argv[2] ?? 6);
+// HEROIS=0 roda sem heróis, para comparar.
+const HEROES = process.env.HEROIS !== '0';
 // RAIO=13 roda no mapa antigo, para comparar.
 if (process.env.RAIO) (CONFIG as { mapRadius: number }).mapRadius = Number(process.env.RAIO);
 const MAX_WAVE = Number(process.argv[3] ?? 40);
@@ -93,6 +98,8 @@ function bot(w: World): void {
   if (units(w, 'engenheiro') < 2) trainAt(w, 'oficina');
   const lvl = castle(w)?.level ?? 1;
   if ((wave >= 5 && lvl < 2) || (wave >= 12 && lvl < 3) || (wave >= 20 && lvl < 4)) upgradeCastle(w);
+  // Etapa 14: compra heróis assim que der (castelo no nível pedido e ouro sobrando).
+  if (HEROES && lvl >= CONFIG.heroes.castleLevel) for (const k of HERO_KINDS) if (!heroOf(w, k) && buyHero(w, k) === null) return;
   if (wave >= 6 && count(w, 'forja') < 1 && put(w, 'forja', 2, 5)) return;
   if (count(w, 'forja') > 0) for (const l of ['armaduras', 'armas', 'flechas'] as const) forgeUpgrade(w, l);
   if (wave >= 8 && count(w, 'catapulta') < Math.min(2 + Math.floor(wave / 10), 4) && put(w, 'catapulta', 2, 4)) return;

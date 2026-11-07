@@ -5,8 +5,8 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BUILDINGS, CONFIG, DIRS, HEX, hexToWorld, openRifts, tileAt } from '../sim/index.ts';
-import type { Building, BuildingKind, SimEvent, World } from '../sim/index.ts';
+import { BUILDINGS, CONFIG, DIRS, HEX, hexToWorld, isHero, openRifts, tileAt } from '../sim/index.ts';
+import type { Building, BuildingKind, SimEvent, UnitKind, World } from '../sim/index.ts';
 import type { Art, CharKey, StaticKey, StaticModel } from './assets.ts';
 import { CharView } from './chars.ts';
 import { buildGround } from './ground.ts';
@@ -140,6 +140,11 @@ const HOME: Record<BuildingKind, StaticKey> = {
 };
 
 /** Altura do topo de cada prédio (para barras e para o arqueiro na torre). */
+/** Pose de luta por tipo (os heróis usam as de duas mãos). */
+const FIGHT_POSE: Partial<Record<UnitKind, Pose>> = { arqueiro: 'shoot', mago: 'cast', clerigo: 'heal', atiradora: 'shoot2', barbaro: 'chop2', druida: 'cast' };
+/** Tamanho dos golpes especiais na tela (o giro cobre o raio do golpe). */
+const SPECIAL_SCALE: Record<'giro' | 'chuva' | 'raizes' | 'pisao', number> = { giro: 1.4, chuva: 1.3, raizes: 0.9, pisao: 1.8 };
+
 const TOP: Partial<Record<BuildingKind, number>> = { catapulta: 1.6, piche: 0.3, estacas: 0.6, castelo: 4.1, torre: 2.2, quartel: 1.7, campo: 1.8, muralha: 1.2, portao: 1.4, torreMago: 2.4, capela: 1.9, estabulo: 1.3, forja: 1.4, oficina: 1.3 };
 
 /** Fosso de piche (Etapa 9): mancha escura e lustrosa no chão. */
@@ -222,6 +227,9 @@ export class World3D {
   /** Tropas escolhidas pelo jogador (anel dourado no chão). */
   selectedUnits: number[] = [];
   private unitRings: THREE.InstancedMesh;
+  private heroRings: THREE.InstancedMesh;
+  /** Até quando o Bárbaro está na animação do giro (Etapa 14). */
+  private spinUntil = new Map<number, number>();
   private rallyFlag = new THREE.Group();
   private crystals!: Instanced;
   private orbs!: THREE.InstancedMesh;
@@ -312,6 +320,14 @@ export class World3D {
     this.unitRings = new THREE.InstancedMesh(new THREE.RingGeometry(0.2, 0.28, 24).rotateX(-Math.PI / 2), gold, 300);
     this.unitRings.count = 0;
     this.unitRings.frustumCulled = false;
+    this.heroRings = new THREE.InstancedMesh(
+      new THREE.RingGeometry(0.34, 0.46, 32).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: '#f2c94c', transparent: true, opacity: 0.85, depthWrite: false }),
+      8,
+    );
+    this.heroRings.count = 0;
+    this.heroRings.frustumCulled = false;
+    scene.add(this.heroRings);
     this.unitRings.renderOrder = 4;
     scene.add(this.unitRings);
     for (const part of art.statics.bandeira.parts) {
@@ -593,6 +609,11 @@ export class World3D {
       else if (e.type === 'hit') fx.play(e.fx, e.x, 0, e.z, { flip: flip(e.dx, e.dz), scale: e.fx === 'faisca' ? 0.6 : 1 });
       else if (e.type === 'death' && e.monster) fx.play('poof', e.x, 0, e.z, { flip: Math.random() < 0.5 });
       else if (e.type === 'monsterFx') fx.play(e.fx, e.x, 0, e.z);
+      else if (e.type === 'special') {
+        fx.play(e.fx, e.x, 0, e.z, { scale: SPECIAL_SCALE[e.fx] });
+        if (e.fx === 'giro') this.spinUntil.set(e.id, this.time + 0.9);
+      } else if (e.type === 'heroLevel') fx.play('nivel', e.x, 0, e.z + 0.3, { scale: 0.7 });
+      else if (e.type === 'heroBack') fx.play('bencao', e.x, 0, e.z, { scale: 1.4 });
       else if (e.type === 'destroyed') {
         const p = hexToWorld(e.q, e.r);
         if (e.kind === 'castelo') this.startFall(p.x, p.z);
@@ -615,7 +636,8 @@ export class World3D {
       let pose: Pose = 'idle';
       if (u.state === 'dead') pose = 'death';
       else if (u.state === 'walk') pose = u.kind === 'cavaleiro' ? 'run' : 'walk';
-      else if (u.state === 'fight') pose = u.kind === 'arqueiro' ? 'shoot' : u.kind === 'mago' ? 'cast' : u.kind === 'clerigo' ? 'heal' : 'attack';
+      else if ((this.spinUntil.get(u.id) ?? 0) > this.time) pose = 'spin';
+      else if (u.state === 'fight') pose = FIGHT_POSE[u.kind] ?? 'attack';
       else if (u.state === 'tower' || u.state === 'shelter') {
         // Dentro da torre (as flechas saem das janelas) ou recolhido no castelo: não aparece.
         v.root.visible = false;
@@ -688,6 +710,15 @@ export class World3D {
       this.unitRings.setMatrixAt(n++, this.tmp);
     }
     this.unitRings.count = n;
+    // Anel dourado no chão debaixo de cada herói de pé.
+    let h = 0;
+    for (const u of w.units.values()) {
+      if (!isHero(u.kind) || u.state === 'dead' || u.state === 'shelter' || h >= 8) continue;
+      this.tmp.makeTranslation(u.x, 0.025, u.z);
+      this.heroRings.setMatrixAt(h++, this.tmp);
+    }
+    this.heroRings.count = h;
+    this.heroRings.instanceMatrix.needsUpdate = true;
     this.unitRings.instanceMatrix.needsUpdate = true;
     // Flechas em arco.
     const arrows = this.sets.get('flecha')!;
@@ -761,8 +792,10 @@ export class World3D {
       else if (b.hp < b.maxHp) this.bars.add(p.x, top, p.z, 1.2, b.hp / b.maxHp, b.kind === 'castelo' ? '#c8483a' : '#8cc56a');
     }
     for (const u of w.units.values()) {
-      if (u.state === 'dead' || u.hp >= u.maxHp) continue;
-      this.bars.add(u.x, 0.85, u.z, 0.5, u.hp / u.maxHp, '#8cc56a');
+      if (u.state === 'dead' || u.state === 'shelter' || u.state === 'tower') continue;
+      // Herói: barra dourada sempre à vista (a criança acha ele de longe).
+      if (isHero(u.kind)) this.bars.add(u.x, 1.05, u.z, 0.75, u.hp / u.maxHp, '#e9b949');
+      else if (u.hp < u.maxHp) this.bars.add(u.x, 0.85, u.z, 0.5, u.hp / u.maxHp, '#8cc56a');
     }
     for (const m of w.monsters.values()) {
       if (m.state === 'dead' || m.hp >= m.maxHp) continue;

@@ -77,6 +77,11 @@ export interface Unit {
   order: 0 | 1 | 2;
   /** Nome (aparece no relatório quando cai). */
   name: string;
+  /** Heróis (Etapa 14): dano causado, nível (1 a 5), tempo desmaiado e recarga do golpe especial. */
+  xp?: number;
+  level?: number;
+  downT?: number;
+  specialT?: number;
 }
 
 export interface Monster {
@@ -97,6 +102,8 @@ export interface Monster {
   healT: number;
   summonT: number;
   owner: number;
+  /** Etapa 14: preso por raízes ou atordoado (s). */
+  stunT?: number;
 }
 
 export type SimEvent =
@@ -107,6 +114,9 @@ export type SimEvent =
   | { type: 'hit'; fx: 'espada' | 'garra' | 'pancada' | 'golpe' | 'faisca' | 'cura'; x: number; z: number; dx: number; dz: number }
   | { type: 'spell'; x1: number; z1: number; x2: number; z2: number }
   | { type: 'monsterFx'; fx: 'bloom' | 'alma'; x: number; z: number }
+  | { type: 'special'; fx: 'giro' | 'chuva' | 'raizes' | 'pisao'; x: number; z: number; id: number }
+  | { type: 'heroLevel'; x: number; z: number; level: number }
+  | { type: 'heroBack'; x: number; z: number }
   | { type: 'siege'; x1: number; z1: number; x2: number; z2: number }
   | { type: 'death'; x: number; z: number; monster: boolean }
   | { type: 'upgrade'; level: number }

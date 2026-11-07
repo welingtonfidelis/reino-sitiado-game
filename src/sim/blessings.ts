@@ -109,6 +109,11 @@ const EPITAPHS: Record<UnitKind, string[]> = {
   clerigo: ['Cuidou dos outros até o fim.', 'Rezou de pé no meio da horda.'],
   cavaleiro: ['Carregou contra a horda mais uma vez.', 'Caiu longe dos portões.'],
   engenheiro: ['Morreu com o martelo na mão, consertando a muralha.', 'A muralha ficou; ele não.'],
+  // Heróis não morrem (desmaiam e voltam); a frase só existe para o tipo fechar.
+  barbaro: ['Desmaiou no meio da horda.'],
+  atiradora: ['Desmaiou de besta na mão.'],
+  druida: ['Desmaiou entre as raízes.'],
+  cavaleiroNegro: ['Desmaiou de escudo erguido.'],
 };
 const ROLE: Record<UnitKind, [string, string]> = {
   soldado: ['soldado', 'soldado'],
@@ -118,6 +123,10 @@ const ROLE: Record<UnitKind, [string, string]> = {
   clerigo: ['clérigo', 'clériga'],
   cavaleiro: ['cavaleiro', 'cavaleira'],
   engenheiro: ['engenheiro', 'engenheira'],
+  barbaro: ['bárbaro', 'bárbaro'],
+  atiradora: ['atiradora', 'atiradora'],
+  druida: ['druida', 'druida'],
+  cavaleiroNegro: ['cavaleiro negro', 'cavaleiro negro'],
 };
 
 export function epitaph(name: string, kind: UnitKind, id: number): Fallen {

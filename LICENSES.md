@@ -20,6 +20,8 @@ copiados por `npm run art` conforme `tools/art-manifest.ts`.
 | KayKit Medieval Hexagon Pack (Etapa 9) | torre com catapulta e a pedra da catapulta |
 | KayKit RPG Tools Bits 1.0 (Etapa 10) | axe, pickaxe, shovel, hammer e tools_bits_texture (ferramentas dos trabalhadores e martelo do engenheiro) |
 | KayKit Resource Bits 1.0 | Iron_Nuggets e a textura do pack |
+| KayKit Adventurers 2.0 (Etapa 14) | Barbarian, Rogue_Hooded, Druid; axe_2handed, crossbow_2handed, druid_staff e as texturas barbarian, rogue e druid |
+| KayKit Mystery Monthly 5 (Etapa 14) | BlackKnight, BlackKnight_Sword, BlackKnight_Shield e a textura |
 | KayKit Character Animations 1.1 | Rig_Medium (General, MovementBasic, CombatMelee, CombatRanged, Tools) e Rig_Large (General, MovementBasic, CombatMelee) |
 
 ## pixelfx (Patch e Hugo Duprez) — MIT
@@ -44,7 +46,12 @@ do pixelfx, https://github.com/patch-gg/pixelfx (commit a84159688af3ca37a4be05a0
 | golpe | melee/heavy-cleave (cavaleiro) |
 | morcego | critters/bat (o morcego gigante voando) |
 | alma | spawn/soul-rise (esqueleto levantado pelo necromante) |
-| bloom | nature/healing-bloom (cura da bruxa) |
+| bloom | nature/healing-bloom (cura da bruxa e da druida) |
+| giro | melee/spin-slash (giro do Bárbaro) |
+| chuva | arcane/star-fall (chuva de virotes da Atiradora) |
+| raizes | nature/root-snare (raízes da Druida) |
+| pisao | impacts/heavy-landing (pisão do Cavaleiro Negro) |
+| bencao | holy/blessing (herói chegando ou voltando) |
 
 Mudanças nossas: ritmo de quadros menor nos efeitos longos e o texto do "subir de nível". O código
 do pixelfx não vai no jogo nem no repositório.
