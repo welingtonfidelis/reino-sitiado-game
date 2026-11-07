@@ -37,6 +37,7 @@ import {
   recruitProblem,
   replantProblem,
   fullStock,
+  MODES,
   sourceOf,
   repairCost,
   repairProblem,
@@ -175,8 +176,9 @@ function mainActs(game: Game, b: Building, openForge: () => void, openHeroes: ()
       run: () => game.callArchers(b.id),
     });
   }
-  if (b.kind === 'fazenda') {
+  if (b.kind === 'fazenda' && MODES[w.mode].depletes) {
     // Etapa 17: plantação colhida até o fim se replanta aqui (o botão pulsa quando é a hora).
+    // No fácil (Etapa 18) nada acaba, e o botão não aparece.
     const why = replantProblem(w, b);
     acts.push({
       id: 'replantar',
@@ -344,7 +346,7 @@ function noteFor(game: Game, b: Building): string | null {
 
 /** Etapa 17: quanto ainda tem no hexágono de onde a serraria, a pedreira ou a mina tira. */
 function stockBar(game: Game, b: Building) {
-  if (b.built < 1) return null;
+  if (b.built < 1 || !MODES[game.world.mode].depletes) return null;
   if (b.kind === 'fazenda') {
     const f = b.harvest / CONFIG.farm.harvest;
     return <Bar label="Colheita" frac={f} color={f > 0 ? 'var(--gold)' : 'var(--hp)'} text={f > 0 ? `${Math.ceil(f * 100)}%` : 'acabou'} />;

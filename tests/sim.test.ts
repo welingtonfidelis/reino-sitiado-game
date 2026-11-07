@@ -35,6 +35,7 @@ import {
 import { CROPS, DIRS, MONSTERS, UNITS, buyHero, cropOf, heroCost, heroOf, heroProblem } from '../src/sim/index.ts';
 import { demolish, moveBuilding, moveProblem, packTime, recruitProblem, tileAt } from '../src/sim/index.ts';
 import { allyPath, fullStock, regrow, replant, replantProblem, sourceOf, stage, worldToHex } from '../src/sim/index.ts';
+import { MODES, saveInfo, waveInterval } from '../src/sim/index.ts';
 import type { Tile } from '../src/sim/index.ts';
 import type { Monster, MonsterKind, World } from '../src/sim/index.ts';
 
@@ -1192,5 +1193,66 @@ describe('plantação que acaba e se replanta (Etapa 17)', () => {
     for (const b of old.buildings) delete b.harvest;
     const w3 = loadWorld(JSON.stringify(old))!;
     expect(w3.buildings.get(farm.id)!.harvest).toBe(CONFIG.farm.harvest);
+  });
+});
+
+describe('modo fácil (Etapa 18)', () => {
+  it('começa com mais recurso, castelo mais forte e mais calma antes da primeira onda', () => {
+    const n = createWorld(91);
+    const f = createWorld(91, undefined, 'facil');
+    expect(f.mode).toBe('facil');
+    expect(f.res.madeira).toBe(Math.round(n.res.madeira * MODES.facil.start));
+    expect(castle(f)!.maxHp).toBe(Math.round(castle(n)!.maxHp * MODES.facil.castleHp));
+    expect(castle(f)!.hp).toBe(castle(f)!.maxHp);
+    expect(f.waveTimer).toBe(n.waveTimer + MODES.facil.calm);
+    // O mapa é o mesmo (a semente manda).
+    expect(f.list.map((t) => t.terrain)).toEqual(n.list.map((t) => t.terrain));
+  });
+
+  it('nada se esgota: floresta e plantação ficam como estão', () => {
+    const w = createWorld(92, undefined, 'facil');
+    calm(w);
+    const farm = [...w.buildings.values()].find((b) => b.kind === 'fazenda')!;
+    const food = w.res.comida;
+    run(w, 60);
+    expect(farm.harvest).toBe(CONFIG.farm.harvest);
+    expect(farm.dry).toBe(false);
+    // A plantação produziu (há comida a mais que o consumo levaria embora).
+    expect(w.res.comida).toBeGreaterThan(food - 5);
+    for (const t of w.list) expect(t.stock).toBe(fullStock(t.terrain));
+  });
+
+  it('ondas mais leves: menos monstros, chefe a cada 20, modificadores só da 20 em diante', () => {
+    const total = (n: number, m: 'normal' | 'facil') => Object.values(waveSize(n, m)).reduce((a, b) => a + b, 0);
+    expect(total(10, 'facil')).toBeLessThan(total(10, 'normal'));
+    expect(total(10, 'facil')).toBeCloseTo(total(10, 'normal') * MODES.facil.monsters, -1);
+    expect(waveSize(15, 'facil').golem).toBe(0);
+    expect(waveSize(20, 'facil').golem).toBe(1);
+    expect(waveSize(15, 'normal').golem).toBe(1);
+    expect(modsForWave(5, 5, 'facil')).toEqual([]);
+    expect(modsForWave(5, 15, 'facil')).toEqual([]);
+    expect(modsForWave(5, 20, 'facil').length).toBeGreaterThan(0);
+    expect(waveInterval(1, 'facil')).toBe(waveInterval(1) + MODES.facil.calm);
+    expect(waveInterval(40, 'facil')).toBe(MODES.facil.calmMin);
+  });
+
+  it('monstros com menos vida e mudança na metade do tempo', () => {
+    const w = createWorld(93, undefined, 'facil');
+    w.waveTimer = 0;
+    run(w, 3, () => w.monsters.size > 0);
+    const m = [...w.monsters.values()][0]!;
+    expect(m.maxHp).toBeCloseTo(MONSTERS[m.kind].hp * MODES.facil.monsterHp);
+    expect(packTime('quartel', 'facil')).toBeCloseTo(packTime('quartel') * MODES.facil.move);
+  });
+
+  it('o salvo guarda o modo; salvo antigo é normal', () => {
+    const w = createWorld(94, undefined, 'facil');
+    const json = saveWorld(w);
+    expect(loadWorld(json)!.mode).toBe('facil');
+    expect(saveInfo(json)!.mode).toBe('facil');
+    const old = JSON.parse(json);
+    delete old.mode;
+    expect(loadWorld(JSON.stringify(old))!.mode).toBe('normal');
+    expect(saveInfo(JSON.stringify(old))!.mode).toBe('normal');
   });
 });

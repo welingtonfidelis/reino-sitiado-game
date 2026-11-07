@@ -3,7 +3,8 @@
  * estado a 20 passos por segundo e a tela só lê.
  */
 import { BUILDINGS, CONFIG, UNITS } from './config.ts';
-import type { BuildingKind, Cost, MonsterKind, Res, UnitKind } from './config.ts';
+import { MODES } from './config.ts';
+import type { BuildingKind, Cost, Mode, MonsterKind, Res, UnitKind } from './config.ts';
 import { DIRS, HexIndex, hexDist, hexToWorld, rng } from './hex.ts';
 import type { Rand } from './hex.ts';
 import { baseMods, emptyStats, nameFor } from './blessings.ts';
@@ -162,6 +163,8 @@ export const WAVE_MODS: Record<WaveMod, { name: string; text: string }> = {
 
 export interface World {
   seed: number;
+  /** Etapa 18: modo da partida (travado do começo ao fim). */
+  mode: Mode;
   rand: Rand;
   tick: number;
   time: number;
@@ -468,7 +471,7 @@ function tileAtAngle(w: World, angle: number, dist: number): Tile {
 /** Ângulos das fendas (norte, nordeste, noroeste): a câmera fica ao sul, livre. */
 export const RIFT_ANGLES = [-Math.PI / 2, -Math.PI / 6, (-5 * Math.PI) / 6];
 
-export function createWorld(seed = 1, R = CONFIG.mapRadius): World {
+export function createWorld(seed = 1, R = CONFIG.mapRadius, mode: Mode = 'normal'): World {
   const grid = new HexIndex(R);
   const tiles: (Tile | null)[] = new Array(grid.size).fill(null);
   const list: Tile[] = [];
@@ -479,8 +482,10 @@ export function createWorld(seed = 1, R = CONFIG.mapRadius): World {
       tiles[t.i] = t;
       list.push(t);
     }
+  const M = MODES[mode];
   const w: World = {
     seed,
+    mode,
     rand: rng(seed),
     tick: 0,
     time: 0,
@@ -491,12 +496,12 @@ export function createWorld(seed = 1, R = CONFIG.mapRadius): World {
     units: new Map(),
     monsters: new Map(),
     nextId: CASTLE_ID,
-    res: { ...CONFIG.start },
+    res: Object.fromEntries(Object.entries(CONFIG.start).map(([k, v]) => [k, Math.round(v * M.start)])) as Record<Res, number>,
     housesBuilt: 0,
     arriveT: 0,
     wave: 0,
     waveState: 'calm',
-    waveTimer: CONFIG.waves.first,
+    waveTimer: CONFIG.waves.first + M.calm,
     spawnQueue: [],
     spawnT: 0,
     rifts: [],
@@ -576,6 +581,7 @@ export function createWorld(seed = 1, R = CONFIG.mapRadius): World {
 
   // Começo: castelo, duas casas e uma fazenda, quatro trabalhadores.
   const c = addBuilding(w, 'castelo', 0, 0, 1);
+  c.maxHp = Math.round(c.maxHp * M.castleHp);
   c.hp = c.maxHp;
   addBuilding(w, 'casa', -1, 2, 1);
   addBuilding(w, 'casa', 1, 1, 1);

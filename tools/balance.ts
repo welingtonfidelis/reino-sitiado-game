@@ -3,7 +3,7 @@
  *
  *   node tools/balance.ts [sementes] [onda máxima]   (RAIO=13 usa o mapa antigo; HEROIS=0, sem heróis;
  *   ESTOQUE=0, recursos sem fim como antes da Etapa 17; RECURSOS='{json}', outros números da Etapa 17;
- *   SO=4, só a quarta semente)
+ *   SO=4, só a quarta semente; MODO=facil, o modo fácil da Etapa 18)
  *
  * "nada" não faz nada (só o castelo atira); "robô" segue uma ordem simples de construção,
  * recruta, conserta e escolhe a primeira bênção. Serve para comparar números da configuração.
@@ -37,7 +37,7 @@ import {
   upgradeCastle,
   workers,
 } from '../src/sim/index.ts';
-import type { BuildingKind, UnitKind, World } from '../src/sim/index.ts';
+import type { BuildingKind, Mode, UnitKind, World } from '../src/sim/index.ts';
 
 const SEEDS = Number(process.argv[2] ?? 6);
 // HEROIS=0 roda sem heróis, para comparar.
@@ -60,6 +60,8 @@ if (process.env.RECURSOS) {
   }
 }
 const ONLY = Number(process.env.SO ?? 0);
+// MODO=facil: joga no modo fácil (Etapa 18).
+const MODE: Mode = process.env.MODO === 'facil' ? 'facil' : 'normal';
 
 function count(w: World, k: BuildingKind): number {
   let n = 0;
@@ -199,7 +201,7 @@ function bot(w: World): void {
 const VERBOSE = process.env.VERBOSE === '1';
 
 function play(seed: number, act: boolean): { wave: number; kills: number } {
-  const w = createWorld(seed);
+  const w = createWorld(seed, undefined, MODE);
   const every = CONFIG.tps * 2;
   const made = { madeira: 0, pedra: 0, ferro: 0, cristal: 0 };
   let lastWave = 0;

@@ -3,7 +3,7 @@
  * cada uma é uma figura grande com cor própria, para quem ainda não lê; o nome e a dica ficam
  * de apoio para quem lê junto.
  */
-import { CONFIG, barnOf, castle, cropOf, isHero, troops } from '../sim/index.ts';
+import { MODES, barnOf, castle, cropOf, isHero, troops } from '../sim/index.ts';
 import type { SimEvent, World } from '../sim/index.ts';
 
 export interface Sticker {
@@ -90,7 +90,7 @@ const RULES: Rule[] = [
     color: '#8a4ad0',
     name: 'Chefe vencido',
     hint: 'Vencer uma onda com chefe.',
-    check: ({ events }) => events.some((e) => e.type === 'waveEnd' && e.wave % CONFIG.bossEvery === 0),
+    check: ({ w, events }) => events.some((e) => e.type === 'waveEnd' && e.wave % MODES[w.mode].bossEvery === 0),
   },
   {
     id: 'semPerdas',

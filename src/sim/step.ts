@@ -2,8 +2,8 @@
  * Um passo da simulação (1/20 s): obras, economia, chegada de trabalhadores, recrutas,
  * ondas, horda, tropas e defesas. Os eventos vão para `w.events`; quem chama esvazia.
  */
-import { BUILDINGS, CONFIG, MONSTERS, UNITS, isHero } from './config.ts';
-import type { BuildingKind, HeroKind, MonsterKind, UnitKind } from './config.ts';
+import { BUILDINGS, CONFIG, MODES, MONSTERS, UNITS, isHero } from './config.ts';
+import type { BuildingKind, HeroKind, Mode, MonsterKind, UnitKind } from './config.ts';
 import { hexDist, hexToWorld, worldToHex } from './hex.ts';
 import { allyPath, computeFlow, computeReach } from './path.ts';
 import { BLESSING_EVERY, BLESSING_IDS, emptyStats, epitaph } from './blessings.ts';
@@ -97,9 +97,9 @@ function damageBuilding(w: World, b: Building, dmg: number): void {
   if (b.hp <= 0) destroyBuilding(w, b, true);
 }
 
-/** Segundos para desmontar o prédio numa mudança. */
-export function packTime(kind: BuildingKind): number {
-  return Math.max(CONFIG.move.packMin, BUILDINGS[kind].build * CONFIG.move.pack);
+/** Segundos para desmontar o prédio numa mudança (no fácil, metade). */
+export function packTime(kind: BuildingKind, mode: Mode = 'normal'): number {
+  return Math.max(CONFIG.move.packMin, BUILDINGS[kind].build * CONFIG.move.pack) * MODES[mode].move;
 }
 
 function construction(w: World): void {
@@ -109,7 +109,8 @@ function construction(w: World): void {
       continue;
     }
     if (b.built >= 1) continue;
-    b.built = Math.min(1, b.built + DT / BUILDINGS[b.kind].build);
+    // Remontar depois de uma mudança segue o fator do modo (no fácil, metade do tempo).
+    b.built = Math.min(1, b.built + DT / (BUILDINGS[b.kind].build * (b.moved ? MODES[w.mode].move : 1)));
     if (b.built >= 1) {
       b.moved = false;
       w.dirty = true;
@@ -124,7 +125,7 @@ function construction(w: World): void {
  * uma fenda ali), remonta no mesmo lugar.
  */
 function unpack(w: World, b: Building): void {
-  b.built = Math.max(0, b.built - DT / packTime(b.kind));
+  b.built = Math.max(0, b.built - DT / packTime(b.kind, w.mode));
   if (b.built > 0) return;
   const to = b.moveTo!;
   b.moveTo = null;
@@ -161,7 +162,9 @@ function economy(w: World): void {
     if (!w.hungry) toast(w, 'A comida acabou. Ninguém chega e o trabalho fica mais lento.', 'bad');
     w.hungry = true;
   } else if (w.res.comida > 2) w.hungry = false;
-  const k = w.hungry ? CONFIG.hungryWork : 1;
+  const k = w.hungry ? MODES[w.mode].hungryWork : 1;
+  // Etapa 18: no fácil, nada se esgota.
+  const depletes = MODES[w.mode].depletes;
   for (const b of w.buildings.values()) {
     const def = BUILDINGS[b.kind];
     if (b.built < 1 || !def.produces || !def.rate) continue;
@@ -182,8 +185,8 @@ function economy(w: World): void {
     w.res[res] += got;
     w.stats.prod[res] += got;
     // O estoque gasta o tirado sem as bênçãos: elas são ganho, não pressa para acabar.
-    if (src) deplete(w, src, base);
-    if (b.kind === 'fazenda') harvest(w, b, base);
+    if (src && depletes) deplete(w, src, base);
+    if (b.kind === 'fazenda' && depletes) harvest(w, b, base);
   }
 }
 
@@ -990,8 +993,9 @@ function idle(w: World, u: Unit): void {
 
 // ---------------------------------------------------------------- ondas
 
-export function waveSize(n: number): Record<MonsterKind, number> {
+export function waveSize(n: number, mode: Mode = 'normal'): Record<MonsterKind, number> {
   const W = CONFIG.waves;
+  const M = MODES[mode];
   const total = Math.round(W.base + W.perWave * n);
   const at = (k: MonsterKind) => n >= MONSTERS[k].from;
   const bruto = at('bruto') ? Math.floor((n - 4) / 4) : 0;
@@ -1001,27 +1005,36 @@ export function waveSize(n: number): Record<MonsterKind, number> {
   const bruxa = at('bruxa') ? Math.min(4, 1 + Math.floor((n - 9) / 5)) : 0;
   const troll = at('troll') ? Math.floor((n - 8) / 4) : 0;
   const necromante = at('necromante') ? Math.floor((n - 12) / 4) : 0;
-  // Chefes: a cada 15 ondas, alternando gelo e ossos.
-  const boss = n % CONFIG.bossEvery === 0 ? (n / CONFIG.bossEvery) % 2 === 1 : null;
+  // Chefes: a cada 15 ondas (20 no fácil), alternando gelo e ossos.
+  const boss = n % M.bossEvery === 0 ? (n / M.bossEvery) % 2 === 1 : null;
   const golem = boss === true ? 1 : 0;
   const golemOssos = boss === false ? 1 : 0;
   const esqueleto = Math.max(0, total - bruto - orc - lobisomem - morcego - bruxa - troll - necromante);
-  return { esqueleto, lobisomem, orc, bruto, morcego, bruxa, troll, necromante, golem, golemOssos };
+  const size = { esqueleto, lobisomem, orc, bruto, morcego, bruxa, troll, necromante, golem, golemOssos };
+  if (M.monsters === 1) return size;
+  // Fácil: menos de cada um (os chefes continuam um só; pelo menos um esqueleto).
+  for (const k of Object.keys(size) as MonsterKind[]) if (k !== 'golem' && k !== 'golemOssos') size[k] = Math.round(size[k] * M.monsters);
+  size.esqueleto = Math.max(1, size.esqueleto);
+  return size;
 }
 
-export function waveInterval(n: number): number {
+export function waveInterval(n: number, mode: Mode = 'normal'): number {
   const W = CONFIG.waves;
-  return Math.max(W.intervalMin, W.interval - W.intervalStep * (n - 1));
+  const M = MODES[mode];
+  return Math.max(M.calmMin, W.interval + M.calm - W.intervalStep * (n - 1));
 }
 
 export function openRifts(n: number): number {
   return CONFIG.waves.riftOpens.filter((k) => n >= k).length;
 }
 
-/** Modificadores da onda n: um a cada 5 ondas, dois a partir da 30; sorteio fixo pela semente. */
-export function modsForWave(seed: number, n: number): WaveMod[] {
+/**
+ * Modificadores da onda n: um a cada 5 ondas, dois a partir da 30; sorteio fixo pela semente.
+ * No fácil, só a partir da onda 20.
+ */
+export function modsForWave(seed: number, n: number, mode: Mode = 'normal'): WaveMod[] {
   const W = CONFIG.waveMods;
-  if (n % W.every !== 0) return [];
+  if (n % W.every !== 0 || n < MODES[mode].modsFrom) return [];
   const all = Object.keys(WAVE_MODS) as WaveMod[];
   let h = (seed ^ (n * 2654435761)) >>> 0;
   const pick = () => {
@@ -1032,16 +1045,16 @@ export function modsForWave(seed: number, n: number): WaveMod[] {
 }
 
 /** Tamanho da onda já com os modificadores (Enxame traz mais esqueletos). */
-export function waveSizeWithMods(n: number, mods: WaveMod[]): ReturnType<typeof waveSize> {
-  const size = waveSize(n);
+export function waveSizeWithMods(n: number, mods: WaveMod[], mode: Mode = 'normal'): ReturnType<typeof waveSize> {
+  const size = waveSize(n, mode);
   if (mods.includes('enxame')) size.esqueleto = Math.round(size.esqueleto * CONFIG.waveMods.swarm) + 3;
   return size;
 }
 
 function startWave(w: World): void {
   w.wave++;
-  w.waveMods = modsForWave(w.seed, w.wave);
-  const size = waveSizeWithMods(w.wave, w.waveMods);
+  w.waveMods = modsForWave(w.seed, w.wave, w.mode);
+  const size = waveSizeWithMods(w.wave, w.waveMods, w.mode);
   if (w.waveMods.length) toast(w, `Onda ${w.wave}: ${w.waveMods.map((k) => `${WAVE_MODS[k].name} (${WAVE_MODS[k].text.charAt(0).toLowerCase()}${WAVE_MODS[k].text.slice(1, -1)})`).join('; ')}.`, 'bad');
   const list: MonsterKind[] = [];
   for (const [k, n] of Object.entries(size) as [MonsterKind, number][]) for (let i = 0; i < n; i++) list.push(k);
@@ -1061,7 +1074,7 @@ function spawnMonster(w: World, kind: MonsterKind): void {
   const rift = w.tiles[w.rifts[Math.floor(w.rand() * n)]!]!;
   const p = hexToWorld(rift.q, rift.r);
   const def = MONSTERS[kind];
-  const hp = def.hp * Math.pow(CONFIG.waves.hpGrowth, w.wave - 1);
+  const hp = def.hp * Math.pow(CONFIG.waves.hpGrowth, w.wave - 1) * MODES[w.mode].monsterHp;
   const m: Monster = {
     id: w.nextId++,
     kind,
@@ -1087,7 +1100,7 @@ function spawnMonster(w: World, kind: MonsterKind): void {
 /** Esqueleto levantado por um necromante, ao lado dele. */
 function summonSkeleton(w: World, owner: Monster): void {
   const def = MONSTERS.esqueleto;
-  const hp = def.hp * Math.pow(CONFIG.waves.hpGrowth, Math.max(0, w.wave - 1));
+  const hp = def.hp * Math.pow(CONFIG.waves.hpGrowth, Math.max(0, w.wave - 1)) * MODES[w.mode].monsterHp;
   const a = w.rand() * Math.PI * 2;
   const m: Monster = {
     id: w.nextId++,
@@ -1115,7 +1128,7 @@ function waves(w: World): void {
   if (w.waveState === 'calm') {
     // Entre as ondas o castelo se recupera devagar.
     const c = castle(w);
-    if (c) c.hp = Math.min(c.maxHp, c.hp + CONFIG.castleRegen * DT);
+    if (c) c.hp = Math.min(c.maxHp, c.hp + CONFIG.castleRegen * MODES[w.mode].castleRegen * DT);
     w.waveTimer -= DT;
     if (w.waveTimer <= 0) startWave(w);
     return;
@@ -1140,9 +1153,9 @@ function waves(w: World): void {
       if (b.kind === 'muralha' || b.kind === 'portao') b.hp = Math.min(b.maxHp, b.hp + b.maxHp * w.mods.wallRegen);
   w.events.push({ type: 'waveEnd', wave: w.wave, gold });
   // Etapa 17: o que acabou de floresta, rocha e veio nasce de novo em outro lugar.
-  regrow(w);
+  if (MODES[w.mode].depletes) regrow(w);
   w.waveState = 'calm';
-  w.waveTimer = waveInterval(w.wave + 1);
+  w.waveTimer = waveInterval(w.wave + 1, w.mode);
   // Relatório: o jogo espera o jogador ler (e escolher a bênção, a cada 4 ondas).
   const free = BLESSING_IDS.filter((id) => !w.blessings.includes(id));
   const choices: typeof free = [];

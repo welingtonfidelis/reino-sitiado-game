@@ -55,7 +55,9 @@ const art = await loadArt(import.meta.env.BASE_URL + 'assets/kaykit/', (k) => {
 });
 
 const seed = Number(params.get('semente')) || Math.floor(Math.random() * 1e9);
-const game = new Game(seed);
+// ?modo=normal ou ?modo=facil escolhe o modo sem passar pela tela de começo (testes).
+const modeParam = params.get('modo');
+const game = modeParam === 'normal' || modeParam === 'facil' ? new Game(seed, modeParam) : new Game(seed);
 const view = new World3D(scene, art);
 view.fx = await FxLayer.load(scene, import.meta.env.BASE_URL + 'assets/fx/');
 view.buildTerrain(game.world);

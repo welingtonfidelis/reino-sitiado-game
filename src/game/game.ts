@@ -36,7 +36,7 @@ import {
   buyHero,
   seasonOf,
 } from '../sim/index.ts';
-import type { BlessingId, BuildingKind, ForgeLine, HeroKind, SimEvent, World } from '../sim/index.ts';
+import type { BlessingId, BuildingKind, ForgeLine, HeroKind, Mode as GameMode, SaveInfo, SimEvent, World } from '../sim/index.ts';
 import { Album } from './album.ts';
 import type { Sticker } from './album.ts';
 import { readQuality, writeQuality } from '../render/quality.ts';
@@ -118,14 +118,30 @@ export class Game {
   private toastId = 0;
   private listeners = new Set<() => void>();
 
-  constructor(seed: number) {
-    this.world = createWorld(seed);
+  constructor(seed: number, mode: GameMode = readGameMode()) {
+    this.world = createWorld(seed, undefined, mode);
     refresh(this.world);
   }
 
-  restart(seed: number): void {
+  /**
+   * Etapa 18: começa a partida no modo escolhido (sem partida salva, a primeira tela chama
+   * isto). Se o modo for outro, o mapa é refeito com a mesma semente.
+   */
+  begin(mode: GameMode): void {
+    writeGameMode(mode);
+    if (mode !== this.world.mode) {
+      this.world = createWorld(this.world.seed, undefined, mode);
+      refresh(this.world);
+    }
+    this.started = true;
+    this.emit();
+  }
+
+  /** Partida nova; o modo fica o da partida de agora, a não ser que venha outro. */
+  restart(seed: number, mode: GameMode = this.world.mode): void {
     clearSave();
-    this.world = createWorld(seed);
+    writeGameMode(mode);
+    this.world = createWorld(seed, undefined, mode);
     refresh(this.world);
     this.mode = { kind: 'none' };
     this.selected = -1;
@@ -267,7 +283,7 @@ export class Game {
   }
 
   /** Partida salva neste navegador, se houver. */
-  static saved(): { wave: number } | null {
+  static saved(): SaveInfo | null {
     try {
       const s = localStorage.getItem(SAVE_KEY);
       return s ? saveInfo(s) : null;
@@ -614,6 +630,29 @@ function writePref(key: string, v: boolean): void {
 }
 
 const SAVE_KEY = 'reino.partida';
+const MODE_KEY = 'reino.modo';
+
+/**
+ * Etapa 18: o último modo escolhido, para vir marcado na próxima partida. Num aparelho novo, o
+ * fácil (quem mais joga é uma criança de 4 anos).
+ */
+export function readGameMode(): GameMode {
+  try {
+    const v = localStorage.getItem(MODE_KEY);
+    if (v === 'normal' || v === 'facil') return v;
+  } catch {
+    // sem armazenamento
+  }
+  return 'facil';
+}
+
+function writeGameMode(m: GameMode): void {
+  try {
+    localStorage.setItem(MODE_KEY, m);
+  } catch {
+    // sem armazenamento: vale só nesta visita
+  }
+}
 
 function clearSave(): void {
   try {

@@ -965,6 +965,56 @@ button.chip {
   gap: 6px;
   pointer-events: auto;
 }
+/* Etapa 18: os dois modos em botões grandes com figura. */
+.mode-title {
+  margin: 0.9rem 0 0;
+  font-weight: 600;
+}
+.mode-pick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 0.5rem;
+}
+.mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 112px;
+  padding: 12px 8px;
+  background: var(--panel-2);
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+.mode-btn .ico {
+  width: 46px;
+  height: 46px;
+}
+.mode-btn.facil .ico {
+  color: var(--gold);
+}
+.mode-btn strong {
+  font-size: 1.15rem;
+}
+.mode-btn small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: center;
+}
+.mode-btn:hover,
+.mode-btn.on {
+  border-color: var(--gold);
+}
+.mode-btn.on {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 40%, transparent);
+}
+.more-row.static {
+  cursor: default;
+}
 .more-row {
   display: flex;
   align-items: center;

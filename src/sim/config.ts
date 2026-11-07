@@ -272,6 +272,67 @@ export const CONFIG = {
   holdEngage: 5,
 };
 
+/**
+ * Etapa 18: modo da partida, escolhido ao começar e travado até o fim (vai no salvo). O fácil é
+ * para o filho do usuário: nada se esgota, a mudança é mais rápida e as ondas são mais leves.
+ */
+export type Mode = 'normal' | 'facil';
+export const MODE_NAMES: Record<Mode, string> = { normal: 'Normal', facil: 'Fácil' };
+
+export interface ModeDef {
+  /** Floresta, rocha, veio e plantação acabam (Etapa 17). */
+  depletes: boolean;
+  /** Fator do tempo de desmontar e montar numa mudança de lugar. */
+  move: number;
+  /** Fator da vida e da quantidade de monstros. */
+  monsterHp: number;
+  monsters: number;
+  /** Segundos a mais na calmaria entre ondas, e o mínimo dela. */
+  calm: number;
+  calmMin: number;
+  /** Chefe a cada tantas ondas; modificadores de onda só a partir desta. */
+  bossEvery: number;
+  modsFrom: number;
+  /** Fator da vida do castelo e da recuperação entre ondas. */
+  castleHp: number;
+  castleRegen: number;
+  /** Fator dos recursos do começo. */
+  start: number;
+  /** Quanto rende o trabalho com fome. */
+  hungryWork: number;
+}
+
+export const MODES: Record<Mode, ModeDef> = {
+  normal: {
+    depletes: true,
+    move: 1,
+    monsterHp: 1,
+    monsters: 1,
+    calm: 0,
+    calmMin: CONFIG.waves.intervalMin,
+    bossEvery: CONFIG.bossEvery,
+    modsFrom: 1,
+    castleHp: 1,
+    castleRegen: 1,
+    start: 1,
+    hungryWork: CONFIG.hungryWork,
+  },
+  facil: {
+    depletes: false,
+    move: 0.5,
+    monsterHp: 0.7,
+    monsters: 0.75,
+    calm: 30,
+    calmMin: 75,
+    bossEvery: 20,
+    modsFrom: 20,
+    castleHp: 1.5,
+    castleRegen: 2,
+    start: 1.5,
+    hungryWork: 0.75,
+  },
+};
+
 /** Golpe especial de cada herói, como aparece no menu do castelo. */
 export const HERO_INFO: Record<HeroKind, { short: string; special: string; text: string }> = {
   barbaro: { short: 'Bárbaro', special: 'Giro do machado', text: 'Gira o machado e acerta todos em volta, com o triplo do dano. Segura a linha de frente.' },

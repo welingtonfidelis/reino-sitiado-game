@@ -613,45 +613,55 @@ O lugar onde um recurso acabou volta a valer quando nenhum prédio fica encostad
 
 Jogar no tablet e no iPhone para ver se os tempos estão bons para uma criança e se os balões aparecem bem no celular.
 
-## 21. Proposta: modo fácil (Etapa 18)
+## 21. Modo fácil (Etapa 18)
 
-Pedido do usuário (2026-11-07): um modo fácil de dificuldade, em que uma das mudanças é não ter o esgotamento de recursos. **Proposta, esperando aprovação.**
+Pedido do usuário (2026-11-07): um modo fácil de dificuldade, em que uma das mudanças é não ter o esgotamento de recursos. O plano foi aprovado como estava.
 
 ### Onde se escolhe
 
-- **Ao começar**: na tela de começo e no Nova partida (⋯), dois botões grandes com figura, porque o filho do usuário não lê. Um é **Fácil**, com uma flor ou um sol; o outro é **Normal**, com uma espada.
-- **O que vale**: a escolha vale para a partida inteira e vai no salvo (`w.mode`). O último modo escolhido fica guardado no navegador e vem marcado da próxima vez.
-- **Durante a partida**: não se troca, para o álbum e o relatório compararem coisa igual. O ⋯ mostra o modo da partida.
+- **Na primeira tela**: dois botões grandes com figura, porque o filho do usuário não lê. O **Fácil** tem um sol; o **Normal** tem espadas. Cada um tem uma linha curta de apoio.
+  - Sem partida salva, a tela pergunta "Como quer jogar?" e o toque já começa a partida. Se o modo escolhido for outro, o mapa é refeito com a mesma semente (`Game.begin`).
+  - Com partida salva, o Continuar mostra o modo dela, e os dois botões ficam embaixo para começar outra.
+- **Nova partida (⋯)** e **tela de derrota**: os mesmos dois botões, com o modo de agora marcado.
+- **Travado**: o modo vale a partida inteira e vai no salvo (`w.mode`; salvo antigo é normal). O ⋯ mostra "Modo fácil" ou "Modo normal" no topo.
+- **Lembrado**: o último modo escolhido fica no navegador (`reino.modo`) e vem marcado; num aparelho novo, o Fácil. Na URL, `?modo=normal` ou `?modo=facil` escolhe sem passar pela tela (para testes).
 
-### O que muda no Fácil
+### O que muda no Fácil (`MODES` em `config.ts`)
 
 | O quê | Normal | Fácil |
 | --- | --- | --- |
-| Floresta, rocha, veio e plantação | acabam (Etapa 17) | não acabam: sem estoque, sem Replantar, sem reposição |
+| Floresta, rocha, veio e plantação | acabam (Etapa 17) | não acabam: sem estoque gasto, sem reposição; o menu não mostra Replantar nem a barra de estoque |
 | Mudar prédio de lugar | desmonta e monta (75% + 100% do tempo da obra) | metade desse tempo |
-| Vida dos monstros | como hoje | 30% menos |
-| Monstros por onda | como hoje | 25% menos |
-| Calmaria entre ondas | 90 s, caindo até 45 s | 30 s a mais, caindo até 75 s |
-| Chefe | a cada 15 ondas | a cada 20 |
-| Modificadores de onda (Noite, Blindados, Enxame, Fúria) | a cada 5 ondas | só a partir da onda 20 |
+| Vida dos monstros | como hoje | 30% menos (os esqueletos do necromante também) |
+| Monstros por onda | como hoje | 25% menos de cada (o chefe continua um só) |
+| Calmaria | 120 s antes da primeira onda; depois 90 s, caindo até 45 s | 30 s a mais em cada uma, caindo até 75 s |
+| Chefe | a cada 15 ondas | a cada 20 (a figurinha do chefe segue o modo) |
+| Modificadores de onda | a cada 5 ondas | só a partir da onda 20 |
 | Vida do castelo | 1500 | 2250, e recupera o dobro entre as ondas |
 | Recursos no começo | como hoje | 50% a mais |
 | Fome | o trabalho cai pela metade | o trabalho cai só 25% |
 
-### Como fazer
+### Equilíbrio (6 sementes)
 
-- **Na simulação**: `CONFIG.modes = { normal, facil }`, com os multiplicadores e as chaves acima. `createWorld(seed, R, mode)` guarda o modo no mundo. A simulação lê `w.mode` nos pontos certos:
-  - `deplete`, `harvest`, `drySites` e `regrow` não rodam no fácil;
-  - o resto em `waveSize`, `spawnMonster`, `waveInterval`, `modsForWave` e `startWave`.
-- **No desenho**: o terreno não rareia no fácil, porque o estoque não baixa. A barra de estoque e o Replantar somem do menu.
-- **Robô**: `MODO=facil npm run balance`. Meta: o robô passa da onda 30 em média e o "nada" chega perto da onda 8.
-- **Testes**: no fácil nada esgota; os números das ondas mudam; o salvo guarda o modo (salvo antigo = normal).
+| Modo | "Nada" (só o castelo atira) | Robô |
+| --- | --- | --- |
+| Normal | onda 4 | 23,2 |
+| Fácil | onda 7,5 | 32,0 (4 das 6 sementes chegam ao teto de 40) |
 
-### Decisões para o usuário
+Para rodar no fácil: `MODO=facil npm run balance`.
 
-- A lista acima está boa, ou o fácil deve mudar só alguns itens (por exemplo, só o esgotamento e a vida dos monstros)?
-- O modo fica travado na partida (proposta) ou pode trocar no meio?
-- Num aparelho novo, o jogo começa no Fácil ou no Normal? (proposta: Fácil, já que quem mais joga é uma criança de 4 anos)
+### Onde está
+
+- **Simulação**:
+  - `MODES` e `Mode` ficam em `config.ts`;
+  - `createWorld(seed, R, mode)` aplica os recursos do começo, o castelo e a primeira calmaria;
+  - `waveSize`, `waveInterval`, `modsForWave` e `waveSizeWithMods` recebem o modo;
+  - a economia não gasta estoque e o fim da onda não repõe quando `depletes` é falso.
+- **Telas**: `ModePick` em `App.tsx` desenha os dois botões; `readGameMode` em `game.ts` lê o modo guardado.
+
+### O que falta
+
+Ver o filho do usuário jogando o Fácil no tablet: se ainda está difícil, os números da tabela são o lugar de mexer.
 
 ## 22. Arquitetura
 
@@ -698,8 +708,8 @@ Pedido do usuário (2026-11-07): um modo fácil de dificuldade, em que uma das m
 | 14 | Heróis: Bárbaro, Atiradora, Druida e Cavaleiro Negro, comprados no castelo (seção 17) | Pronta em 2026-11-07. Vista no navegador do Mac (compra, giro, os quatro modelos, submenu); falta jogar no iPhone. |
 | 15 | Fazenda com celeiro: plantações hexagonais em volta, uma planta por plantação (seção 18) | Pronta em 2026-11-07. Vista no navegador do Mac; falta jogar no iPhone. |
 | 16 | Festa da vitória, mundo vivo, estações com tempo, música ambiente e álbum de figurinhas (seção 19) | Pronta em 2026-11-07, na `main`. Vista no navegador do Mac (festa, as quatro estações, chuva, figurinha, álbum no computador e no celular); a música foi conferida por medição, falta ouvir e jogar no iPhone. |
-| 17 | Recursos que acabam e reaparecem longe do castelo, dos portais e das construções; plantação que acaba e se replanta (seção 20) | Pronta em 2026-11-07, fora da `main`. Vista no navegador do Mac (degraus da floresta e da rocha, toras, cascalho, balões, broto, Replantar no menu); falta jogar no tablet e no iPhone. |
-| 18 | Modo fácil, sem esgotamento e com ondas mais leves (seção 21) | Proposta em 2026-11-07, esperando aprovação. |
+| 17 | Recursos que acabam e reaparecem longe do castelo, dos portais e das construções; plantação que acaba e se replanta (seção 20) | Pronta em 2026-11-07, na `main`. Vista no navegador do Mac (degraus da floresta e da rocha, toras, cascalho, balões, broto, Replantar no menu); falta jogar no tablet e no iPhone. |
+| 18 | Modo fácil: nada acaba, ondas e mudança mais leves, castelo mais forte; escolhido com figura ao começar (seção 21) | Pronta em 2026-11-07, na `main`. Vista no navegador do Mac (primeira tela no tamanho de celular, Nova partida no ⋯, menu da plantação no fácil); falta jogar no tablet. |
 
 ## 24. Arte e licenças
 

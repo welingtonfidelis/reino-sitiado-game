@@ -4,9 +4,9 @@
  * avisos e as telas de começo e fim.
  */
 import { useEffect, useReducer, useState } from 'preact/hooks';
-import { SEASON_ICON, SEASON_NAME, BUILDINGS, CONFIG, RES_ORDER, castle, castleCap, housing, troops, workers, missing, waveSize, MONSTERS, BLESSINGS, repairAllCost, modsForWave, waveSizeWithMods, WAVE_MODS, tileAt, hexToWorld } from '../sim/index.ts';
-import type { BlessingId, Category, MonsterKind, Res, UnitKind } from '../sim/index.ts';
-import { FALL_TIME, Game } from '../game/game.ts';
+import { MODE_NAMES, SEASON_ICON, SEASON_NAME, BUILDINGS, CONFIG, RES_ORDER, castle, castleCap, housing, troops, workers, missing, waveSize, MONSTERS, BLESSINGS, repairAllCost, modsForWave, waveSizeWithMods, WAVE_MODS, tileAt, hexToWorld } from '../sim/index.ts';
+import type { BlessingId, Category, Mode, MonsterKind, Res, UnitKind } from '../sim/index.ts';
+import { FALL_TIME, Game, readGameMode } from '../game/game.ts';
 import type { IsoCamera } from '../render/camera.ts';
 import { Icon, RES_LABEL, costText, short } from './common.tsx';
 import { BuildFan, RadialMenu } from './Radial.tsx';
@@ -49,7 +49,7 @@ function Hud({ game, cam, small }: { game: Game; cam: IsoCamera; small: boolean 
   const calm = w.waveState === 'calm';
   const left = calm ? 0 : [...w.monsters.values()].filter((m) => m.state !== 'dead').length + w.spawnQueue.length;
   const boss = [...w.monsters.values()].find((m) => m.state !== 'dead' && MONSTERS[m.kind].boss);
-  const nextMods = modsForWave(w.seed, w.wave + 1).map((k) => WAVE_MODS[k].name);
+  const nextMods = modsForWave(w.seed, w.wave + 1, w.mode).map((k) => WAVE_MODS[k].name);
   const nowMods = w.waveMods.map((k) => WAVE_MODS[k].name);
   // Cristal só aparece quando já conta: com estoque ou com uma mina no veio de cristal.
   const crystal = w.res.cristal >= 1 || [...w.buildings.values()].some((b) => b.kind === 'mina' && tileAt(w, b.q, b.r)?.terrain === 'crystal');
@@ -241,6 +241,26 @@ function SeasonCard({ season }: { season: number }) {
 }
 
 /** O ⋯: som, relatório a cada onda, nova partida e o diário de avisos. */
+/**
+ * Etapa 18: os dois modos em botões grandes com figura (o filho do usuário não lê): o sol é o
+ * fácil (nada acaba, ondas leves), as espadas são o normal.
+ */
+function ModePick({ current, onPick }: { current: Mode; onPick: (m: Mode) => void }) {
+  return (
+    <div class="mode-pick">
+      {(['facil', 'normal'] as Mode[]).map((m) => (
+        <button key={m} class={`mode-btn ${m}${m === current ? ' on' : ''}`} onClick={() => onPick(m)} aria-label={`Jogar no modo ${MODE_NAMES[m].toLowerCase()}`}>
+          <Icon name={m === 'facil' ? 'sol' : 'espadas'} />
+          <strong>{MODE_NAMES[m]}</strong>
+          <small>{m === 'facil' ? 'nada acaba, ondas leves' : 'recursos acabam, ondas fortes'}</small>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const newSeed = () => Math.floor(Math.random() * 1e9);
+
 function MoreMenu({ game, onClose, onAlbum }: { game: Game; onClose: () => void; onAlbum: () => void }) {
   const [confirmNew, setConfirmNew] = useState(false);
   useEffect(() => {
@@ -255,6 +275,11 @@ function MoreMenu({ game, onClose, onAlbum }: { game: Game; onClose: () => void;
     <>
       <div class="more-backdrop" onPointerDown={onClose} />
       <section class="panel more-menu" aria-label="Opções">
+        <div class="more-row static" aria-label={`Modo desta partida: ${MODE_NAMES[game.world.mode].toLowerCase()}`}>
+          <Icon name={game.world.mode === 'facil' ? 'sol' : 'espadas'} />
+          <span>Modo {MODE_NAMES[game.world.mode].toLowerCase()}</span>
+          <small class="more-hint">até o fim da partida</small>
+        </div>
         <button class="more-row album-row" onClick={onAlbum}>
           <Icon name="album" />
           <span>Álbum de figurinhas</span>
@@ -282,17 +307,15 @@ function MoreMenu({ game, onClose, onAlbum }: { game: Game; onClose: () => void;
         </label>
         {confirmNew ? (
           <div class="more-confirm">
-            <p>Começar uma partida nova? O reino de agora (onda {game.world.wave}) se perde.</p>
+            <p>Começar uma partida nova? O reino de agora (onda {game.world.wave}) se perde. Escolha o modo:</p>
+            <ModePick
+              current={game.world.mode}
+              onPick={(m) => {
+                onClose();
+                game.restart(newSeed(), m);
+              }}
+            />
             <div class="row">
-              <button
-                class="btn danger"
-                onClick={() => {
-                  onClose();
-                  game.restart(Math.floor(Math.random() * 1e9));
-                }}
-              >
-                <Icon name="novo" /> Sim, começar de novo
-              </button>
               <button class="btn ghost" onClick={() => setConfirmNew(false)}>
                 Cancelar
               </button>
@@ -457,8 +480,8 @@ function Report({ game }: { game: Game }) {
   const damage = [r.wallsLost ? count(r.wallsLost, 'trecho de muralha', 'trechos de muralha') : '', r.buildingsLost ? count(r.buildingsLost, 'prédio', 'prédios') : ''].filter(Boolean).join(' · ') || 'Nenhum';
   const works = (['madeira', 'pedra', 'ferro'] as Res[]).filter((k) => r.prod[k] >= 1).map((k) => `+${Math.floor(r.prod[k])} de ${RES_LABEL[k]}`).join(' · ') || 'Nada';
   const next = w.wave + 1;
-  const nextMods = modsForWave(w.seed, next);
-  const size = waveSizeWithMods(next, nextMods);
+  const nextMods = modsForWave(w.seed, next, w.mode);
+  const size = waveSizeWithMods(next, nextMods, w.mode);
   const news = (Object.keys(size) as MonsterKind[]).filter((k) => MONSTERS[k].from === next && size[k] > 0 && NEWS[k]).map((k) => NEWS[k]);
   for (const k of ['golem', 'golemOssos'] as MonsterKind[]) if (size[k] > 0) news.push(`Chefe nesta onda: ${MONSTERS[k].name}. ${MONSTERS[k].blurb.replace('Chefe. ', '')}`);
   const rift = CONFIG.waves.riftOpens.includes(next) && next > 1;
@@ -614,22 +637,15 @@ function Intro({ game }: { game: Game }) {
           <li>Muralhas desviam a horda; orcs derrubam. Torres só atiram com arqueiros dentro.</li>
           <li>Arraste para mover o mapa e use a pinça ou a roda do mouse para o zoom.</li>
         </ul>
-        <div class="report-actions">
-          {saved ? (
-            <button class="btn" onClick={() => game.restart(Math.floor(Math.random() * 1e9))}>
-              Nova partida
-            </button>
-          ) : null}
-          {saved ? (
+        {saved ? (
+          <div class="report-actions">
             <button class="btn primary" onClick={() => game.continueSaved()}>
-              {saved.wave > 0 ? `Continuar partida (onda ${saved.wave})` : 'Continuar partida'}
+              {saved.wave > 0 ? `Continuar partida (onda ${saved.wave} · ${MODE_NAMES[saved.mode].toLowerCase()})` : `Continuar partida (${MODE_NAMES[saved.mode].toLowerCase()})`}
             </button>
-          ) : (
-            <button class="btn primary" onClick={() => ((game.started = true), game.emit())}>
-              Começar
-            </button>
-          )}
-        </div>
+          </div>
+        ) : null}
+        <p class="mode-title">{saved ? 'Ou comece outra:' : 'Como quer jogar?'}</p>
+        <ModePick current={saved ? saved.mode : readGameMode()} onPick={(m) => (saved ? game.restart(newSeed(), m) : game.begin(m))} />
       </article>
     </div>
   );
@@ -647,12 +663,9 @@ function Lost({ game }: { game: Game }) {
             Você resistiu a {Math.max(0, w.wave - 1)} {w.wave - 1 === 1 ? 'onda' : 'ondas'} e abateu {w.kills} monstros.
           </p>
         </header>
-        <p class="sub">A horda da onda {w.wave} trouxe {Object.entries(waveSize(w.wave)).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${MONSTERS[k as keyof typeof MONSTERS].name.toLowerCase()}`).join(', ')}.</p>
-        <div class="report-actions">
-          <button class="btn primary" onClick={() => game.restart(Math.floor(Math.random() * 1e9))}>
-            Começar de novo
-          </button>
-        </div>
+        <p class="sub">A horda da onda {w.wave} trouxe {Object.entries(waveSize(w.wave, w.mode)).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${MONSTERS[k as keyof typeof MONSTERS].name.toLowerCase()}`).join(', ')}.</p>
+        <p class="mode-title">Começar de novo:</p>
+        <ModePick current={w.mode} onPick={(m) => game.restart(newSeed(), m)} />
       </article>
     </div>
   );

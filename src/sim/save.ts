@@ -4,6 +4,7 @@
  * num JSON. Caminhos e alcance são refeitos ao carregar.
  */
 import { CONFIG } from './config.ts';
+import type { Mode } from './config.ts';
 import { rng } from './hex.ts';
 import { createWorld, fullStock } from './world.ts';
 import type { Building, Monster, Terrain, Unit, World } from './world.ts';
@@ -16,11 +17,13 @@ const PLAIN = [
   'tick', 'time', 'nextId', 'res', 'housesBuilt', 'arriveT', 'wave', 'waveState', 'waveTimer', 'spawnQueue', 'spawnT',
   'hungry', 'shelter', 'lost', 'kills', 'flags', 'blessings', 'mods', 'stats', 'report', 'forge', 'waveMods',
   'regrow',
+  'mode',
 ] as const;
 
 export interface SaveInfo {
   wave: number;
   seed: number;
+  mode: Mode;
 }
 
 export function saveWorld(w: World): string {
@@ -43,7 +46,7 @@ export function saveInfo(json: string): SaveInfo | null {
   try {
     const d = JSON.parse(json);
     if (d.v !== VERSION || typeof d.seed !== 'number') return null;
-    return { wave: d.wave, seed: d.seed };
+    return { wave: d.wave, seed: d.seed, mode: d.mode === 'facil' ? 'facil' : 'normal' };
   } catch {
     return null;
   }
