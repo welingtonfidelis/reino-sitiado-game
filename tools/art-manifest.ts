@@ -50,6 +50,13 @@ export const MEDIEVAL: [string, string][] = [
   ['decoration/props', 'tent'],
   ['decoration/props', 'resource_stone'],
   ['decoration/props', 'crate_open'],
+  // Vila: poço da praça, taverna e mercado do bairro, barril, caixa e balde nos quintais.
+  ['buildings/blue', 'building_well_blue'],
+  ['buildings/blue', 'building_tavern_blue'],
+  ['buildings/blue', 'building_market_blue'],
+  ['decoration/props', 'barrel'],
+  ['decoration/props', 'crate_A_small'],
+  ['decoration/props', 'bucket_water'],
   ['units/neutral', 'projectile_arrow'],
   ['buildings/neutral', 'projectile_catapult'],
 ];

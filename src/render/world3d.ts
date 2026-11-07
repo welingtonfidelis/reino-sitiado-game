@@ -9,7 +9,8 @@ import { BUILDINGS, CONFIG, CROPS, DIRS, HEX, cropOf, hexToWorld, isHero, openRi
 import type { Building, BuildingKind, Crop, SimEvent, UnitKind, World } from '../sim/index.ts';
 import type { Art, CharKey, StaticKey, StaticModel } from './assets.ts';
 import { CharView } from './chars.ts';
-import { buildGround } from './ground.ts';
+import { buildGround, paintVillage } from './ground.ts';
+import { planVillage } from './village.ts';
 import { SEASON_U, SeasonLook, Weather, leafy, snowy, weatherOf } from './season.ts';
 import type { QualityLook } from './quality.ts';
 import type { FxLayer } from './fx.ts';
@@ -377,6 +378,9 @@ export class World3D {
     big('catapulta', 100);
     big('pedraCerco', 40, false);
     for (const k of ['rochaA', 'rochaB', 'rochaC', 'rochaD'] as StaticKey[]) big(k, 300);
+    // Vila: praça, taverna e mercado, e enfeites dos quintais.
+    for (const k of ['poco', 'taverna', 'mercado'] as StaticKey[]) big(k, 60);
+    for (const k of ['barril', 'caixa', 'balde'] as StaticKey[]) big(k, 600);
     // Etapa 16: estações. Árvores com copa da estação (cópia do material); o resto ganha neve por cima.
     const trees = new Set<StaticKey>(['arvoreA', 'arvoreB', 'arvoreC', 'arvoreD']);
     const leafMats = new Map<THREE.Material, THREE.Material>();
@@ -543,7 +547,7 @@ export class World3D {
   syncStatic(w: World): void {
     if (w.ver === this.ver) return;
     this.ver = w.ver;
-    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'catapulta'];
+    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'catapulta', 'poco', 'taverna', 'mercado', 'barril', 'caixa', 'balde'];
     for (const k of keys) this.sets.get(k)!.begin();
     this.crystals.begin();
     this.pitch.begin();
@@ -576,8 +580,17 @@ export class World3D {
         this.place(t.deco % 2 ? 'pedraA' : 'pedraC', p.x + ((t.deco % 7) - 3) * 0.15, 0, p.z + ((t.deco % 5) - 2) * 0.15, rot, 1.4);
       }
     }
+    // Vila: casas viradas para a trilha, quintal com enfeites, poço, taverna e mercado.
+    const village = planVillage(w);
+    for (const v of village.pieces) this.place(v.key, v.x, 0, v.z, v.rot, v.scale, v.id);
+    paintVillage(village.yards, village.trails);
     for (const b of w.buildings.values()) {
       const p = hexToWorld(b.q, b.r);
+      const home = village.homes.get(b.id);
+      if (home) {
+        this.place(home.model, home.x, 0, home.z, home.rot, home.scale, b.id);
+        continue;
+      }
       if (b.kind === 'muralha' || b.kind === 'portao') {
         this.wallPiece(w, b, p.x, p.z);
         continue;
@@ -586,8 +599,7 @@ export class World3D {
         this.place('obra', p.x, 0, p.z, 0, 0.85, b.id);
         continue;
       }
-      let key = HOME[b.kind];
-      if (b.kind === 'casa' && b.id % 2) key = 'casaB';
+      const key = HOME[b.kind];
       const rot = b.kind === 'castelo' ? 0 : ((b.id * 7) % 6) * sixth;
       if (b.kind === 'piche' || b.kind === 'estacas') {
         this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), b.id * 0.7);

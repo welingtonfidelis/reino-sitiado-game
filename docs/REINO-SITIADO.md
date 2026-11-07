@@ -516,6 +516,14 @@ Pedidos do usuário depois de jogar:
   - Sem escolha guardada, um aparelho de toque que o Chrome diz ter 4 GB de memória ou menos já começa no leve. O Safari do iPhone não diz a memória, então lá começa no normal.
   - A simulação é a mesma nos dois modos.
 - **Personagens numa peça só** (vale para os dois modos): cada personagem do KayKit vem em 6 a 12 peças (corpo, cabeça, braços, pernas, chapéu), cada uma um desenho. Ao carregar, as peças que usam o mesmo material viram uma malha só (`mergeSkinned` em `assets.ts`). São 1 ou 2 desenhos por personagem.
+- **Cada boneco no seu ritmo**: trabalhadores, tropas e monstros que começavam a mesma animação no mesmo instante (chegar ao serviço, entrar na luta, abrir o jogo) se mexiam em compasso, como se fossem um só. Agora a animação em laço entra num ponto qualquer dela e cada boneco tem um ritmo próprio (±8%), então ninguém bate a enxada, marcha ou atira junto com o vizinho (`CharView` em `chars.ts`). A queda e o giro do Bárbaro continuam contando do começo.
+- **Vilinha em vez de casas soltas** (o usuário achou as casas soltas, sem cara de bairro; tudo só no desenho, a simulação não muda; `src/render/village.ts`):
+  - **Chão de vila**: cada casa tem um quintal de terra batida, que emenda no da casa vizinha. É um mapa de 512 px visto de cima, pintado em canvas a cada mudança do mundo (`paintVillage` em `ground.ts`) e misturado no shader do chão como terra.
+  - **Ruas**: da casa mais perto do castelo para a mais longe, cada uma abre uma trilha da porta até a rede de ruas (o castelo, as trilhas já feitas e as casas já ligadas). A trilha acaba onde encontra outra, então vira rua em vez de uma trilha por casa. A busca é incremental: a rede só cresce, então cada casa só corrige o que ficou mais perto (2 ms com 17 casas, só quando um prédio muda). Casa encostada numa já ligada não abre trilha, porque o quintal já liga as duas. As trilhas fogem de rocha, água, fenda e prédios, cortam mato só se precisarem e passam por portão e armadilha.
+  - **Porta para a rua**: a porta (o +Z do modelo) dá para o primeiro passo da trilha. Sem trilha, dá para o lado do castelo que não tenha outra casa.
+  - **Quintal com enfeites**: a casa está 15% maior. Dos lados da porta ficam barril e balde, feno e saco, ou carrinho e caixas (varia pelo id). A cerca nos fundos foi testada e o usuário pediu para tirar.
+  - **Pracinha**: o canto em comum de três casas encostadas ganha um poço (no máximo um a cada 3,5 m), e as casas se afastam um pouco dele.
+  - **Taverna e mercado**: um bairro (casas encostadas) de 5 casas ganha taverna na casa mais cercada, e um de 8 ganha também o mercado. O modelo troca, mas as vagas são as mesmas.
   - Com 32 personagens na tela, os desenhos por quadro caíram de 403 para 164.
   - No Mac, o leve desenha cada quadro em cerca de metade do tempo do normal.
 
@@ -536,6 +544,7 @@ Pedidos do usuário depois de jogar:
   - `camera.ts`: câmera isométrica com arrastar, pinça, roda e toque.
   - `season.ts`: estações (tom da grama e das copas, neve, sombras de nuvem) e o tempo que cai do céu (Etapa 16).
   - `quality.ts`: gráficos normais ou leves (o que cada um liga e desliga, e o palpite pelo aparelho).
+  - `village.ts`: a vila (casas viradas para a rua, ruas até o castelo, quintais, poço, taverna e mercado); o chão dela é pintado em `ground.ts`.
 - `src/audio/`: `sound.ts` com os efeitos sonoros e `music.ts` com a música ambiente, tudo feito na hora pelo Web Audio.
 - **Muralha:** cada trecho desenha meio muro até cada vizinho que também é muralha e um poste nas curvas e pontas. O portão segue a linha dos dois vizinhos opostos.
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. `album.ts`: as figurinhas e o que guarda no navegador. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.

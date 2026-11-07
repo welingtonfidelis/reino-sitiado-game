@@ -21,6 +21,7 @@ copiados por `npm run art` conforme `tools/art-manifest.ts`.
 | KayKit RPG Tools Bits 1.0 (Etapa 10) | axe, pickaxe, shovel, hammer e tools_bits_texture (ferramentas dos trabalhadores e martelo do engenheiro) |
 | KayKit Resource Bits 1.0 | Iron_Nuggets; Stone_Bricks_Stack_Large e Medium, Stone_Chunks_Large e Small (pedreira); textura do pack |
 | KayKit Medieval Hexagon Pack (pedreira) | barraca, resource_stone, crate_open |
+| KayKit Medieval Hexagon Pack (vila) | poço, taverna, mercado, barril, caixa pequena, balde com água |
 | KayKit Adventurers 2.0 (Etapa 14) | Barbarian, Rogue_Hooded, Druid; axe_2handed, crossbow_2handed, druid_staff e as texturas barbarian, rogue e druid |
 | KayKit Mystery Monthly 5 (Etapa 14) | BlackKnight, BlackKnight_Sword, BlackKnight_Shield e a textura |
 | KayKit Character Animations 1.1 | Rig_Medium (General, MovementBasic, CombatMelee, CombatRanged, Tools, Simulation) e Rig_Large (General, MovementBasic, CombatMelee). Da Simulation (Etapa 16): Cheering, Waving, Sit_Floor_Idle e Push_Ups |

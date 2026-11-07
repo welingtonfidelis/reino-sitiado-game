@@ -183,6 +183,69 @@ function makeTexture(kind: 'grama' | 'solo'): THREE.CanvasTexture {
 
 let TEX: { grama: THREE.CanvasTexture; solo: THREE.CanvasTexture } | null = null;
 
+/**
+ * Chão da vila: um mapa visto de cima (512 px para o mapa inteiro) pintado com os quintais e as
+ * trilhas; o chão mistura terra onde ele é claro. Pintado de novo quando a vila muda.
+ */
+const VILLAGE_PX = 512;
+const VILLAGE = (() => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = VILLAGE_PX;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.flipY = false;
+  tex.colorSpace = THREE.NoColorSpace;
+  // box: canto (x, z) do mapa e 1 / lado, em metros.
+  return { canvas, tex, box: new THREE.Vector3(0, 0, 1) };
+})();
+
+/** Pinta os quintais (manchas redondas que se juntam) e as trilhas (linhas macias). */
+export function paintVillage(yards: { x: number; z: number }[], trails: { x: number; z: number }[][]): void {
+  const g = VILLAGE.canvas.getContext('2d');
+  if (!g) return;
+  const k = VILLAGE.box.z * VILLAGE_PX;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, VILLAGE_PX, VILLAGE_PX);
+  // Daqui em diante desenha em metros do mundo: (x, z) -> pixel.
+  g.setTransform(k, 0, 0, k, -VILLAGE.box.x * k, -VILLAGE.box.y * k);
+  for (const y of yards) {
+    const r = 1.5;
+    const grad = g.createRadialGradient(y.x, y.z, 0, y.x, y.z, r);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.55, 'rgba(255,255,255,0.95)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.beginPath();
+    g.arc(y.x, y.z, r, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  // Borda macia: três traços, do mais largo e fraco ao mais estreito e cheio.
+  for (const [width, alpha] of [
+    [0.85, 0.3],
+    [0.62, 0.6],
+    [0.42, 1],
+  ] as const) {
+    g.strokeStyle = `rgba(255,255,255,${alpha})`;
+    g.lineWidth = width;
+    for (const t of trails) {
+      if (t.length < 2) continue;
+      // Curva pelos pontos do meio: a trilha faz volta em vez de quina.
+      g.beginPath();
+      g.moveTo(t[0]!.x, t[0]!.z);
+      for (let i = 1; i < t.length - 1; i++) {
+        const a = t[i]!;
+        const b = t[i + 1]!;
+        g.quadraticCurveTo(a.x, a.z, (a.x + b.x) / 2, (a.z + b.z) / 2);
+      }
+      g.lineTo(t[t.length - 1]!.x, t[t.length - 1]!.z);
+      g.stroke();
+    }
+  }
+  VILLAGE.tex.needsUpdate = true;
+}
+
 function groundMaterial(): THREE.MeshLambertMaterial {
   TEX ??= { grama: makeTexture('grama'), solo: makeTexture('solo') };
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
@@ -193,17 +256,23 @@ function groundMaterial(): THREE.MeshLambertMaterial {
     sh.uniforms.uGrassTint = SEASON_U.uGrassTint;
     sh.uniforms.uTime = SEASON_U.uTime;
     sh.uniforms.uClouds = SEASON_U.uClouds;
+    sh.uniforms.uVillage = { value: VILLAGE.tex };
+    sh.uniforms.uVillageBox = { value: VILLAGE.box };
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float aSoil;\nvarying float vSoil;\nvarying vec2 vGround;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSoil = aSoil;\nvGround = (modelMatrix * vec4(position, 1.0)).xz;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform sampler2D uGrass;\nuniform sampler2D uSoil;\nvarying float vSoil;\nvarying vec2 vGround;' + GROUND_SEASON.head)
+      .replace('#include <common>', '#include <common>\nuniform sampler2D uGrass;\nuniform sampler2D uSoil;\nuniform sampler2D uVillage;\nuniform vec3 uVillageBox;\nvarying float vSoil;\nvarying vec2 vGround;' + GROUND_SEASON.head)
       .replace(
         '#include <map_fragment>',
         `// Grama e solo pela posição no mundo (um quadro de textura a cada 3,5 m): não segue a grade.
         vec3 grass = texture2D(uGrass, vGround / 3.5).rgb * uGrassTint;
         vec3 soil = texture2D(uSoil, vGround / 2.6 + 0.37).rgb;
         float s = smoothstep(0.25, 0.75, vSoil);
+        // Quintais e trilhas da vila: terra batida, um pouco mais clara que a terra solta.
+        float vil = smoothstep(0.2, 0.75, texture2D(uVillage, (vGround - uVillageBox.xy) * uVillageBox.z).r);
+        s = max(s, vil);
+        soil *= 1.0 + 0.1 * vil;
         diffuseColor.rgb *= mix(grass, soil, s) * 1.25;`,
       )
       .replace('#include <color_fragment>', '#include <color_fragment>\n' + GROUND_SEASON.body);
@@ -257,6 +326,20 @@ export function buildGround(w: World): Ground {
   const wpos: number[] = [];
   const wshore: number[] = [];
   const c0 = hexToWorld(0, 0);
+  // O mapa da vila cobre o mapa inteiro (com folga de um hexágono) e começa vazio.
+  let minX = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxZ = -Infinity;
+  for (const t of w.list) {
+    const p = hexToWorld(t.q, t.r);
+    minX = Math.min(minX, p.x);
+    minZ = Math.min(minZ, p.z);
+    maxX = Math.max(maxX, p.x);
+    maxZ = Math.max(maxZ, p.z);
+  }
+  VILLAGE.box.set(minX - 2, minZ - 2, 1 / (Math.max(maxX - minX, maxZ - minZ) + 4));
+  paintVillage([], []);
   const corner = (cx: number, cz: number, k: number, r = HEX) => {
     const a = Math.PI / 6 + (k * Math.PI) / 3;
     return { x: cx + Math.cos(a) * r, z: cz + Math.sin(a) * r };

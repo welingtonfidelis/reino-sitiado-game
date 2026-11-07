@@ -55,6 +55,9 @@ const BIG: Record<Pose, string> = {
   pushups: 'Idle_A',
 };
 
+/** Poses que contam do começo (o resto entra em laço num ponto qualquer). */
+const ONCE = new Set<Pose>(['death', 'spin']);
+
 const GEAR: Partial<Record<CharKey, { r?: WeaponKey; l?: WeaponKey }>> = {
   soldado: { r: 'espada', l: 'escudo' },
   arqueiro: { l: 'arco' },
@@ -84,6 +87,11 @@ export class CharView {
   private handR: THREE.Object3D | null = null;
   private tool: THREE.Object3D | null = null;
   private toolKey: WeaponKey | null = null;
+  /**
+   * Ritmo próprio deste boneco (±8%): quem começa junto vai se desencontrando, e ninguém
+   * bate a enxada, marcha ou atira no mesmo compasso do vizinho.
+   */
+  private readonly pace = 0.92 + Math.random() * 0.16;
 
   constructor(art: Art, kind: CharKey) {
     this.kind = kind;
@@ -107,7 +115,6 @@ export class CharView {
     const gear = GEAR[kind];
     if (gear?.r) this.handR?.add(art.weapons[gear.r].clone(true));
     if (gear?.l) findBone(model, ['handslotl', 'handslot.l'])?.add(art.weapons[gear.l].clone(true));
-    this.mixer.setTime(Math.random() * 2);
     this.play('idle');
   }
 
@@ -123,7 +130,7 @@ export class CharView {
   play(pose: Pose, speed = 1): void {
     const a = this.actions.get(pose) ?? this.actions.get('idle');
     if (!a) return;
-    a.timeScale = speed;
+    a.timeScale = pose === 'death' ? speed : speed * this.pace;
     if (this.current === pose) {
       this.want = null;
       return;
@@ -139,6 +146,10 @@ export class CharView {
     this.want = null;
     const prev = this.current ? this.actions.get(this.current) : undefined;
     a.reset();
+    // Animação em laço começa num ponto qualquer dela: quem chega ao serviço, à luta ou à
+    // marcha no mesmo instante não fica espelhando o outro. A queda e o giro do Bárbaro
+    // contam do começo.
+    if (!ONCE.has(pose)) a.time = Math.random() * a.getClip().duration;
     a.play();
     if (prev && prev !== a) a.crossFadeFrom(prev, pose === 'death' ? 0.1 : 0.2, false);
     this.current = pose;

@@ -59,6 +59,13 @@ export const STATIC_MODELS = {
   saco: 'medieval/sack.gltf',
   carrinho: 'medieval/wheelbarrow.gltf',
   flecha: 'medieval/projectile_arrow.gltf',
+  // Vila: praça, taverna e mercado do bairro, e os enfeites dos quintais.
+  poco: 'medieval/building_well_blue.gltf',
+  taverna: 'medieval/building_tavern_blue.gltf',
+  mercado: 'medieval/building_market_blue.gltf',
+  barril: 'medieval/barrel.gltf',
+  caixa: 'medieval/crate_A_small.gltf',
+  balde: 'medieval/bucket_water.gltf',
 } as const;
 export type StaticKey = keyof typeof STATIC_MODELS;
 
