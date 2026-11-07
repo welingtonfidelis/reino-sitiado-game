@@ -600,7 +600,8 @@ export class World3D {
         continue;
       }
       const key = HOME[b.kind];
-      const rot = b.kind === 'castelo' ? 0 : ((b.id * 7) % 6) * sixth;
+      // Prédio ligado às ruas: porta para a trilha; os outros giram pelo id.
+      const rot = b.kind === 'castelo' ? 0 : village.turns.get(b.id) ?? ((b.id * 7) % 6) * sixth;
       if (b.kind === 'piche' || b.kind === 'estacas') {
         this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), b.id * 0.7);
         this.tmp.compose(this.p.set(p.x, 0, p.z), this.q, this.s.setScalar(1));

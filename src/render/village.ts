@@ -7,12 +7,14 @@
  *   como ruas. Casa encostada noutra não abre trilha: o quintal já liga as duas.
  * - A porta dá para a trilha; a casa é um pouco maior e o quintal tem barril, caixa, feno ou
  *   carrinho dos lados da porta; o quintal fica aberto, sem cerca.
+ * - Quartel, campo de tiro, capela, estábulo, forja e oficina também entram nas ruas, com
+ *   quintal e porta virada para a trilha. Prédios de trabalho, torres, muralhas e armadilhas, não.
  * - Três casas encostadas fazem uma pracinha com poço no canto em comum. Um bairro de 5 casas
  *   ganha uma taverna e um de 8, um mercado (a casa do meio troca de modelo; as vagas são as
  *   mesmas). Tudo é só desenho: a simulação não muda.
  */
 import { BUILDINGS, DIRS, castle, hexToWorld, tileAt } from '../sim/index.ts';
-import type { Building, Tile, World } from '../sim/index.ts';
+import type { Building, BuildingKind, Tile, World } from '../sim/index.ts';
 import type { StaticKey } from './assets.ts';
 
 export interface Home {
@@ -35,6 +37,8 @@ export interface Piece {
 
 export interface VillagePlan {
   homes: Map<number, Home>;
+  /** Rotação dos outros prédios ligados às ruas (porta para a trilha). */
+  turns: Map<number, number>;
   pieces: Piece[];
   /** Centros dos quintais e as trilhas (pontos no mundo), para pintar o chão. */
   yards: { x: number; z: number }[];
@@ -42,6 +46,8 @@ export interface VillagePlan {
 }
 
 export const HOUSE_SCALE = 1.15;
+/** Prédios que a rua liga ao castelo: as casas e os de treinar e equipar a tropa. */
+export const LINKED: ReadonlySet<BuildingKind> = new Set<BuildingKind>(['casa', 'quartel', 'campo', 'capela', 'estabulo', 'forja', 'oficina']);
 /** Bairro com tantas casas ganha taverna e mercado. */
 export const TAVERN_AT = 5;
 export const MARKET_AT = 8;
@@ -65,6 +71,13 @@ function isHome(w: World, t: Tile | null): Building | null {
   return b && b.kind === 'casa' && b.built >= 1 ? b : null;
 }
 
+/** Prédio pronto que a rua liga (casa ou de tropa). */
+function isLinked(w: World, t: Tile | null): Building | null {
+  if (!t || t.b < 0) return null;
+  const b = w.buildings.get(t.b);
+  return b && LINKED.has(b.kind) && b.built >= 1 ? b : null;
+}
+
 /** Custo de a trilha passar pelo ladrilho (Infinity = não passa). */
 function trailCost(w: World, t: Tile): number {
   if (t.terrain === 'rock' || t.terrain === 'water' || t.terrain === 'rift') return Infinity;
@@ -73,7 +86,7 @@ function trailCost(w: World, t: Tile): number {
     const b = w.buildings.get(t.b);
     if (!b) return c;
     if (b.kind === 'castelo' || b.kind === 'portao') return c;
-    if (b.kind === 'casa') return c + 2;
+    if (LINKED.has(b.kind)) return c + 2;
     if (BUILDINGS[b.kind].trap) return c + 1;
     return Infinity;
   }
@@ -175,11 +188,13 @@ class Streets {
 
 export function planVillage(w: World): VillagePlan {
   const homes = new Map<number, Home>();
+  const turns = new Map<number, number>();
   const pieces: Piece[] = [];
   const yards: { x: number; z: number }[] = [];
   const trails: { x: number; z: number }[][] = [];
-  const houses = [...w.buildings.values()].filter((b) => b.kind === 'casa' && b.built >= 1);
-  if (!houses.length) return { homes, pieces, yards, trails };
+  const linked = [...w.buildings.values()].filter((b) => LINKED.has(b.kind) && b.built >= 1);
+  const houses = linked.filter((b) => b.kind === 'casa');
+  if (!linked.length) return { homes, turns, pieces, yards, trails };
   const c = castle(w);
   const cp = c ? hexToWorld(c.q, c.r) : { x: 0, z: 0 };
 
@@ -231,8 +246,8 @@ export function planVillage(w: World): VillagePlan {
     }
   }
 
-  // Ruas: da casa mais perto do castelo para a mais longe, cada uma liga a sua porta à rede (o
-  // castelo, as trilhas já feitas e as casas já ligadas, cujo quintal emenda no da vizinha).
+  // Ruas: do prédio mais perto do castelo para o mais longe, cada um liga a sua porta à rede (o
+  // castelo, as trilhas já feitas e os prédios já ligados, cujo quintal emenda no do vizinho).
   const streets = new Streets(w);
   const { net, next } = streets;
   const first = new Map<number, number>();
@@ -240,14 +255,14 @@ export function planVillage(w: World): VillagePlan {
     streets.add(w.grid.idx(c.q, c.r));
     streets.relax();
     const far = Float32Array.from(streets.dist);
-    const order = [...houses].sort((a, z) => far[w.grid.idx(a.q, a.r)]! - far[w.grid.idx(z.q, z.r)]! || a.id - z.id);
+    const order = [...linked].sort((a, z) => far[w.grid.idx(a.q, a.r)]! - far[w.grid.idx(z.q, z.r)]! || a.id - z.id);
     for (const b of order) {
       const ti = w.grid.idx(b.q, b.r);
       const n = next[ti]!;
       const p = hexToWorld(b.q, b.r);
       const path: { x: number; z: number }[] = [];
       const tiles = [ti];
-      if (n >= 0 && !isHome(w, w.tiles[n]!)) {
+      if (n >= 0 && !isLinked(w, w.tiles[n]!)) {
         // Da porta, de ladrilho em ladrilho, até encostar na rede.
         const e = hexToWorld(w.tiles[n]!.q - b.q, w.tiles[n]!.r - b.r);
         path.push({ x: p.x + e.x * 0.35, z: p.z + e.z * 0.35 });
@@ -259,7 +274,7 @@ export function planVillage(w: World): VillagePlan {
           i = next[i]!;
         }
       }
-      // Encostada numa casa já ligada: o quintal faz a ligação, sem trilha.
+      // Encostado num prédio já ligado: o quintal faz a ligação, sem trilha.
       if (n >= 0) first.set(b.id, n);
       for (const i of tiles) streets.add(i);
       streets.relax();
@@ -267,29 +282,39 @@ export function planVillage(w: World): VillagePlan {
     }
   }
 
-  for (const b of houses) {
+  /** Porta: para o primeiro passo da trilha; sem trilha própria, para o lado do castelo sem vizinho ligado. */
+  const doorOf = (b: Building): number => {
     const p = hexToWorld(b.q, b.r);
-    yards.push(p);
-    // Porta: para o primeiro passo da trilha, se ele não cair noutra casa; senão, para o lado do castelo.
-    let front = -1;
     const n = first.get(b.id) ?? -1;
     if (n >= 0) {
       const nt = w.tiles[n]!;
-      if (!isHome(w, nt)) front = DIRS.findIndex(([dq, dr]) => b.q + dq === nt.q && b.r + dr === nt.r);
+      if (!isLinked(w, nt)) return DIRS.findIndex(([dq, dr]) => b.q + dq === nt.q && b.r + dr === nt.r);
     }
-    if (front < 0) {
-      let best = -Infinity;
-      for (let k = 0; k < 6; k++) {
-        const e = edge(k);
-        const dot = e.x * (cp.x - p.x) + e.z * (cp.z - p.z);
-        if (dot > best && !homeAt(b.q + DIRS[k]![0], b.r + DIRS[k]![1])) {
-          best = dot;
-          front = k;
-        }
+    let front = 0;
+    let best = -Infinity;
+    for (let k = 0; k < 6; k++) {
+      const e = edge(k);
+      const dot = e.x * (cp.x - p.x) + e.z * (cp.z - p.z);
+      if (dot > best && !isLinked(w, tileAt(w, b.q + DIRS[k]![0], b.r + DIRS[k]![1]))) {
+        best = dot;
+        front = k;
       }
-      if (front < 0) front = 0;
     }
-    const f = edge(front);
+    return front;
+  };
+
+  // Prédios de tropa: quintal e porta para a rua (o modelo já vem cheio, sem enfeites).
+  for (const b of linked) {
+    if (b.kind === 'casa') continue;
+    yards.push(hexToWorld(b.q, b.r));
+    const f = edge(doorOf(b));
+    turns.set(b.id, facing(f.x, f.z));
+  }
+
+  for (const b of houses) {
+    const p = hexToWorld(b.q, b.r);
+    yards.push(p);
+    const f = edge(doorOf(b));
     const s = { x: f.z, z: -f.x };
     const model = special.get(b.id) ?? (b.id % 2 ? 'casaB' : 'casaA');
     const scale = model === 'mercado' ? 0.85 : model === 'taverna' ? 1 : HOUSE_SCALE;
@@ -333,5 +358,5 @@ export function planVillage(w: World): VillagePlan {
       }
     }
   }
-  return { homes, pieces, yards, trails };
+  return { homes, turns, pieces, yards, trails };
 }

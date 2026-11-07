@@ -524,6 +524,7 @@ Pedidos do usuário depois de jogar:
   - **Quintal com enfeites**: a casa está 15% maior. Dos lados da porta ficam barril e balde, feno e saco, ou carrinho e caixas (varia pelo id). A cerca nos fundos foi testada e o usuário pediu para tirar.
   - **Pracinha**: o canto em comum de três casas encostadas ganha um poço (no máximo um a cada 3,5 m), e as casas se afastam um pouco dele.
   - **Taverna e mercado**: um bairro (casas encostadas) de 5 casas ganha taverna na casa mais cercada, e um de 8 ganha também o mercado. O modelo troca, mas as vagas são as mesmas.
+  - **Prédios de tropa também** (pedido do usuário): quartel, campo de tiro, capela, estábulo, forja e oficina entram nas ruas como as casas, com quintal e porta virada para a trilha (`LINKED` em `village.ts`). Ficam de fora os prédios de trabalho (celeiro, plantação, serraria, pedreira, mina), as torres (arqueiros, mago, catapulta), as muralhas e as armadilhas.
   - Com 32 personagens na tela, os desenhos por quadro caíram de 403 para 164.
   - No Mac, o leve desenha cada quadro em cerca de metade do tempo do normal.
 
@@ -544,7 +545,7 @@ Pedidos do usuário depois de jogar:
   - `camera.ts`: câmera isométrica com arrastar, pinça, roda e toque.
   - `season.ts`: estações (tom da grama e das copas, neve, sombras de nuvem) e o tempo que cai do céu (Etapa 16).
   - `quality.ts`: gráficos normais ou leves (o que cada um liga e desliga, e o palpite pelo aparelho).
-  - `village.ts`: a vila (casas viradas para a rua, ruas até o castelo, quintais, poço, taverna e mercado); o chão dela é pintado em `ground.ts`.
+  - `village.ts`: a vila (casas e prédios de tropa virados para a rua, ruas até o castelo, quintais, poço, taverna e mercado); o chão dela é pintado em `ground.ts`.
 - `src/audio/`: `sound.ts` com os efeitos sonoros e `music.ts` com a música ambiente, tudo feito na hora pelo Web Audio.
 - **Muralha:** cada trecho desenha meio muro até cada vizinho que também é muralha e um poste nas curvas e pontas. O portão segue a linha dos dois vizinhos opostos.
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. `album.ts`: as figurinhas e o que guarda no navegador. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
