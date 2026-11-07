@@ -24,6 +24,8 @@ import {
   repairAll,
   saveWorld,
   setRally,
+  garrison,
+  callArchers,
   step,
   toggleShelter,
   troops,
@@ -632,5 +634,58 @@ describe('defesas novas e ondas variadas (Etapa 9)', () => {
     s.postZ = 6;
     run(w, 0.5);
     expect(m.hp).toBe(MONSTERS.orc.hp - UNITS.soldado.dmg * 0.75);
+  });
+});
+
+describe('arqueiros e torres', () => {
+  /** Arqueiros prontos perto do castelo, com uma ordem (0 livre, 1 ponto de encontro, 2 mandado). */
+  function archers(w: World, n: number, order: 0 | 1 | 2) {
+    const c = castle(w)!;
+    const p = hexToWorld(c.q, c.r);
+    return Array.from({ length: n }, (_, i) => {
+      const u = addUnit(w, 'arqueiro', p.x + 1 + (i % 3) * 0.4, p.z + 2 + Math.floor(i / 3) * 0.4);
+      u.order = order;
+      u.postX = u.x;
+      u.postZ = u.z;
+      return u;
+    });
+  }
+
+  it('a torre tem 4 lugares e o arqueiro do ponto de encontro sobe sozinho', () => {
+    const w = createWorld(61);
+    calm(w);
+    const [p] = freeGrass(w, 1, 3, 4);
+    const t = addBuilding(w, 'torre', p!.q, p!.r, 1);
+    const us = archers(w, 5, 1);
+    run(w, 25, () => t.archers.length >= 4 && us.filter((u) => u.state === 'tower').length >= 4);
+    expect(t.archers.length).toBe(4);
+    expect(us.filter((u) => u.state === 'tower').length).toBe(4);
+  });
+
+  it('o arqueiro mandado para um lugar fica; tocar na torre faz ele subir', () => {
+    const w = createWorld(62);
+    calm(w);
+    const [p] = freeGrass(w, 1, 3, 4);
+    const t = addBuilding(w, 'torre', p!.q, p!.r, 1);
+    const us = archers(w, 6, 2);
+    run(w, 3);
+    expect(t.archers.length).toBe(0);
+    const why = garrison(w, us.map((u) => u.id), t.id);
+    expect(why).toContain('2 arqueiros ficaram no chão');
+    run(w, 25, () => us.filter((u) => u.state === 'tower').length >= 4);
+    expect(us.filter((u) => u.state === 'tower').length).toBe(4);
+    expect(garrison(w, [us[5]!.id], t.id)).toContain('Torre cheia');
+  });
+
+  it('"Chamar arqueiros" puxa os do chão mais perto', () => {
+    const w = createWorld(63);
+    calm(w);
+    const [p] = freeGrass(w, 1, 3, 4);
+    const t = addBuilding(w, 'torre', p!.q, p!.r, 1);
+    const us = archers(w, 2, 2);
+    expect(callArchers(w, t.id)).toBeNull();
+    run(w, 25, () => us.every((u) => u.state === 'tower'));
+    expect(us.every((u) => u.state === 'tower')).toBe(true);
+    expect(callArchers(w, t.id)).toContain('Nenhum arqueiro no chão');
   });
 });

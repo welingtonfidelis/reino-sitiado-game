@@ -242,7 +242,7 @@ function SelectionBar({ game, touch }: { game: Game; touch: boolean }) {
   return (
     <div class="placebar">
       <span>
-        {parts.join(' e ')} {game.units.length === 1 ? 'escolhido' : 'escolhidos'}. {touch ? 'Toque' : 'Clique'} no mapa para mandar; numa tropa para pôr ou tirar.
+        {parts.join(' e ')} {game.units.length === 1 ? 'escolhido' : 'escolhidos'}. {touch ? 'Toque' : 'Clique'} no mapa para mandar; numa torre, os arqueiros sobem; numa tropa, põe ou tira da escolha.
       </span>
       <button class="btn ghost small" onClick={() => game.clearUnits()}>
         Limpar

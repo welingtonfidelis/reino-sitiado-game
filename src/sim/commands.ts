@@ -4,10 +4,10 @@
  */
 import { BUILDINGS, CONFIG, RES_ORDER, UNITS } from './config.ts';
 import type { BuildingKind, Cost, Res } from './config.ts';
-import { DIRS, hexDist } from './hex.ts';
+import { DIRS, hexDist, hexToWorld } from './hex.ts';
 import { addBuilding, buildCost, castle, pay, refundTo, tileAt } from './world.ts';
 import type { Building, World } from './world.ts';
-import { destroyBuilding, formation, releaseFromBuilding } from './step.ts';
+import { destroyBuilding, formation, releaseFromBuilding, towerSlots } from './step.ts';
 import { castleDoor } from './world.ts';
 import { BLESSINGS } from './blessings.ts';
 import type { BlessingId } from './blessings.ts';
@@ -262,6 +262,69 @@ export function orderMove(w: World, ids: number[], x: number, z: number): string
   }
   if (k === 0) return 'Nenhuma tropa escolhida';
   if (reach === 0) return 'Não há caminho a pé até lá (falta um portão?)';
+  return null;
+}
+
+/**
+ * Põe arqueiros dentro de uma torre (até encher). Quem estava em outra torre sai dela; todos
+ * perdem a ordem de ficar parado e vão a pé até a torre.
+ */
+export function garrison(w: World, ids: number[], towerId: number): string | null {
+  const t = w.buildings.get(towerId);
+  if (!t || t.kind !== 'torre') return 'Não é uma torre';
+  if (t.built < 1) return 'A torre ainda está em obra';
+  const archers = ids.map((id) => w.units.get(id)).filter((u) => u && u.kind === 'arqueiro' && u.state !== 'dead' && u.tower !== t.id);
+  if (!archers.length) return ids.some((id) => w.units.get(id)?.tower === t.id) ? null : 'Só arqueiros sobem na torre';
+  const free = towerSlots() - t.archers.length;
+  if (free <= 0) return `Torre cheia (${t.archers.length} de ${towerSlots()})`;
+  for (const u of archers.slice(0, free)) {
+    if (!u) continue;
+    if (u.tower >= 0) {
+      const old = w.buildings.get(u.tower);
+      if (old) old.archers = old.archers.filter((a) => a !== u.id);
+    }
+    u.tower = t.id;
+    t.archers.push(u.id);
+    u.order = 0;
+    u.target = -1;
+    u.state = 'walk';
+    u.path = [];
+    u.goal = -1;
+  }
+  if (archers.length > free) return `A torre encheu: ${archers.length - free} ${archers.length - free === 1 ? 'arqueiro ficou' : 'arqueiros ficaram'} no chão`;
+  return null;
+}
+
+function hexToWorldOf(b: Building): { x: number; z: number } {
+  return hexToWorld(b.q, b.r);
+}
+
+/** Arqueiros no chão (fora de torre), do mais perto ao mais longe da torre. */
+export function groundArchers(w: World, towerId: number): number[] {
+  const t = w.buildings.get(towerId);
+  if (!t) return [];
+  const p = hexToWorldOf(t);
+  return [...w.units.values()]
+    .filter((u) => u.kind === 'arqueiro' && u.state !== 'dead' && u.tower < 0)
+    .sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))
+    .map((u) => u.id);
+}
+
+export function callArchersProblem(w: World, towerId: number): string | null {
+  const t = w.buildings.get(towerId);
+  if (!t) return 'Não existe mais';
+  if (t.built < 1) return 'Ainda em obra';
+  if (t.archers.length >= towerSlots()) return 'Torre cheia';
+  if (!groundArchers(w, towerId).length) return 'Nenhum arqueiro no chão; recrute no campo de tiro';
+  return null;
+}
+
+/** Chama os arqueiros no chão mais perto para encher a torre. */
+export function callArchers(w: World, towerId: number): string | null {
+  const why = callArchersProblem(w, towerId);
+  if (why) return why;
+  const t = w.buildings.get(towerId)!;
+  garrison(w, groundArchers(w, towerId).slice(0, towerSlots() - t.archers.length), towerId);
   return null;
 }
 

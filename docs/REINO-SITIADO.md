@@ -70,7 +70,7 @@ No console: `game`, `view`, `cam` e `snap('nome')` (salva `reports/snap-nome.png
   - destruir, com confirmação e metade do custo de volta.
 - **Tropas:**
   - soldado: corpo a corpo, procura o monstro mais perto que dá para alcançar a pé;
-  - arqueiro: sobe sozinho para a torre com vaga, senão guarda o castelo atirando do chão.
+  - arqueiro: sobe sozinho para a torre com vaga (cabem 4 por torre), senão guarda o castelo atirando do chão.
 - **Horda:**
 
   | Monstro | A partir da onda | Detalhe |
@@ -102,7 +102,11 @@ Todos os números estão em `src/sim/config.ts`. São valores iniciais para test
   - Quem sai treinado de lá vai para esse ponto e espera em roda.
   - Quem já saiu fica onde está: mudar o ponto só vale para os próximos (pedido do usuário, 2026-11-06).
   - O ponto aparece como uma bandeira quando o prédio está selecionado.
-- **Arqueiros:** sem ponto de encontro, sobem sozinhos para torres com vaga. Com ponto ou com ordem, ficam onde foram mandados e atiram do chão.
+- **Arqueiros:** sobem sozinhos para torres com vaga, inclusive os que esperam no ponto de encontro. Só quem o jogador mandou para um lugar fica no chão, atirando dali.
+  - Até 2026-11-07, quem esperava no ponto de encontro também ficava no chão, e uma torre nova podia ficar vazia (o usuário notou). Corrigido, com teste.
+  - **Pôr na torre:** com arqueiros escolhidos, tocar numa torre faz eles subirem (até encher); as outras tropas escolhidas vão até perto dela. Quem sobe sai da escolha. Antes, o toque mandava todos para o chão ao lado da torre, e eles ficavam lá.
+  - **Chamar arqueiros:** no menu da torre, puxa os arqueiros no chão mais perto até encher a torre.
+  - **4 por torre** (eram 2; pedido do usuário em 2026-11-07). O robô de equilíbrio passou a encher as torres de 4 e ficou na mesma média (22,3 ondas).
 - **Escolher tropas:**
   - tocar numa tropa escolhe ela;
   - com tropas escolhidas, tocar em outra põe ou tira da escolha;
@@ -357,7 +361,7 @@ Pedido do usuário em 2026-11-06, depois do esboço "Menu circular de prédio" n
 
 | Casa | Ação |
 | --- | --- |
-| Topo | a principal: Recrutar (prédios de tropa), Melhorar (castelo), Melhorias (forja), Acender (piche) |
+| Topo | a principal: Recrutar (prédios de tropa), Melhorar (castelo), Melhorias (forja), Acender (piche), Chamar arqueiros (torre) |
 | Direita | Encontro (prédios de tropa), Recolher ou Liberar (castelo) |
 | Baixo à direita | Consertar |
 | Baixo à esquerda | Destruir (o castelo não tem) |

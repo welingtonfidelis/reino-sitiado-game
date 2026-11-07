@@ -68,7 +68,7 @@ export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
   mina: { name: 'Mina', category: 'economia', blurb: 'Ferro. Só em cima de um veio de minério.', cost: { madeira: 50, pedra: 20 }, hp: 220, build: 10, site: 'ore', workers: 2, produces: 'ferro', rate: 8, breakCost: 6 },
   muralha: { name: 'Muralha', category: 'defesa', blurb: 'Segura e desvia a horda. Orcs derrubam.', cost: { pedra: 5 }, hp: 250, build: 2, site: 'grass', breakCost: 14 },
   portao: { name: 'Portão', category: 'defesa', blurb: 'Vira um trecho de muralha. Sua gente passa, a horda não.', cost: { madeira: 30, ferro: 10 }, hp: 320, build: 4, site: 'wall', breakCost: 14 },
-  torre: { name: 'Torre de arqueiros', category: 'defesa', blurb: 'Só atira com arqueiros dentro. Cabem 2.', cost: { madeira: 60, pedra: 20 }, hp: 300, build: 10, site: 'grass', slots: 2, breakCost: 10 },
+  torre: { name: 'Torre de arqueiros', category: 'defesa', blurb: 'Só atira com arqueiros dentro. Cabem 4.', cost: { madeira: 60, pedra: 20 }, hp: 300, build: 10, site: 'grass', slots: 4, breakCost: 10 },
   quartel: { name: 'Quartel', category: 'militar', blurb: 'Treina soldados.', cost: { madeira: 60, pedra: 30 }, hp: 400, build: 12, site: 'grass', recruits: 'soldado', breakCost: 6 },
   campo: { name: 'Campo de tiro', category: 'militar', blurb: 'Treina arqueiros.', cost: { madeira: 50 }, hp: 300, build: 10, site: 'grass', recruits: 'arqueiro', breakCost: 6 },
   torreMago: { name: 'Torre do mago', category: 'militar', blurb: 'Treina magos. Cada feitiço gasta cristal.', cost: { pedra: 60, cristal: 10 }, hp: 300, build: 12, site: 'grass', recruits: 'mago', breakCost: 6, needsLevel: 2 },

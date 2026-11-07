@@ -29,6 +29,8 @@ import {
   step,
   tileAt,
   upgradeCastle,
+  garrison,
+  callArchers,
 } from '../sim/index.ts';
 import type { BlessingId, BuildingKind, ForgeLine, SimEvent, World } from '../sim/index.ts';
 
@@ -307,6 +309,22 @@ export class Game {
         this.emit();
         return;
       }
+      // Tocar numa torre: os arqueiros escolhidos sobem nela; o resto das tropas vai até perto.
+      const tower = (buildingId >= 0 ? w.buildings.get(buildingId) : hex ? w.buildings.get(tileAt(w, hex.q, hex.r)?.b ?? -1) : undefined) ?? null;
+      if (tower?.kind === 'torre') {
+        const archers = this.units.filter((id) => w.units.get(id)?.kind === 'arqueiro');
+        const others = this.units.filter((id) => !archers.includes(id));
+        if (archers.length) {
+          const why = garrison(w, archers, tower.id);
+          if (why) this.toast(why, 'warn');
+          // Quem subiu sai da escolha (fica escondido dentro da torre).
+          this.units = this.units.filter((id) => w.units.get(id)?.tower !== tower.id);
+        }
+        if (others.length && point) this.result(orderMove(w, others, point.x, point.z));
+        refresh(w);
+        this.emit();
+        return;
+      }
       if (point) this.result(orderMove(w, this.units, point.x, point.z));
       return;
     }
@@ -401,6 +419,9 @@ export class Game {
     this.speed = this.before || 1;
     if (thenCall) this.callWave();
     this.emit();
+  }
+  callArchers(id: number): void {
+    this.result(callArchers(this.world, id));
   }
   ignite(id: number): void {
     this.result(ignitePitch(this.world, id));

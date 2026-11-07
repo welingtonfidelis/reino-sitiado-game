@@ -21,6 +21,7 @@ import {
   recruit,
   repairAll,
   step,
+  towerSlots,
   upgradeCastle,
   workers,
 } from '../src/sim/index.ts';
@@ -85,7 +86,7 @@ function bot(w: World): void {
   // Defesa.
   if (count(w, 'campo') < 1 && put(w, 'campo', 2, 4)) return;
   if (count(w, 'torre') < Math.min(2 + wave, 12) && put(w, 'torre', 2, 4)) return;
-  if (units(w, 'arqueiro') < count(w, 'torre') * 2) trainAt(w, 'campo');
+  if (units(w, 'arqueiro') < count(w, 'torre') * towerSlots()) trainAt(w, 'campo');
   if (wave >= 2 && count(w, 'quartel') < 1 && put(w, 'quartel', 2, 4)) return;
   if (units(w, 'soldado') < Math.min(4 + wave / 2, 12)) trainAt(w, 'quartel');
   if (wave >= 4 && count(w, 'oficina') < 1 && put(w, 'oficina', 2, 4)) return;

@@ -22,6 +22,8 @@ import {
   hexToWorld,
   housing,
   igniteProblem,
+  callArchersProblem,
+  towerSlots,
   levelProblem,
   missing,
   moveProblem,
@@ -144,6 +146,19 @@ function mainActs(game: Game, b: Building, openForge: () => void): Act[] {
       run: openForge,
     });
   }
+  if (b.kind === 'torre') {
+    const free = towerSlots() - b.archers.length;
+    acts.push({
+      id: 'chamar',
+      slot: 0,
+      icon: 'arco',
+      label: 'Chamar',
+      tone: 'primary',
+      hint: `Chamar os arqueiros no chão mais perto (${free} ${free === 1 ? 'vaga' : 'vagas'}).`,
+      why: callArchersProblem(w, b.id),
+      run: () => game.callArchers(b.id),
+    });
+  }
   if (b.kind === 'piche') {
     acts.push({
       id: 'acender',
@@ -236,7 +251,7 @@ function noteFor(game: Game, b: Building): string | null {
       return `Vagas nas casas ${housing(w)} · teto do castelo ${castleCap(w)} · tropas ${troops(w)}, sem teto.${bl}`;
     }
     case 'torre':
-      return 'Arqueiros treinados no campo de tiro sobem sozinhos.';
+      return 'Arqueiros do campo de tiro sobem sozinhos; os que você mandou para um lugar sobem com "Chamar" ou tocando na torre.';
     case 'catapulta':
       return 'Atira sozinha a cada 4 s no monstro com mais vida entre 3 e 12 m. Não acerta quem voa.';
     case 'estacas':
@@ -452,7 +467,7 @@ export function RadialMenu({ game, cam, b, touch }: { game: Game; cam: IsoCamera
           {def.recruits ? (
             <Bar label="Fila" frac={b.queue / CONFIG.recruitQueue} color="var(--xp)" text={`${b.queue} de ${CONFIG.recruitQueue}${b.queue ? ` · ${Math.ceil(UNITS[def.recruits].train - b.queueT)} s` : ''}`} />
           ) : null}
-          {b.kind === 'torre' ? <Bar label="Arqueiros" frac={b.archers.length / (def.slots ?? 2)} color="var(--loyalty)" text={`${b.archers.length} de ${def.slots ?? 2}`} /> : null}
+          {b.kind === 'torre' ? <Bar label="Arqueiros" frac={b.archers.length / towerSlots()} color="var(--loyalty)" text={`${b.archers.length} de ${towerSlots()}`} /> : null}
         </div>
         {shown ? (
           <p class={`rcard-hint${shown.why ? ' bad' : ''}${confirm && shown.id === 'destruir' ? ' danger' : ''}`}>

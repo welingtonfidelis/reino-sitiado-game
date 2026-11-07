@@ -83,7 +83,8 @@ function troopAt(x: number, y: number): number {
 cam.onTap = (x, y) => {
   const free = game.mode.kind === 'none';
   const unit = free ? troopAt(x, y) : -1;
-  const id = free && unit < 0 && game.units.length === 0 ? view.pickBuilding(cam.raycaster(x, y)) : -1;
+  // Com tropas escolhidas, o prédio tocado também conta (tocar numa torre põe os arqueiros nela).
+  const id = free && unit < 0 ? view.pickBuilding(cam.raycaster(x, y)) : -1;
   const g = cam.groundAt(x, y);
   const hex = g ? worldToHex(g.x, g.z) : null;
   game.tap(hex && game.world.grid.has(hex.q, hex.r) ? hex : null, id, touch, g ? { x: g.x, z: g.z } : null, unit);

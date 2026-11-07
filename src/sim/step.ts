@@ -235,14 +235,19 @@ function assignJobs(w: World): void {
   }
 }
 
+/**
+ * Arqueiro sem torre sobe sozinho na mais perto com vaga. Quem espera no ponto de encontro também
+ * sobe (antes não subia, e a torre nova ficava vazia); só fica no chão quem o jogador mandou para
+ * um lugar (ordem 2), e esse sobe quando o jogador toca na torre ou usa "Chamar arqueiros".
+ */
 function assignArchers(w: World): void {
   if (w.tick % 10 !== 5) return;
   for (const u of w.units.values()) {
-    if (u.kind !== 'arqueiro' || u.state === 'dead' || u.tower >= 0 || u.order > 0) continue;
+    if (u.kind !== 'arqueiro' || u.state === 'dead' || u.tower >= 0 || u.order === 2) continue;
     let best: Building | null = null;
     let bd = Infinity;
     for (const b of w.buildings.values()) {
-      if (b.kind !== 'torre' || b.built < 1 || b.archers.length >= (BUILDINGS.torre.slots ?? 2)) continue;
+      if (b.kind !== 'torre' || b.built < 1 || b.archers.length >= towerSlots()) continue;
       const d = dist(u.x, u.z, center(b).x, center(b).z);
       if (d < bd) {
         bd = d;
@@ -256,6 +261,11 @@ function assignArchers(w: World): void {
     u.path = [];
     u.goal = -1;
   }
+}
+
+/** Lugares de arqueiro numa torre. */
+export function towerSlots(): number {
+  return BUILDINGS.torre.slots ?? 4;
 }
 
 function recruiting(w: World): void {
