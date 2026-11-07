@@ -35,6 +35,9 @@ import {
   missing,
   moveProblem,
   recruitProblem,
+  replantProblem,
+  fullStock,
+  sourceOf,
   repairCost,
   repairProblem,
   troops,
@@ -60,6 +63,8 @@ interface Act {
   tone: Tone;
   badge?: string;
   progress?: number;
+  /** Botão que pede atenção (pulsa): o Mover do prédio sem recurso (Etapa 17). */
+  pulse?: boolean;
   run: () => void;
 }
 
@@ -170,6 +175,21 @@ function mainActs(game: Game, b: Building, openForge: () => void, openHeroes: ()
       run: () => game.callArchers(b.id),
     });
   }
+  if (b.kind === 'fazenda') {
+    // Etapa 17: plantação colhida até o fim se replanta aqui (o botão pulsa quando é a hora).
+    const why = replantProblem(w, b);
+    acts.push({
+      id: 'replantar',
+      slot: 0,
+      icon: 'broto',
+      label: 'Replantar',
+      tone: 'primary',
+      hint: `Replantar · ${costText(CONFIG.farm.replant)}. A plantação dá ${CONFIG.farm.harvest} de comida e depois precisa de outra semeadura.`,
+      why,
+      pulse: !why,
+      run: () => game.replant(b.id),
+    });
+  }
   if (b.kind === 'piche') {
     acts.push({
       id: 'acender',
@@ -240,8 +260,10 @@ function mainActs(game: Game, b: Building, openForge: () => void, openHeroes: ()
       icon: 'mover',
       label: 'Mover',
       tone: '',
-      hint: `Mover ${name} para outro lugar.`,
+      hint: b.dry && b.kind !== 'fazenda' ? `Sem recurso aqui: leve ${name} para perto de outro.` : `Mover ${name} para outro lugar.`,
       why: moveProblem(w, b),
+      // Etapa 17: pulsa no prédio sem recurso (a plantação colhida pede Replantar, não mudança).
+      pulse: b.dry && b.kind !== 'fazenda' && !moveProblem(w, b),
       run: () => game.startMove(b.id),
     });
   }
@@ -318,6 +340,21 @@ function noteFor(game: Game, b: Building): string | null {
     default:
       return null;
   }
+}
+
+/** Etapa 17: quanto ainda tem no hexágono de onde a serraria, a pedreira ou a mina tira. */
+function stockBar(game: Game, b: Building) {
+  if (b.built < 1) return null;
+  if (b.kind === 'fazenda') {
+    const f = b.harvest / CONFIG.farm.harvest;
+    return <Bar label="Colheita" frac={f} color={f > 0 ? 'var(--gold)' : 'var(--hp)'} text={f > 0 ? `${Math.ceil(f * 100)}%` : 'acabou'} />;
+  }
+  if (b.kind !== 'serraria' && b.kind !== 'pedreira' && b.kind !== 'mina') return null;
+  const label = b.kind === 'serraria' ? 'Floresta' : b.kind === 'pedreira' ? 'Rocha' : 'Veio';
+  const t = sourceOf(game.world, b);
+  if (!t) return <Bar label={label} frac={0} color="var(--hp)" text="acabou" />;
+  const full = fullStock(t.terrain);
+  return <Bar label={label} frac={t.stock / full} color="var(--gold)" text={`${Math.ceil((t.stock / full) * 100)}%`} />;
 }
 
 function Bar({ label, frac, color, text }: { label: string; frac: number; color: string; text: string }) {
@@ -485,7 +522,7 @@ export function RadialMenu({ game, cam, b, touch }: { game: Game; cam: IsoCamera
             </button>
           );
         }
-        const cls = ['rbtn', a.tone, a.why ? 'off' : '', shownId === a.id && focus ? 'focus' : '', confirm ? 'dim' : ''].filter(Boolean).join(' ');
+        const cls = ['rbtn', a.tone, a.why ? 'off' : '', a.pulse ? 'pulse' : '', shownId === a.id && focus ? 'focus' : '', confirm ? 'dim' : ''].filter(Boolean).join(' ');
         return (
           <button
             key={a.id}
@@ -533,6 +570,7 @@ export function RadialMenu({ game, cam, b, touch }: { game: Game; cam: IsoCamera
             <Bar label="Fila" frac={b.queue / CONFIG.recruitQueue} color="var(--xp)" text={`${b.queue} de ${CONFIG.recruitQueue}${b.queue ? ` · ${Math.ceil(UNITS[def.recruits].train - b.queueT)} s` : ''}`} />
           ) : null}
           {b.kind === 'torre' ? <Bar label="Arqueiros" frac={b.archers.length / towerSlots()} color="var(--loyalty)" text={`${b.archers.length} de ${towerSlots()}`} /> : null}
+          {stockBar(game, b)}
         </div>
         {shown ? (
           <p class={`rcard-hint${shown.why ? ' bad' : ''}${confirm && shown.id === 'destruir' ? ' danger' : ''}`}>

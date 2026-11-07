@@ -3,8 +3,9 @@
  * cada ladrilho, prédios, gente, monstros, recursos, ondas, bênçãos, forja e o sorteio) vai
  * num JSON. Caminhos e alcance são refeitos ao carregar.
  */
+import { CONFIG } from './config.ts';
 import { rng } from './hex.ts';
-import { createWorld } from './world.ts';
+import { createWorld, fullStock } from './world.ts';
 import type { Building, Monster, Terrain, Unit, World } from './world.ts';
 
 const VERSION = 1;
@@ -14,6 +15,7 @@ const TERRAINS: Terrain[] = ['grass', 'forest', 'rock', 'ore', 'crystal', 'rift'
 const PLAIN = [
   'tick', 'time', 'nextId', 'res', 'housesBuilt', 'arriveT', 'wave', 'waveState', 'waveTimer', 'spawnQueue', 'spawnT',
   'hungry', 'shelter', 'lost', 'kills', 'flags', 'blessings', 'mods', 'stats', 'report', 'forge', 'waveMods',
+  'regrow',
 ] as const;
 
 export interface SaveInfo {
@@ -29,7 +31,7 @@ export function saveWorld(w: World): string {
     seed: w.seed,
     R: w.grid.R,
     rng: w.rand.state.a,
-    tiles: w.list.map((t) => [TERRAINS.indexOf(t.terrain), t.deco, t.b, t.ruin ? 1 : 0]),
+    tiles: w.list.map((t) => [TERRAINS.indexOf(t.terrain), t.deco, t.b, t.ruin ? 1 : 0, Math.round(t.stock), t.left]),
     buildings: [...w.buildings.values()],
     units: [...w.units.values()],
     monsters: [...w.monsters.values()],
@@ -60,16 +62,21 @@ export function loadWorld(json: string): World | null {
   w.rand = rng(d.seed, d.rng);
   if (d.tiles.length !== w.list.length) return null;
   w.list.forEach((t, i) => {
-    const [ter, deco, b, ruin] = d.tiles[i]!;
+    const [ter, deco, b, ruin, stock, left] = d.tiles[i]!;
     t.terrain = TERRAINS[ter!] ?? 'grass';
     t.deco = deco!;
     t.b = b!;
     t.ruin = ruin === 1;
+    // Salvo de antes da Etapa 17: recurso cheio.
+    t.stock = stock ?? fullStock(t.terrain);
+    t.left = left ?? 0;
   });
   // Salvo de antes da mudança em duas etapas: prédio sem mudança.
   for (const b of d.buildings) {
     b.moveTo ??= null;
     b.moved ??= false;
+    b.dry ??= false;
+    b.harvest ??= b.kind === 'fazenda' ? CONFIG.farm.harvest : 0;
   }
   w.buildings = new Map(d.buildings.map((b) => [b.id, b]));
   w.units = new Map(d.units.map((u) => [u.id, u]));

@@ -1,7 +1,9 @@
 /**
  * Robô de equilíbrio (Etapa 7): joga partidas inteiras sem tela e diz em que onda o castelo caiu.
  *
- *   node tools/balance.ts [sementes] [onda máxima]   (RAIO=13 usa o mapa antigo; HEROIS=0, sem heróis)
+ *   node tools/balance.ts [sementes] [onda máxima]   (RAIO=13 usa o mapa antigo; HEROIS=0, sem heróis;
+ *   ESTOQUE=0, recursos sem fim como antes da Etapa 17; RECURSOS='{json}', outros números da Etapa 17;
+ *   SO=4, só a quarta semente)
  *
  * "nada" não faz nada (só o castelo atira); "robô" segue uma ordem simples de construção,
  * recruta, conserta e escolhe a primeira bênção. Serve para comparar números da configuração.
@@ -14,8 +16,15 @@ import {
   castle,
   castleCap,
   chooseBlessing,
+  DIRS,
   createWorld,
+  demolish,
+  fullStock,
+  tileAt,
   forgeUpgrade,
+  moveBuilding,
+  placeProblem,
+  replant,
   hexDist,
   housing,
   recruit,
@@ -36,6 +45,21 @@ const HEROES = process.env.HEROIS !== '0';
 // RAIO=13 roda no mapa antigo, para comparar.
 if (process.env.RAIO) (CONFIG as { mapRadius: number }).mapRadius = Number(process.env.RAIO);
 const MAX_WAVE = Number(process.argv[3] ?? 40);
+// ESTOQUE=0: floresta, rocha e veio sem fim (como antes da Etapa 17), para comparar.
+if (process.env.ESTOQUE === '0') {
+  const st = CONFIG.deposits.stock as Record<string, number>;
+  for (const k of Object.keys(st)) st[k] = 1e12;
+  CONFIG.farm.harvest = 1e12;
+}
+// RECURSOS='{"stock":{"forest":450},"due":{"forest":99}}': testa outros números da Etapa 17.
+if (process.env.RECURSOS) {
+  const d = CONFIG.deposits as unknown as Record<string, unknown>;
+  for (const [k, v] of Object.entries(JSON.parse(process.env.RECURSOS) as Record<string, unknown>)) {
+    if (v && typeof v === 'object' && !Array.isArray(v)) Object.assign(d[k] as object, v);
+    else d[k] = v;
+  }
+}
+const ONLY = Number(process.env.SO ?? 0);
 
 function count(w: World, k: BuildingKind): number {
   let n = 0;
@@ -49,15 +73,45 @@ function units(w: World, k: UnitKind): number {
   return n;
 }
 
-/** Lugar mais perto do castelo (entre min e max) onde dá para erguer. */
-function spot(w: World, k: BuildingKind, min: number, max: number): { q: number; r: number } | null {
+/** Quanto vale, em hexágonos de distância, cada hexágono de recurso livre em volta (até FREE_CAP). */
+const FREE_WEIGHT = Number(process.env.ROBO_PESO ?? 0.5);
+const FREE_CAP = Number(process.env.ROBO_TETO ?? 2);
+
+/**
+ * Etapa 17: quanto recurso livre a serraria ou a pedreira teria em (q, r), em hexágonos cheios:
+ * o estoque dos vizinhos do tipo certo que nenhuma outra (fora `self`) já usa.
+ */
+function freeStock(w: World, k: BuildingKind, q: number, r: number, self = -1): number {
+  const want = k === 'serraria' ? 'forest' : k === 'pedreira' ? 'rock' : null;
+  if (!want) return 0;
+  let sum = 0;
+  for (const [dq, dr] of DIRS) {
+    const t = tileAt(w, q + dq, r + dr);
+    if (t?.terrain !== want) continue;
+    const shared = DIRS.some(([eq, er]) => {
+      const n = tileAt(w, t.q + eq, t.r + er);
+      const o = n && n.b >= 0 ? w.buildings.get(n.b) : undefined;
+      return !!o && o.kind === k && o.id !== self;
+    });
+    if (!shared) sum += t.stock / fullStock(want);
+  }
+  return sum;
+}
+
+/**
+ * Lugar mais perto do castelo (entre min e max) onde dá para erguer. Serraria e pedreira pesam
+ * também o recurso livre em volta (como um jogador faria, para não mudar logo de lugar).
+ */
+function spot(w: World, k: BuildingKind, min: number, max: number, self = -1): { q: number; r: number } | null {
   let best: { q: number; r: number } | null = null;
   let bd = Infinity;
   for (const t of w.list) {
     const d = hexDist(t.q, t.r, 0, 0);
     if (d < min || d > max) continue;
-    if (canBuild(w, k, t.q, t.r)) continue;
-    const score = d + (t.deco % 7) * 0.01;
+    if (self >= 0 ? placeProblem(w, k, t.q, t.r, self) : canBuild(w, k, t.q, t.r)) continue;
+    const free = freeStock(w, k, t.q, t.r, self);
+    if ((k === 'serraria' || k === 'pedreira') && free <= 0) continue;
+    const score = d - FREE_WEIGHT * Math.min(free, FREE_CAP) + (t.deco % 7) * 0.01;
     if (score < bd) {
       bd = score;
       best = { q: t.q, r: t.r };
@@ -71,6 +125,22 @@ function put(w: World, k: BuildingKind, min = 1, max = 5): boolean {
   return !!p && build(w, k, p.q, p.r) === null;
 }
 
+/**
+ * Etapa 17: serraria, pedreira ou mina sem recurso muda para o lugar mais perto do castelo onde
+ * ainda tem (só entre as ondas); sem lugar nenhum, é derrubada para o robô erguer outra depois.
+ */
+function relocate(w: World): boolean {
+  if (w.waveState !== 'calm') return false;
+  for (const b of w.buildings.values()) {
+    if (!b.dry || b.moveTo || b.moved || b.kind === 'fazenda') continue;
+    const best = spot(w, b.kind, 2, w.grid.R - 2, b.id);
+    if (best && moveBuilding(w, b.id, best.q, best.r) === null) return true;
+    demolish(w, b.id);
+    return true;
+  }
+  return false;
+}
+
 function trainAt(w: World, k: BuildingKind): void {
   for (const b of w.buildings.values()) if (b.kind === k && b.built >= 1 && b.queue === 0) recruit(w, b.id);
 }
@@ -78,6 +148,9 @@ function trainAt(w: World, k: BuildingKind): void {
 function bot(w: World): void {
   if (w.report) chooseBlessing(w, w.report.choices[0] ?? null);
   if (w.waveState === 'calm') repairAll(w);
+  // Etapa 17: plantação colhida se replanta; extração sem recurso muda de lugar.
+  for (const b of w.buildings.values()) if (b.kind === 'fazenda' && b.dry) replant(w, b.id);
+  if (relocate(w)) return;
   const wave = w.wave;
   const wk = workers(w);
   // Economia.
@@ -128,11 +201,15 @@ const VERBOSE = process.env.VERBOSE === '1';
 function play(seed: number, act: boolean): { wave: number; kills: number } {
   const w = createWorld(seed);
   const every = CONFIG.tps * 2;
+  const made = { madeira: 0, pedra: 0, ferro: 0, cristal: 0 };
   let lastWave = 0;
   for (let i = 0; i < CONFIG.tps * 60 * 120 && !w.lost && w.wave < MAX_WAVE; i++) {
     if (act && i % every === 0) bot(w);
     else if (!act && w.report) chooseBlessing(w, w.report.choices[0] ?? null);
+    const before = { ...w.res };
     step(w);
+    // Produção somada (o que entra durante o passo), para comparar economias.
+    for (const k of Object.keys(made) as (keyof typeof made)[]) made[k] += Math.max(0, w.res[k] - before[k]);
     if (VERBOSE && act && w.wave !== lastWave) {
       lastWave = w.wave;
       const kinds: Record<string, number> = {};
@@ -140,8 +217,17 @@ function play(seed: number, act: boolean): { wave: number; kills: number } {
       const tr: Record<string, number> = {};
       for (const u of w.units.values()) if (u.state !== 'dead') tr[u.kind] = (tr[u.kind] ?? 0) + 1;
       const r = Object.fromEntries(Object.entries(w.res).map(([k, v]) => [k, Math.floor(v)]));
-      console.log(`  onda ${w.wave} t=${Math.round(w.time)}s castelo ${Math.round(castle(w)?.hp ?? 0)} res ${JSON.stringify(r)} prédios ${JSON.stringify(kinds)} gente ${JSON.stringify(tr)}`);
+      const dry = [...w.buildings.values()].filter((b) => b.dry).length;
+      console.log(`  feito ${JSON.stringify(Object.fromEntries(Object.entries(made).map(([k, v]) => [k, Math.round(v)])))}`);
+      console.log(`  onda ${w.wave} t=${Math.round(w.time)}s castelo ${Math.round(castle(w)?.hp ?? 0)} res ${JSON.stringify(r)} prédios ${JSON.stringify(kinds)} gente ${JSON.stringify(tr)} esgotados ${dry} faltam ${JSON.stringify(w.regrow)}`);
     }
+    if (VERBOSE && act)
+      for (const e of w.events) {
+        if (e.type === 'depleted') console.log(`    t=${Math.round(w.time)}s acabou ${e.terrain} em ${w.tiles[e.i]!.q},${w.tiles[e.i]!.r}`);
+        else if (e.type === 'dry') console.log(`    t=${Math.round(w.time)}s parou ${w.buildings.get(e.id)?.kind}`);
+        else if (e.type === 'sprout') console.log(`    t=${Math.round(w.time)}s brotou ${e.terrain} (${e.tiles.length})`);
+        else if (e.type === 'packed') console.log(`    t=${Math.round(w.time)}s desmontou ${w.buildings.get(e.id)?.kind}`);
+      }
     w.events.length = 0;
   }
   return { wave: w.wave, kills: w.kills };
@@ -150,7 +236,7 @@ function play(seed: number, act: boolean): { wave: number; kills: number } {
 for (const [name, act] of [['nada', false], ['robô', true]] as const) {
   const res: number[] = [];
   const t0 = Date.now();
-  for (let s = 1; s <= SEEDS; s++) res.push(play(s * 7919, act).wave);
+  for (let s = 1; s <= SEEDS; s++) if (!ONLY || s === ONLY) res.push(play(s * 7919, act).wave);
   const avg = res.reduce((a, b) => a + b, 0) / res.length;
   console.log(`${name}: caiu nas ondas ${res.join(' ')} | média ${avg.toFixed(1)} (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
 }

@@ -19,6 +19,7 @@ import {
   chooseBlessing,
   forgeUpgrade,
   ignitePitch,
+  replant,
   loadWorld,
   saveInfo,
   saveWorld,
@@ -572,6 +573,10 @@ export class Game {
   }
   ignite(id: number): void {
     this.result(ignitePitch(this.world, id));
+  }
+  /** Etapa 17: replantar a plantação colhida até o fim. */
+  replant(id: number): void {
+    this.result(replant(this.world, id));
   }
   forge(line: ForgeLine): void {
     this.result(forgeUpgrade(this.world, line));

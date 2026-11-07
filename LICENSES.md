@@ -22,6 +22,7 @@ copiados por `npm run art` conforme `tools/art-manifest.ts`.
 | KayKit Resource Bits 1.0 | Iron_Nuggets; Stone_Bricks_Stack_Large e Medium, Stone_Chunks_Large e Small (pedreira); textura do pack |
 | KayKit Medieval Hexagon Pack (pedreira) | barraca, resource_stone, crate_open |
 | KayKit Medieval Hexagon Pack (vila) | poço, taverna, mercado, barril, caixa pequena, balde com água |
+| KayKit Resource Bits (Etapa 17) | Wood_Log_A e Wood_Log_B (toras onde a floresta acabou) |
 | KayKit Adventurers 2.0 (Etapa 14) | Barbarian, Rogue_Hooded, Druid; axe_2handed, crossbow_2handed, druid_staff e as texturas barbarian, rogue e druid |
 | KayKit Mystery Monthly 5 (Etapa 14) | BlackKnight, BlackKnight_Sword, BlackKnight_Shield e a textura |
 | KayKit Character Animations 1.1 | Rig_Medium (General, MovementBasic, CombatMelee, CombatRanged, Tools, Simulation) e Rig_Large (General, MovementBasic, CombatMelee). Da Simulation (Etapa 16): Cheering, Waving, Sit_Floor_Idle e Push_Ups |

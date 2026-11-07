@@ -7,7 +7,8 @@ import type { BuildingKind, HeroKind, MonsterKind, UnitKind } from './config.ts'
 import { hexDist, hexToWorld, worldToHex } from './hex.ts';
 import { allyPath, computeFlow, computeReach } from './path.ts';
 import { BLESSING_EVERY, BLESSING_IDS, emptyStats, epitaph } from './blessings.ts';
-import { addUnit, castle, castleCap, castleDoor, housing, population, resourceDir, tileAt, workers } from './world.ts';
+import { addUnit, castle, castleCap, castleDoor, housing, isExtractor, population, resourceDir, sourceOf, tileAt, workers } from './world.ts';
+import { deplete, harvest, regrow } from './deposits.ts';
 import type { Building, Monster, Unit, WaveMod, World } from './world.ts';
 import { WAVE_MODS } from './world.ts';
 
@@ -164,15 +165,49 @@ function economy(w: World): void {
   for (const b of w.buildings.values()) {
     const def = BUILDINGS[b.kind];
     if (b.built < 1 || !def.produces || !def.rate) continue;
+    // Etapa 17: serraria, pedreira e mina tiram do hexágono de recurso; sem ele, param.
+    const src = isExtractor(b.kind) ? sourceOf(w, b) : null;
+    if (isExtractor(b.kind) && !src) continue;
+    // Plantação colhida até o fim: espera replantar.
+    if (b.kind === 'fazenda' && b.harvest <= 0) continue;
     let present = 0;
     for (const id of b.workers) if (w.units.get(id)?.state === 'work') present++;
+    if (present === 0) continue;
     // Mina em veio azul: cristal no lugar do ferro (Etapa 5).
-    const crystal = b.kind === 'mina' && tileAt(w, b.q, b.r)?.terrain === 'crystal';
+    const crystal = b.kind === 'mina' && src?.terrain === 'crystal';
     const res = crystal ? 'cristal' : def.produces;
     const rate = crystal ? CONFIG.crystalRate : def.rate;
-    const got = (rate / 60) * DT * present * k * w.mods.prod[res];
+    const base = (rate / 60) * DT * present * k;
+    const got = base * w.mods.prod[res];
     w.res[res] += got;
     w.stats.prod[res] += got;
+    // O estoque gasta o tirado sem as bênçãos: elas são ganho, não pressa para acabar.
+    if (src) deplete(w, src, base);
+    if (b.kind === 'fazenda') harvest(w, b, base);
+  }
+}
+
+/**
+ * Etapa 17: serraria sem floresta, pedreira sem rocha ou mina sem veio para e solta quem
+ * trabalha nela (vão para outro serviço); volta sozinha se o recurso aparecer de novo ao lado
+ * (depois de uma mudança de lugar). A plantação colhida até o fim também para, até replantar.
+ */
+function drySites(w: World): void {
+  if (w.tick % 10 !== 3) return;
+  for (const b of w.buildings.values()) {
+    const farm = b.kind === 'fazenda';
+    if ((!isExtractor(b.kind) && !farm) || b.built < 1) continue;
+    const dry = farm ? b.harvest <= 0 : !sourceOf(w, b);
+    if (dry === b.dry) continue;
+    b.dry = dry;
+    if (!dry) continue;
+    releaseFromBuilding(w, b);
+    if (farm) toast(w, 'Plantação colhida até o fim: replante pelo menu dela.', 'warn');
+    else {
+      const what = b.kind === 'serraria' ? 'floresta' : b.kind === 'pedreira' ? 'rocha' : 'veio';
+      toast(w, `${BUILDINGS[b.kind].name} sem ${what} por perto: mude de lugar.`, 'warn');
+    }
+    w.events.push({ type: 'dry', id: b.id });
   }
 }
 
@@ -271,7 +306,7 @@ function nearestJob(w: World, u: Unit): Building | null {
   const h = worldToHex(u.x, u.z);
   for (const b of w.buildings.values()) {
     const def = BUILDINGS[b.kind];
-    if (b.built < 1 || !def.workers || b.workers.length >= def.workers) continue;
+    if (b.built < 1 || b.dry || !def.workers || b.workers.length >= def.workers) continue;
     const d = hexDist(h.q, h.r, b.q, b.r);
     if (d < bd && allyPath(w, tileIndexAt(w, u.x, u.z), w.grid.idx(b.q, b.r))) {
       bd = d;
@@ -1104,6 +1139,8 @@ function waves(w: World): void {
     for (const b of w.buildings.values())
       if (b.kind === 'muralha' || b.kind === 'portao') b.hp = Math.min(b.maxHp, b.hp + b.maxHp * w.mods.wallRegen);
   w.events.push({ type: 'waveEnd', wave: w.wave, gold });
+  // Etapa 17: o que acabou de floresta, rocha e veio nasce de novo em outro lugar.
+  regrow(w);
   w.waveState = 'calm';
   w.waveTimer = waveInterval(w.wave + 1);
   // Relatório: o jogo espera o jogador ler (e escolher a bênção, a cada 4 ondas).
@@ -1454,6 +1491,7 @@ export function step(w: World): void {
   refresh(w);
   construction(w);
   economy(w);
+  drySites(w);
   arrivals(w);
   assignJobs(w);
   recruiting(w);

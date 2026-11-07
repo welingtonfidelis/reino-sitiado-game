@@ -34,6 +34,8 @@ import {
 } from '../src/sim/index.ts';
 import { CROPS, DIRS, MONSTERS, UNITS, buyHero, cropOf, heroCost, heroOf, heroProblem } from '../src/sim/index.ts';
 import { demolish, moveBuilding, moveProblem, packTime, recruitProblem, tileAt } from '../src/sim/index.ts';
+import { allyPath, fullStock, regrow, replant, replantProblem, sourceOf, stage, worldToHex } from '../src/sim/index.ts';
+import type { Tile } from '../src/sim/index.ts';
 import type { Monster, MonsterKind, World } from '../src/sim/index.ts';
 
 function run(w: World, seconds: number, stop?: (w: World) => boolean): void {
@@ -950,5 +952,245 @@ describe('mudar prédio de lugar custa tempo', () => {
     run(w2, packTime('quartel') + BUILDINGS.quartel.build + 0.5);
     expect([b2.q, b2.r]).toEqual([d!.q, d!.r]);
     expect(b2.built).toBe(1);
+  });
+});
+
+describe('recursos que acabam e reaparecem (Etapa 17)', () => {
+  /** Grama livre, longe de recurso, para montar uma serraria com uma floresta só do lado. */
+  function lonelySpot(w: World): Tile {
+    return w.list.find(
+      (t) =>
+        t.terrain === 'grass' &&
+        t.b < 0 &&
+        hexDist(t.q, t.r, 0, 0) >= 3 &&
+        hexDist(t.q, t.r, 0, 0) <= 6 &&
+        DIRS.every(([dq, dr]) => tileAt(w, t.q + dq, t.r + dr)?.terrain === 'grass' && tileAt(w, t.q + dq, t.r + dr)!.b < 0),
+    )!;
+  }
+
+  function staff(w: World, b: { id: number; q: number; r: number }, n = 2): void {
+    const p = hexToWorld(b.q, b.r);
+    for (let i = 0; i < n; i++) addUnit(w, 'trabalhador', p.x + 0.4 * i, p.z + 0.6);
+    run(w, 8, () => [...w.units.values()].filter((u) => u.job === b.id && u.state === 'work').length >= n);
+  }
+
+  it('floresta, rocha e veio começam cheios', () => {
+    const w = createWorld(51);
+    for (const t of w.list) expect(t.stock).toBe(fullStock(t.terrain));
+    expect(w.list.some((t) => t.terrain === 'forest' && t.stock === CONFIG.deposits.stock.forest)).toBe(true);
+    expect(w.list.find((t) => t.terrain === 'grass')!.stock).toBe(0);
+  });
+
+  it('a serraria gasta a floresta; acabou, vira grama com toras e a serraria para', () => {
+    const w = createWorld(52);
+    calm(w);
+    const g = lonelySpot(w);
+    const f = tileAt(w, g.q + 1, g.r)!;
+    f.terrain = 'forest';
+    f.stock = 6;
+    const b = addBuilding(w, 'serraria', g.q, g.r, 1);
+    expect(sourceOf(w, b)).toBe(f);
+    staff(w, b);
+    const wood = w.res.madeira;
+    const events: string[] = [];
+    for (let i = 0; i < 20 * CONFIG.tps && f.terrain === 'forest'; i++) {
+      step(w);
+      for (const e of w.events) events.push(e.type);
+      w.events.length = 0;
+    }
+    expect(f.terrain).toBe('grass');
+    expect(f.left).toBe(1);
+    expect(w.res.madeira - wood).toBeGreaterThan(5);
+    expect(w.regrow.forest).toBe(1);
+    expect(events).toContain('depleted');
+    run(w, 1);
+    expect(b.dry).toBe(true);
+    expect(b.workers).toEqual([]);
+    // Parada: não produz mais.
+    const after = w.res.madeira;
+    run(w, 5);
+    expect(w.res.madeira).toBe(after);
+  });
+
+  it('a floresta rareia em três degraus', () => {
+    const w = createWorld(53);
+    const f = w.list.find((t) => t.terrain === 'forest')!;
+    expect(stage(f)).toBe(2);
+    f.stock = fullStock('forest') * 0.5;
+    expect(stage(f)).toBe(1);
+    f.stock = fullStock('forest') * 0.1;
+    expect(stage(f)).toBe(0);
+  });
+
+  it('a mina esgota o veio e fica parada; mudada para outro veio, volta a trabalhar', () => {
+    const w = createWorld(54);
+    calm(w);
+    w.res.madeira = 500;
+    w.res.pedra = 500;
+    const g = lonelySpot(w);
+    g.terrain = 'ore';
+    g.stock = 4;
+    const b = addBuilding(w, 'mina', g.q, g.r, 1);
+    staff(w, b);
+    run(w, 30, () => b.dry);
+    expect(g.terrain).toBe('grass');
+    expect(b.dry).toBe(true);
+    expect(w.regrow.ore).toBe(1);
+    // Outro veio, longe: a mina muda para lá e volta a ter gente.
+    const v = w.list.find((t) => t.terrain === 'ore' && t.b < 0 && hexDist(t.q, t.r, 0, 0) < w.grid.R - 1)!;
+    expect(moveBuilding(w, b.id, v.q, v.r)).toBeNull();
+    run(w, packTime('mina') + BUILDINGS.mina.build + 1);
+    expect(b.dry).toBe(false);
+    run(w, 30, () => b.workers.length > 0);
+    expect(b.workers.length).toBeGreaterThan(0);
+  });
+
+  /** Confere as regras do lugar em cada ladrilho que brotou. */
+  function checkSpot(w: World, tiles: number[]): void {
+    const D = CONFIG.deposits;
+    const c = castle(w)!;
+    const people = new Set<number>();
+    for (const u of w.units.values()) {
+      const h = worldToHex(u.x, u.z);
+      if (w.grid.has(h.q, h.r)) people.add(w.grid.idx(h.q, h.r));
+    }
+    for (const i of tiles) {
+      const t = w.tiles[i]!;
+      expect(hexDist(t.q, t.r, c.q, c.r)).toBeGreaterThanOrEqual(D.castleMin);
+      for (const r of w.rifts) expect(hexDist(t.q, t.r, w.tiles[r]!.q, w.tiles[r]!.r)).toBeGreaterThanOrEqual(D.riftMin);
+      expect(hexDist(t.q, t.r, 0, 0)).toBeLessThanOrEqual(w.grid.R - D.edge);
+      expect(t.b).toBe(-1);
+      for (const [dq, dr] of DIRS) expect(tileAt(w, t.q + dq, t.r + dr)?.b ?? -1).toBe(-1);
+      expect(people.has(i)).toBe(false);
+      expect(t.stock).toBe(fullStock(t.terrain));
+    }
+  }
+
+  it('no fim da onda, a floresta que acabou nasce noutro lugar seguindo as regras', () => {
+    for (const seed of [61, 62, 63, 64, 65]) {
+      const w = createWorld(seed);
+      const forest = w.list.filter((t) => t.terrain === 'forest').length;
+      w.regrow.forest = 3;
+      regrow(w);
+      const sprout = w.events.find((e) => e.type === 'sprout');
+      expect(sprout).toBeTruthy();
+      if (sprout?.type !== 'sprout') continue;
+      expect(sprout.terrain).toBe('forest');
+      expect(sprout.tiles.length).toBeGreaterThanOrEqual(CONFIG.deposits.size.forest[0]!);
+      expect(w.list.filter((t) => t.terrain === 'forest').length).toBe(forest + sprout.tiles.length);
+      expect(w.regrow.forest).toBe(0);
+      checkSpot(w, sprout.tiles);
+    }
+  });
+
+  it('pouca falta não brota nada (espera juntar)', () => {
+    const w = createWorld(66);
+    w.regrow.forest = 1;
+    regrow(w);
+    expect(w.events.some((e) => e.type === 'sprout')).toBe(false);
+    expect(w.regrow.forest).toBe(1);
+  });
+
+  it('veio que acabou volta encostado numa rocha nova, sem fechar caminho', () => {
+    for (const seed of [71, 72, 73, 74]) {
+      const w = createWorld(seed);
+      w.regrow.crystal = 1;
+      regrow(w);
+      const sprout = w.events.find((e) => e.type === 'sprout');
+      expect(sprout?.type).toBe('sprout');
+      if (sprout?.type !== 'sprout') continue;
+      const tiles = sprout.tiles.map((i) => w.tiles[i]!);
+      const crystal = tiles.filter((t) => t.terrain === 'crystal');
+      expect(crystal.length).toBe(1);
+      expect(DIRS.some(([dq, dr]) => tileAt(w, crystal[0]!.q + dq, crystal[0]!.r + dr)?.terrain === 'rock')).toBe(true);
+      expect(w.regrow.crystal).toBe(0);
+      checkSpot(w, sprout.tiles);
+      // A gente ainda chega a todo prédio, e o castelo ainda alcança cada portal.
+      const c = castle(w)!;
+      for (const b of w.buildings.values()) {
+        if (b.kind === 'castelo') continue;
+        expect(allyPath(w, w.grid.idx(c.q, c.r), w.grid.idx(b.q, b.r))).not.toBeNull();
+      }
+    }
+  });
+
+  it('não nasce em cima de gente', () => {
+    const w = createWorld(67);
+    // Gente espalhada por quase todo o mapa: o broto tem de fugir dela.
+    for (const t of w.list) {
+      if (t.terrain !== 'grass' || (t.q + 2 * t.r) % 3 === 0) continue;
+      const p = hexToWorld(t.q, t.r);
+      addUnit(w, 'soldado', p.x, p.z);
+    }
+    w.regrow.forest = 3;
+    regrow(w);
+    const sprout = w.events.find((e) => e.type === 'sprout');
+    if (sprout?.type === 'sprout') checkSpot(w, sprout.tiles);
+  });
+
+  it('o salvo guarda o estoque, as sobras e a conta do que falta', () => {
+    const w = createWorld(68);
+    const f = w.list.find((t) => t.terrain === 'forest')!;
+    f.stock = 123;
+    const g = w.list.find((t) => t.terrain === 'grass' && t.b < 0)!;
+    g.left = 2;
+    w.regrow.rock = 1;
+    const w2 = loadWorld(saveWorld(w))!;
+    expect(w2.tiles[f.i]!.stock).toBe(123);
+    expect(w2.tiles[g.i]!.left).toBe(2);
+    expect(w2.regrow.rock).toBe(1);
+    // Salvo antigo (sem estoque): recurso cheio.
+    const old = JSON.parse(saveWorld(w));
+    old.tiles = old.tiles.map((t: number[]) => t.slice(0, 4));
+    delete old.regrow;
+    const w3 = loadWorld(JSON.stringify(old))!;
+    expect(w3.tiles[f.i]!.stock).toBe(fullStock('forest'));
+    expect(w3.regrow.forest).toBe(0);
+  });
+});
+
+describe('plantação que acaba e se replanta (Etapa 17)', () => {
+  it('colhe até o fim, para, solta a gente e volta depois de replantar', () => {
+    const w = createWorld(81);
+    calm(w);
+    const farm = [...w.buildings.values()].find((b) => b.kind === 'fazenda')!;
+    expect(farm.harvest).toBe(CONFIG.farm.harvest);
+    expect(replantProblem(w, farm)).toBe('Ainda tem o que colher');
+    farm.harvest = 3;
+    run(w, 40, () => farm.dry);
+    expect(farm.harvest).toBe(0);
+    expect(farm.dry).toBe(true);
+    expect(farm.workers).toEqual([]);
+    // Colhida: não dá mais comida por ela (as outras plantações não existem neste mapa).
+    w.res.comida = 100;
+    w.res.madeira = 50;
+    // Replantar custa madeira e enche a colheita.
+    const wood = w.res.madeira;
+    expect(replant(w, farm.id)).toBeNull();
+    expect(w.res.madeira).toBe(wood - CONFIG.farm.replant.madeira!);
+    expect(farm.harvest).toBe(CONFIG.farm.harvest);
+    expect(farm.dry).toBe(false);
+    run(w, 20, () => farm.workers.length > 0);
+    expect(farm.workers.length).toBeGreaterThan(0);
+  });
+
+  it('sem madeira não replanta', () => {
+    const w = createWorld(82);
+    const farm = [...w.buildings.values()].find((b) => b.kind === 'fazenda')!;
+    farm.harvest = 0;
+    w.res.madeira = 0;
+    expect(replantProblem(w, farm)).toBe('Falta madeira');
+  });
+
+  it('o salvo guarda a colheita; salvo antigo vem com a plantação cheia', () => {
+    const w = createWorld(83);
+    const farm = [...w.buildings.values()].find((b) => b.kind === 'fazenda')!;
+    farm.harvest = 77;
+    const w2 = loadWorld(saveWorld(w))!;
+    expect(w2.buildings.get(farm.id)!.harvest).toBe(77);
+    const old = JSON.parse(saveWorld(w));
+    for (const b of old.buildings) delete b.harvest;
+    const w3 = loadWorld(JSON.stringify(old))!;
+    expect(w3.buildings.get(farm.id)!.harvest).toBe(CONFIG.farm.harvest);
   });
 });

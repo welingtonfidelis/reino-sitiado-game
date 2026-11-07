@@ -142,7 +142,8 @@ export const ART: [string, string][] = [
   ] as [string, string][]),
   [`${FN}/forest_texture.png`, 'forest/forest_texture.png'],
   // Minério da mina; blocos e lascas de pedra da pedreira.
-  ...['Iron_Nuggets', 'Stone_Bricks_Stack_Large', 'Stone_Bricks_Stack_Medium', 'Stone_Chunks_Large', 'Stone_Chunks_Small'].flatMap((n) => [
+  // Etapa 17: toras onde a floresta acabou.
+  ...['Iron_Nuggets', 'Stone_Bricks_Stack_Large', 'Stone_Bricks_Stack_Medium', 'Stone_Chunks_Large', 'Stone_Chunks_Small', 'Wood_Log_A', 'Wood_Log_B'].flatMap((n) => [
     [`${RB}/${n}.gltf`, `resource/${n}.gltf`],
     [`${RB}/${n}.bin`, `resource/${n}.bin`],
   ] as [string, string][]),

@@ -534,85 +534,132 @@ Pedidos do usuário depois de jogar:
   - Com 32 personagens na tela, os desenhos por quadro caíram de 403 para 164.
   - No Mac, o leve desenha cada quadro em cerca de metade do tempo do normal.
 
-## 20. Proposta: recursos que acabam e reaparecem (Etapa 17)
+## 20. Recursos que acabam e reaparecem (Etapa 17)
 
-Pedido do usuário (2026-11-07): como no Age of Empires, floresta, rocha e veio se esgotam e a extração precisa mudar de lugar (a mudança custa tempo; ver os ajustes da seção 19). Como o jogo não tem fim, o recurso que acaba num lugar aparece em outro. O lugar novo nunca fica em cima de construção, nem perto demais do castelo, nem perto dos portais. **Esperando aprovação; nada disso está feito.**
+Pedido do usuário (2026-11-07): como no Age of Empires, floresta, rocha e veio se esgotam, e a extração precisa mudar de lugar (a mudança custa tempo; ver os ajustes da seção 19). Como o jogo não tem fim, o que acaba num lugar nasce em outro. O lugar novo nunca fica em cima de construção, nem perto demais do castelo, nem perto dos portais. No meio da etapa o usuário pediu que a plantação também acabasse, com um ícone avisando e Replantar no menu dela. Isso troca a proposta, que era plantação sem fim.
 
 ### O que acaba
 
-| Recurso | Fonte | Estoque inicial (por hexágono) | Quanto dura com 2 trabalhadores |
+| Recurso | Fonte | Estoque | Quanto dura com 2 trabalhadores |
 | --- | --- | --- | --- |
-| Madeira | floresta vizinha da serraria | 300 | ~9 min por hexágono; uma serraria costuma ter 2 ou 3 vizinhos de floresta, então ~20 a 30 min |
-| Pedra | rocha vizinha da pedreira | 400 | ~20 min por hexágono |
+| Madeira | floresta vizinha da serraria | 300 por hexágono | ~9 min por hexágono; com 2 ou 3 vizinhos de floresta, 20 a 30 min |
+| Pedra | rocha vizinha da pedreira | 400 por hexágono | ~20 min por hexágono |
 | Ferro | o veio debaixo da mina | 250 | ~15 min |
-| Cristal | o veio azul debaixo da mina | 120 | ~12 min |
-| Comida | plantação | não acaba (é replantada) | sem fim |
+| Cristal | o veio azul debaixo da mina | 120 | ~20 min (o cristal sai devagar) |
+| Comida | a plantação | 300 por semeadura | ~15 min; depois, Replantar (10 de madeira) |
 
-Os números são para começar e se ajustam jogando. A partida de 20 ondas dura uns 30 min, então cada lugar de extração é trocado uma ou duas vezes.
+Os números ficam em `CONFIG.deposits` e `CONFIG.farm`.
 
-### Simulação
+### Simulação (`src/sim/deposits.ts`)
 
-- **Estoque no ladrilho**: cada ladrilho ganha `stock`, cheio na criação do mapa conforme o terreno (`CONFIG.deposits`). O salvo guarda o estoque; um salvo antigo enche pelo terreno.
-- **De onde sai**: a produção tira do ladrilho de onde o trabalhador está tirando. Na serraria e na pedreira é o vizinho do tipo certo que ainda tem estoque (o `resourceDir` passa a escolher esse, e os trabalhadores viram para ele). Na mina é o próprio veio.
-- **Quando um hexágono acaba**:
-  - floresta vira grama com toras caídas;
-  - rocha vira grama com cascalho (abre caminho: a horda e a gente passam a andar por ali);
-  - veio vira terreno comum, e a mina fica "esgotada".
-- **Prédio sem nada para tirar**: para e avisa. Os trabalhadores sentam e ficam livres para outro serviço.
+- **Estoque no ladrilho**: cada ladrilho tem `stock`, cheio na criação do mapa conforme o terreno. A plantação guarda a colheita no próprio prédio (`harvest`). O salvo guarda os dois; um salvo antigo enche tudo.
+- **De onde sai**: a serraria e a pedreira tiram do vizinho do tipo certo que ainda tem estoque (`sourceOf`); o `resourceDir` aponta para ele, e os trabalhadores viram para lá. A mina tira do veio debaixo dela. As bênçãos aumentam o ganho, mas não gastam mais estoque.
+- **Quando um hexágono acaba**: a floresta vira grama com toras, a rocha vira grama com cascalho (e abre caminho), e o veio vira chão comum. O hexágono entra na conta do tipo (`w.regrow`).
+- **Prédio sem recurso (`dry`)**: para e solta quem trabalhava nele (vão para outro serviço). A serraria, a pedreira e a mina voltam sozinhas quando mudam para perto de recurso; a plantação colhida volta com Replantar.
+- **Desenho em degraus**: o estoque tem três degraus. Ao passar de um para outro, o mundo pede redesenho.
 
-### Onde o recurso novo aparece
+### Onde o recurso novo nasce
 
-**Quando:** a reposição vem no fim de cada onda, nunca no meio do ataque. Para cada tipo, se o estoque que sobra no mapa ficar abaixo de um piso, nasce uma mancha nova:
+**Quando** (muda a proposta): em vez de um piso de estoque no mapa, cada hexágono que acaba entra numa conta. No fim da onda, quando a conta chega a 3 florestas, 2 rochas ou 1 veio, nasce uma mancha nova:
 - floresta: 4 a 6 hexágonos;
-- rocha: 2 ou 3, com 1 ou 2 veios encostados (ferro ou cristal, alternando como hoje).
+- rocha: 2 ou 3, com os veios que faltam encostados (cristal primeiro, se faltar).
 
-**Regras do lugar.** Cada hexágono da mancha precisa obedecer todas:
-1. É grama, sem prédio, sem obra, sem ruína e sem lugar guardado de mudança.
-2. Está a 1 hexágono ou mais de qualquer prédio, para não emparedar nada nem cobrir uma rua.
-3. Está a 6 hexágonos ou mais do castelo (as primeiras, da criação do mapa, ficam a 4 ou 5).
-4. Está a 5 hexágonos ou mais de cada portal, aberto ou ainda fechado.
-5. Fica longe da borda (até R − 2) e fora de água e fenda.
-6. Não tem gente nem monstro em cima (rocha não se atravessa, e ninguém fica preso).
-7. Fica a 3 hexágonos ou mais de outra mancha do mesmo tipo, para o recurso se espalhar pelo mapa.
+O motivo da troca: o mapa começa com perto de 90 hexágonos de floresta, e um piso quase nunca seria alcançado numa partida. A conta repõe o que se gastou.
 
-**Teste final:** a rocha nova não pode fechar caminho. Depois de pôr a mancha, cada portal ainda chega ao castelo e a gente ainda chega a todo prédio. Se não chegar, a mancha é desfeita e o sorteio tenta outro lugar. O sorteio usa `w.rand`, então a mesma semente repete o mesmo mapa.
+**Regras do lugar** (todas, em cada hexágono):
+1. É grama, sem prédio, obra, ruína ou lugar guardado de mudança.
+2. Está a 1 hexágono ou mais de prédio e de lugar guardado.
+3. Está a 6 hexágonos ou mais do castelo.
+4. Está a 5 hexágonos ou mais de cada portal, aberto ou fechado.
+5. Fica até R − 2 e fora de água e fenda.
+6. Não tem gente nem monstro em cima.
+7. Fica a 3 hexágonos ou mais de outra mancha do mesmo tipo. Esta regra cai se não houver lugar nenhum.
 
-### Como a criança percebe (ícone antes de texto)
+O lugar onde um recurso acabou volta a valer quando nenhum prédio fica encostado nele (a floresta nova cobre as toras).
 
-- **O estoque aparece no próprio terreno**:
-  - a floresta rareia (árvore grande, depois média, depois uma só, depois toras);
-  - a rocha encolhe (rochedo, pedras, cascalho);
-  - o minério ao lado da mina diminui.
-- **Esgotado**: ícone sobre o prédio (machado, picareta ou pedra riscada) e o botão Mover pulsando no menu do prédio.
-- **Recurso novo**: as árvores brotam do chão (ou as pedras sobem) em uns 2 s, com brilho. Um balão com o ícone do recurso fica 5 s em cima, e uma nota vai para o diário.
+**Teste do caminho:** rocha nova não fecha caminho. Cada portal ainda chega ao castelo e a gente ainda chega a todo prédio que alcançava; senão, a mancha é desfeita e o sorteio tenta outro lugar (até 60 vezes).
+
+### Como a criança percebe
+
+- **O terreno mostra o estoque**:
+  - a floresta rareia (grupo grande, grupo menor, uma árvore só, toras);
+  - a rocha encolhe (rochedo, pedras com lascas, cascalho);
+  - o minério e o cristal ao lado da mina diminuem;
+  - as plantas da plantação baixam até o toco.
+- **Prédio sem recurso**: balão com o recurso riscado em vermelho, balançando em cima dele (`src/render/bubbles.ts`; árvore, pedra, ferro ou espiga). No menu dele:
+  - a serraria, a pedreira e a mina mostram o Mover pulsando;
+  - a plantação mostra o Replantar pulsando.
+  - O cartão ganha a barra Floresta, Rocha, Veio ou Colheita.
+- **Recurso novo**: cresce do chão em 1,6 s com brilho. Um balão com o ícone do recurso fica uns 6 s em cima, e um aviso vai para o diário. A plantação replantada também cresce de novo.
+- **Chão**: o chão é refeito quando o terreno muda (`w.land`). A floresta que acaba some do tom do chão, e a rocha nova ganha terra em volta.
 
 ### Arte
 
-Tudo do KayKit local:
-- `log_A`, `log_B` e `Wood_Log_A`/`B` (toras);
-- `gravel` e `rubble_half` (cascalho);
-- as árvores médias e `tree_single_A`/`B` do Medieval, que já estão no projeto.
+- `Wood_Log_A` e `Wood_Log_B` do Resource Bits (toras, puxadas do LFS da coleção local).
+- `tree_single_A` e `tree_single_B` do Medieval (já estavam copiadas).
+- O cascalho usa as lascas e pedrinhas que o jogo já tinha.
 
-### Etapas
+### Equilíbrio (`npm run balance`)
 
-1. Estoque nos ladrilhos, esgotar e salvar, com testes.
-2. Visual do estoque (rarear e encolher) e aviso de esgotado com o Mover em destaque.
-3. Reposição no fim da onda com as regras de lugar, com testes de cada regra e do caminho.
-4. Brotar com brilho e balão de ícone. O robô de `npm run balance` aprende a mudar a extração; a meta é chegar perto da onda que chega hoje (≈ 22,8).
-5. Ajustar os números jogando (tablet e iPhone).
+- **O que o robô aprendeu**:
+  - mudar a serraria, a pedreira ou a mina sem recurso para o lugar com recurso livre mais perto (sem lugar, ele derruba);
+  - replantar a plantação colhida;
+  - escolher onde erguer a extração pesando o recurso livre em volta (0,5 hexágono de distância por hexágono livre, até 2). Antes ele punha duas serrarias encostadas no mesmo hexágono de floresta, que acabava em 6 min.
+- **Resultado com 12 sementes**: 20,3 com tudo esgotando, contra 23,2 do mesmo robô sem esgotar (`ESTOQUE=0`). Com as 6 sementes de sempre: 23,2 (antes da etapa, 21,5).
+- **Ruído**: o robô cai na onda 15 (chefe) ou passa da 25, sem meio-termo, então cada semente que vira pesa muito na média. Estoques maiores (450 a 600) não mudaram o quadro.
+- **Opções novas do robô**: `RECURSOS='{json}'` testa outros números, `SO=n` roda uma semente só, e `ROBO_PESO`/`ROBO_TETO` mudam a escolha de lugar. Com `VERBOSE=1`, ele mostra o que acabou, parou, brotou e desmontou, e quanto produziu.
+
+### O que falta
+
+Jogar no tablet e no iPhone para ver se os tempos estão bons para uma criança e se os balões aparecem bem no celular.
+
+## 21. Proposta: modo fácil (Etapa 18)
+
+Pedido do usuário (2026-11-07): um modo fácil de dificuldade, em que uma das mudanças é não ter o esgotamento de recursos. **Proposta, esperando aprovação.**
+
+### Onde se escolhe
+
+- **Ao começar**: na tela de começo e no Nova partida (⋯), dois botões grandes com figura, porque o filho do usuário não lê. Um é **Fácil**, com uma flor ou um sol; o outro é **Normal**, com uma espada.
+- **O que vale**: a escolha vale para a partida inteira e vai no salvo (`w.mode`). O último modo escolhido fica guardado no navegador e vem marcado da próxima vez.
+- **Durante a partida**: não se troca, para o álbum e o relatório compararem coisa igual. O ⋯ mostra o modo da partida.
+
+### O que muda no Fácil
+
+| O quê | Normal | Fácil |
+| --- | --- | --- |
+| Floresta, rocha, veio e plantação | acabam (Etapa 17) | não acabam: sem estoque, sem Replantar, sem reposição |
+| Mudar prédio de lugar | desmonta e monta (75% + 100% do tempo da obra) | metade desse tempo |
+| Vida dos monstros | como hoje | 30% menos |
+| Monstros por onda | como hoje | 25% menos |
+| Calmaria entre ondas | 90 s, caindo até 45 s | 30 s a mais, caindo até 75 s |
+| Chefe | a cada 15 ondas | a cada 20 |
+| Modificadores de onda (Noite, Blindados, Enxame, Fúria) | a cada 5 ondas | só a partir da onda 20 |
+| Vida do castelo | 1500 | 2250, e recupera o dobro entre as ondas |
+| Recursos no começo | como hoje | 50% a mais |
+| Fome | o trabalho cai pela metade | o trabalho cai só 25% |
+
+### Como fazer
+
+- **Na simulação**: `CONFIG.modes = { normal, facil }`, com os multiplicadores e as chaves acima. `createWorld(seed, R, mode)` guarda o modo no mundo. A simulação lê `w.mode` nos pontos certos:
+  - `deplete`, `harvest`, `drySites` e `regrow` não rodam no fácil;
+  - o resto em `waveSize`, `spawnMonster`, `waveInterval`, `modsForWave` e `startWave`.
+- **No desenho**: o terreno não rareia no fácil, porque o estoque não baixa. A barra de estoque e o Replantar somem do menu.
+- **Robô**: `MODO=facil npm run balance`. Meta: o robô passa da onda 30 em média e o "nada" chega perto da onda 8.
+- **Testes**: no fácil nada esgota; os números das ondas mudam; o salvo guarda o modo (salvo antigo = normal).
 
 ### Decisões para o usuário
 
-- A plantação continua sem fim? (proposta: sim)
-- O recurso novo aparece sozinho no fim da onda ou precisa ser "descoberto"? (proposta: sozinho)
-- Os estoques acima (uma troca a cada 10 a 20 min) estão bons para começar?
+- A lista acima está boa, ou o fácil deve mudar só alguns itens (por exemplo, só o esgotamento e a vida dos monstros)?
+- O modo fica travado na partida (proposta) ou pode trocar no meio?
+- Num aparelho novo, o jogo começa no Fácil ou no Normal? (proposta: Fácil, já que quem mais joga é uma criança de 4 anos)
 
-## 21. Arquitetura
+## 22. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
   - `world.ts`: estado e geração do mapa.
   - `path.ts`: campo de fluxo da horda e caminho das pessoas.
+  - `deposits.ts`: estoque de floresta, rocha, veio e plantação, o que acontece quando acaba e onde o recurso novo nasce (Etapa 17).
   - `step.ts`: obras, economia, chegadas, recrutas, ondas, horda, tropas e defesas.
   - `commands.ts`: ordens do jogador, cada uma com o motivo de não poder.
 - **Campo de fluxo:** Dijkstra a partir do castelo. Prédios e muralhas custam mais para atravessar (`breakCost`). Com o reino todo cercado, o caminho mais barato passa por uma muralha, e o monstro para e bate nela.
@@ -624,13 +671,14 @@ Tudo do KayKit local:
   - `camera.ts`: câmera isométrica com arrastar, pinça, roda e toque.
   - `season.ts`: estações (tom da grama e das copas, neve, sombras de nuvem) e o tempo que cai do céu (Etapa 16).
   - `quality.ts`: gráficos normais ou leves (o que cada um liga e desliga, e o palpite pelo aparelho).
+  - `bubbles.ts`: balões de ícone no mundo (prédio sem recurso, recurso novo), desenhados em canvas (Etapa 17).
   - `village.ts`: a vila (casas e prédios de tropa virados para a rua, ruas até o castelo, quintais, poço, taverna e mercado); o chão dela é pintado em `ground.ts`.
 - `src/audio/`: `sound.ts` com os efeitos sonoros e `music.ts` com a música ambiente, tudo feito na hora pelo Web Audio.
 - **Muralha:** cada trecho desenha meio muro até cada vizinho que também é muralha e um poste nas curvas e pontas. O portão segue a linha dos dois vizinhos opostos.
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. `album.ts`: as figurinhas e o que guarda no navegador. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
 - `src/ui/App.tsx`: HUD, ⋯, botões flutuantes, avisos e telas de começo e fim. O menu do prédio e o leque do Construir ficam em `src/ui/Radial.tsx` (seções 14 e 15).
 
-## 22. Etapas
+## 23. Etapas
 
 | Etapa | O que | Situação |
 | --- | --- | --- |
@@ -650,9 +698,10 @@ Tudo do KayKit local:
 | 14 | Heróis: Bárbaro, Atiradora, Druida e Cavaleiro Negro, comprados no castelo (seção 17) | Pronta em 2026-11-07. Vista no navegador do Mac (compra, giro, os quatro modelos, submenu); falta jogar no iPhone. |
 | 15 | Fazenda com celeiro: plantações hexagonais em volta, uma planta por plantação (seção 18) | Pronta em 2026-11-07. Vista no navegador do Mac; falta jogar no iPhone. |
 | 16 | Festa da vitória, mundo vivo, estações com tempo, música ambiente e álbum de figurinhas (seção 19) | Pronta em 2026-11-07, na `main`. Vista no navegador do Mac (festa, as quatro estações, chuva, figurinha, álbum no computador e no celular); a música foi conferida por medição, falta ouvir e jogar no iPhone. |
-| 17 | Recursos que acabam e reaparecem longe do castelo, dos portais e das construções (seção 20) | Proposta em 2026-11-07, esperando aprovação. |
+| 17 | Recursos que acabam e reaparecem longe do castelo, dos portais e das construções; plantação que acaba e se replanta (seção 20) | Pronta em 2026-11-07, fora da `main`. Vista no navegador do Mac (degraus da floresta e da rocha, toras, cascalho, balões, broto, Replantar no menu); falta jogar no tablet e no iPhone. |
+| 18 | Modo fácil, sem esgotamento e com ondas mais leves (seção 21) | Proposta em 2026-11-07, esperando aprovação. |
 
-## 23. Arte e licenças
+## 24. Arte e licenças
 
 Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art` (lista em `tools/art-manifest.ts`). Detalhes em `LICENSES.md`.
 

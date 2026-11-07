@@ -5,11 +5,12 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BUILDINGS, CONFIG, CROPS, DIRS, HEX, cropOf, hexToWorld, isHero, openRifts, resourceDir, tileAt } from '../sim/index.ts';
+import { BUILDINGS, CONFIG, CROPS, DIRS, HEX, cropOf, farmStage, hexToWorld, isHero, openRifts, resourceDir, stage, tileAt } from '../sim/index.ts';
 import type { Building, BuildingKind, Crop, SimEvent, UnitKind, World } from '../sim/index.ts';
 import type { Art, CharKey, StaticKey, StaticModel, StaticPart } from './assets.ts';
 import { CharView } from './chars.ts';
 import { buildGround, paintVillage } from './ground.ts';
+import { Bubbles } from './bubbles.ts';
 import { planVillage } from './village.ts';
 import type { Home } from './village.ts';
 import { SEASON_U, SeasonLook, Weather, leafy, snowy, weatherOf } from './season.ts';
@@ -174,6 +175,9 @@ const FIGHT_POSE: Partial<Record<UnitKind, Pose>> = { arqueiro: 'shoot', mago: '
 /** Tamanho dos golpes especiais na tela (o giro cobre o raio do golpe). */
 const SPECIAL_SCALE: Record<'giro' | 'chuva' | 'raizes' | 'pisao', number> = { giro: 1.4, chuva: 1.3, raizes: 0.9, pisao: 1.8 };
 
+/** Etapa 17: segundos que o recurso novo leva para crescer do chão. */
+const SPROUT_TIME = 1.6;
+
 /** Torre dos arqueiros: a torre de vigia aberta do KayKit, maior, com os arqueiros na plataforma. */
 const TOWER_SCALE = 1.8;
 /** Piso da plataforma e os quatro cantos (em medidas do modelo, antes da escala). */
@@ -325,6 +329,13 @@ export class World3D {
   /** Muralha de mudança: o pedaço é refeito no syncStatic, então ele roda de tempos em tempos. */
   private wallsMoving = false;
   private wallSync = 0;
+  /** Etapa 17: versão do terreno já desenhada (o chão é refeito quando o recurso acaba ou brota). */
+  private land = 0;
+  /** Hexágonos que brotaram (índice -> instante): o recurso cresce do chão em SPROUT_TIME. */
+  private sprouting = new Map<number, number>();
+  private sproutSync = 0;
+  /** Balões de ícone: prédio sem recurso e recurso novo. */
+  private bubbles: Bubbles;
   private chars = new Map<number, CharView>();
   private flights: Flight[] = [];
   private bars: Bars;
@@ -392,7 +403,9 @@ export class World3D {
     this.scene = scene;
     this.art = art;
     const big = (k: StaticKey, cap: number, cast = true, receive = false) => this.sets.set(k, new Instanced(scene, art.statics[k], cap, cast, receive));
-    for (const k of ['arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina'] as StaticKey[]) big(k, 400);
+    for (const k of ['arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'arvoreE', 'arvoreF', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina'] as StaticKey[]) big(k, 400);
+    // Etapa 17: toras onde a floresta acabou.
+    for (const k of ['toras', 'torasB'] as StaticKey[]) big(k, 300);
     for (const k of ['feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote'] as StaticKey[]) big(k, 120);
     for (const k of ['castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina'] as StaticKey[]) big(k, 200);
     this.crystals = new Instanced(scene, crystalModel(), 200, true, false);
@@ -406,7 +419,7 @@ export class World3D {
     for (const k of ['poco', 'taverna', 'mercado'] as StaticKey[]) big(k, 60);
     for (const k of ['barril', 'caixa', 'balde'] as StaticKey[]) big(k, 600);
     // Etapa 16: estações. Árvores com copa da estação (cópia do material); o resto ganha neve por cima.
-    const trees = new Set<StaticKey>(['arvoreA', 'arvoreB', 'arvoreC', 'arvoreD']);
+    const trees = new Set<StaticKey>(['arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'arvoreE', 'arvoreF']);
     const leafMats = new Map<THREE.Material, THREE.Material>();
     for (const [k, set] of this.sets) {
       if (k === 'flecha' || k === 'pedraCerco') continue;
@@ -420,6 +433,7 @@ export class World3D {
       }
     }
     this.weather = new Weather(scene);
+    this.bubbles = new Bubbles(scene);
     const orbGeo = new THREE.SphereGeometry(0.11, 10, 8);
     this.orbs = new THREE.InstancedMesh(orbGeo, new THREE.MeshBasicMaterial({ color: '#b48cff' }), 64);
     this.orbs.count = 0;
@@ -549,6 +563,8 @@ export class World3D {
       this.rifts.push(rim);
     });
     this.ver = -1;
+    this.land = w.land;
+    this.sprouting.clear();
     this.look.snap(this.season);
   }
 
@@ -571,7 +587,9 @@ export class World3D {
   syncStatic(w: World): void {
     if (w.ver === this.ver) return;
     this.ver = w.ver;
-    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'catapulta', 'poco', 'taverna', 'mercado', 'barril', 'caixa', 'balde'];
+    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'catapulta', 'poco', 'taverna', 'mercado', 'barril', 'caixa', 'balde', 'arvoreE', 'arvoreF', 'toras', 'torasB'];
+    // Etapa 17: o terreno mudou (recurso acabou ou brotou): refaz o chão antes de pintar a vila.
+    if (w.land !== this.land) this.rebuildGround(w);
     for (const k of keys) this.sets.get(k)!.begin();
     this.crystals.begin();
     this.pitch.begin();
@@ -583,23 +601,41 @@ export class World3D {
       const rot = (t.deco % 6) * sixth;
       if (t.b >= 0) continue;
       if (t.ruin) this.place('ruina', p.x, 0, p.z, rot, 0.9);
-      if (t.terrain === 'forest') this.place((['arvoreA', 'arvoreB', 'arvoreC', 'arvoreD'] as StaticKey[])[t.deco % 4]!, p.x, 0, p.z, rot);
-      else if (t.terrain === 'rock') {
+      // Etapa 17: o recurso rareia em três degraus e cresce do chão quando brota.
+      const st = stage(t);
+      const g = this.sproutGrow(t.i);
+      if (t.terrain === 'forest') {
+        // Cheia: o grupo de árvores; pela metade: o grupo menor; no fim: uma árvore só.
+        const key = (st === 2 ? ['arvoreA', 'arvoreB', 'arvoreC', 'arvoreD'] : st === 1 ? ['arvoreC', 'arvoreD'] : ['arvoreE', 'arvoreF'])[t.deco % (st === 2 ? 4 : 2)] as StaticKey;
+        this.place(key, p.x, 0, p.z, rot, g * (st === 0 ? 1.3 : 1));
+      } else if (t.terrain === 'rock') {
         // Rochedo de pedras soltas (Forest Nature Pack): sem a base sextavada das montanhas.
+        const k = (st === 2 ? 1 : st === 1 ? 0.75 : 0.5) * g;
         const big = (['rochaC', 'rochaA'] as StaticKey[])[t.deco % 2]!;
-        this.place(big, p.x + ((t.deco % 5) - 2) * 0.08, 0, p.z + ((t.deco % 3) - 1) * 0.1, (t.deco % 13) * 0.5, 1.9 + (t.deco % 4) * 0.15);
-        this.place((['rochaB', 'rochaD'] as StaticKey[])[t.deco % 2]!, p.x + 0.55, 0, p.z - 0.35, t.deco * 0.7, 1.3);
-        this.place('rochaA', p.x - 0.5, 0, p.z + 0.45, t.deco * 1.3, 0.9 + (t.deco % 3) * 0.2);
+        this.place(big, p.x + ((t.deco % 5) - 2) * 0.08, 0, p.z + ((t.deco % 3) - 1) * 0.1, (t.deco % 13) * 0.5, (1.9 + (t.deco % 4) * 0.15) * k);
+        if (st > 0) this.place((['rochaB', 'rochaD'] as StaticKey[])[t.deco % 2]!, p.x + 0.55, 0, p.z - 0.35, t.deco * 0.7, 1.3 * k);
+        if (st === 2) this.place('rochaA', p.x - 0.5, 0, p.z + 0.45, t.deco * 1.3, (0.9 + (t.deco % 3) * 0.2) * g);
+        if (st < 2) this.place('lascasB', p.x - 0.45, 0, p.z + 0.4, t.deco * 1.1, 0.35 * g);
       }
       else if (t.terrain === 'crystal') {
-        this.place('pedraA', p.x - 0.4, 0, p.z + 0.25, rot, 2.4);
+        this.place('pedraA', p.x - 0.4, 0, p.z + 0.25, rot, 2.4 * g);
         this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rot);
-        this.tmp.compose(this.p.set(p.x + 0.1, 0, p.z - 0.05), this.q, this.s.setScalar(1.2));
+        this.tmp.compose(this.p.set(p.x + 0.1, 0, p.z - 0.05), this.q, this.s.setScalar((st === 2 ? 1.2 : st === 1 ? 0.9 : 0.6) * g));
         this.crystals.push(this.tmp);
       } else if (t.terrain === 'ore') {
-        this.place('pedraA', p.x - 0.35, 0, p.z + 0.2, rot, 2.6);
-        this.place('pedraC', p.x + 0.4, 0, p.z - 0.25, rot, 2.4);
-        this.place('minerio', p.x, 0, p.z, rot, 1.4);
+        this.place('pedraA', p.x - 0.35, 0, p.z + 0.2, rot, 2.6 * g);
+        this.place('pedraC', p.x + 0.4, 0, p.z - 0.25, rot, 2.4 * g);
+        this.place('minerio', p.x, 0, p.z, rot, (st === 2 ? 1.4 : st === 1 ? 1 : 0.6) * g);
+      } else if (t.left === 1) {
+        // Floresta que acabou: toras caídas no chão.
+        this.place('toras', p.x - 0.2, 0, p.z + 0.1, rot, 0.22);
+        this.place('torasB', p.x + 0.3, 0, p.z - 0.25, rot + 1.1, 0.19);
+        this.place('torasB', p.x + 0.05, 0, p.z + 0.4, rot + 2.3, 0.17);
+      } else if (t.left === 2) {
+        // Rocha que acabou: cascalho.
+        this.place('lascasB', p.x - 0.25, 0, p.z + 0.15, rot, 0.4);
+        this.place('lascas', p.x + 0.3, 0, p.z - 0.2, rot + 2, 0.3);
+        this.place('pedraC', p.x + 0.05, 0, p.z + 0.45, rot, 1);
       } else if (t.terrain === 'grass' && !t.ruin && t.deco % 23 === 0 && Math.hypot(p.x, p.z) > 5) {
         this.place(t.deco % 2 ? 'pedraA' : 'pedraC', p.x + ((t.deco % 7) - 3) * 0.15, 0, p.z + ((t.deco % 5) - 2) * 0.15, rot, 1.4);
       }
@@ -650,9 +686,11 @@ export class World3D {
         continue;
       }
       if (b.kind === 'fazenda') {
-        // Plantação no hexágono, com as fileiras apontando para o celeiro vizinho.
+        // Plantação no hexágono, com as fileiras apontando para o celeiro vizinho. Etapa 17: as
+        // plantas baixam conforme a colheita (colhida, fica o toco) e crescem de novo ao replantar.
         this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -farmAngle(w, b));
-        this.tmp.compose(this.p.set(p.x, 0, p.z), this.q, this.s.setScalar(1));
+        const tall = [0.2, 0.55, 0.8, 1][farmStage(b) + 1]! * this.sproutGrow(w.grid.idx(b.q, b.r));
+        this.tmp.compose(this.p.set(p.x, 0, p.z), this.q, this.s.set(1, Math.max(0.12, tall), 1));
         this.farms.get(cropOf(w, b))!.push(this.tmp, b.id);
         continue;
       }
@@ -671,20 +709,106 @@ export class World3D {
       }
       this.place(key, p.x, 0, p.z, rot, b.kind === 'torre' ? TOWER_SCALE : 1, b.id);
       if (b.kind === 'castelo') this.place('bandeira', p.x, 4.0, p.z, 0, 1.2, b.id);
-      if (b.kind === 'mina') this.place('minerio', p.x + 0.6, 0, p.z + 0.5, 0, 0.35, b.id);
+      if (b.kind === 'mina') {
+        // O minério ao lado da mina diminui com o veio (some quando ele acaba).
+        const vein = tileAt(w, b.q, b.r)!;
+        if (vein.terrain === 'ore') this.place('minerio', p.x + 0.6, 0, p.z + 0.5, 0, [0.2, 0.28, 0.35][stage(vein)]!, b.id);
+      }
     }
     for (const k of keys) this.sets.get(k)!.end();
     // Mina em veio azul mostra os cristais ao lado.
     for (const b of w.buildings.values()) {
-      if (b.kind !== 'mina' || tileAt(w, b.q, b.r)?.terrain !== 'crystal') continue;
+      const vein = tileAt(w, b.q, b.r);
+      if (b.kind !== 'mina' || vein?.terrain !== 'crystal') continue;
       const p = hexToWorld(b.q, b.r);
-      this.tmp.compose(this.p.set(p.x + 0.6, 0, p.z + 0.5), this.q.identity(), this.s.setScalar(0.8));
+      this.tmp.compose(this.p.set(p.x + 0.6, 0, p.z + 0.5), this.q.identity(), this.s.setScalar([0.45, 0.62, 0.8][stage(vein)]!));
       this.crystals.push(this.tmp);
     }
     this.crystals.end();
     for (const f of this.farms.values()) f.end();
     this.pitch.end();
     this.spikes.end();
+  }
+
+  /**
+   * Etapa 17: refaz o chão quando o terreno muda (floresta que acabou some do tom do chão, rocha
+   * nova ganha terra em volta). A grade continua ligada ou não, como estava.
+   */
+  private rebuildGround(w: World): void {
+    this.land = w.land;
+    const gridOn = this.grid?.visible ?? false;
+    for (const o of [this.ground, this.grid, this.water]) {
+      if (!o) continue;
+      this.scene.remove(o);
+      o.geometry.dispose();
+    }
+    const { ground, grid, water } = buildGround(w);
+    this.ground = ground;
+    this.grid = grid;
+    this.water = water;
+    grid.visible = gridOn;
+    this.scene.add(ground, grid);
+    if (water) this.scene.add(water);
+  }
+
+  /** Quanto o recurso que brotou já cresceu (1 = pronto), com um pulinho no fim. */
+  private sproutGrow(i: number): number {
+    const t0 = this.sprouting.get(i);
+    if (t0 === undefined) return 1;
+    const k = Math.min(1, Math.max(0, (this.time - t0) / SPROUT_TIME));
+    const c = 1.7;
+    return Math.max(0.02, 1 + (c + 1) * (k - 1) ** 3 + c * (k - 1) ** 2);
+  }
+
+  /**
+   * Etapa 17 a cada quadro: o broto cresce (o syncStatic roda de tempos em tempos enquanto isso)
+   * e os balões de ícone acompanham os prédios sem recurso e os recursos novos.
+   */
+  private syncDeposits(w: World, events: SimEvent[]): void {
+    for (const e of events) {
+      if (e.type === 'sprout') {
+        let x = 0;
+        let z = 0;
+        for (const i of e.tiles) {
+          this.sprouting.set(i, this.time);
+          const t = w.tiles[i]!;
+          const p = hexToWorld(t.q, t.r);
+          x += p.x / e.tiles.length;
+          z += p.z / e.tiles.length;
+          this.fx?.play('cura', p.x, 0.1, p.z, { scale: 1.2 });
+        }
+        const vein = e.tiles.map((i) => w.tiles[i]!.terrain).find((k) => k === 'crystal' || k === 'ore');
+        this.bubbles.flash(e.terrain === 'forest' ? 'arvore' : vein === 'crystal' ? 'cristal' : vein === 'ore' ? 'ferro' : 'pedra', x, 2.4, z, this.time, 6);
+      } else if (e.type === 'replanted') {
+        // Replantou: as plantas crescem do chão de novo, com brilho.
+        const b = w.buildings.get(e.id);
+        if (b) {
+          const p = hexToWorld(b.q, b.r);
+          this.sprouting.set(w.grid.idx(b.q, b.r), this.time);
+          this.fx?.play('cura', p.x, 0.1, p.z, { scale: 1.2 });
+        }
+      } else if (e.type === 'depleted') {
+        const t = w.tiles[e.i]!;
+        const p = hexToWorld(t.q, t.r);
+        this.fx?.play('poof', p.x, 0.1, p.z, { scale: 0.9 });
+      }
+    }
+    if (this.sprouting.size) {
+      if (this.time - this.sproutSync > 0.06) {
+        this.sproutSync = this.time;
+        this.ver = -1;
+      }
+      for (const [i, t0] of this.sprouting) if (this.time - t0 > SPROUT_TIME + 0.1) this.sprouting.delete(i);
+    }
+    // Prédio sem recurso: balão com o recurso riscado em cima dele (some na mudança).
+    const dry = new Map<number, { icon: 'semMadeira' | 'semPedra' | 'semFerro' | 'semComida'; x: number; y: number; z: number }>();
+    for (const b of w.buildings.values()) {
+      if (!b.dry || b.moveTo || b.moved) continue;
+      const p = hexToWorld(b.q, b.r);
+      const icon = b.kind === 'serraria' ? 'semMadeira' : b.kind === 'pedreira' ? 'semPedra' : b.kind === 'fazenda' ? 'semComida' : 'semFerro';
+      dry.set(b.id, { icon, x: p.x, y: b.kind === 'fazenda' ? 0.35 : this.topOf(b) + 0.9, z: p.z });
+    }
+    this.bubbles.sync(dry, this.time);
   }
 
   /** O que desenhar de um prédio de mudança: o modelo principal, sem os enfeites em volta. */
@@ -864,6 +988,7 @@ export class World3D {
     this.stepFall(fxDt);
     this.stepParty(fxDt);
     this.syncMovers(w, dt);
+    this.syncDeposits(w, events);
     // Na festa, a gente comemora mesmo com o jogo parado esperando o relatório.
     const animDt = this.partying ? fxDt : dt;
     const flip = (dx: number, dz: number) => dx * Math.cos(this.camYaw) - dz * Math.sin(this.camYaw) < 0;

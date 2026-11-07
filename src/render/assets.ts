@@ -43,6 +43,11 @@ export const STATIC_MODELS = {
   arvoreB: 'medieval/trees_B_large.gltf',
   arvoreC: 'medieval/trees_A_medium.gltf',
   arvoreD: 'medieval/trees_B_medium.gltf',
+  // Etapa 17: floresta no fim (uma árvore só) e as toras de onde ela acabou.
+  arvoreE: 'medieval/tree_single_A.gltf',
+  arvoreF: 'medieval/tree_single_B.gltf',
+  toras: 'resource/Wood_Log_A.gltf',
+  torasB: 'resource/Wood_Log_B.gltf',
   rochaA: 'forest/Rock_1_A_Color1.gltf',
   rochaB: 'forest/Rock_2_A_Color1.gltf',
   rochaC: 'forest/Rock_3_A_Color1.gltf',

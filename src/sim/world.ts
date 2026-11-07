@@ -10,6 +10,9 @@ import { baseMods, emptyStats, nameFor } from './blessings.ts';
 import type { BlessingId, Mods, Report, WaveStats } from './blessings.ts';
 
 export type Terrain = 'grass' | 'forest' | 'rock' | 'ore' | 'crystal' | 'rift' | 'water';
+/** Terrenos que se esgotam (Etapa 17). */
+export type Deposit = 'forest' | 'rock' | 'ore' | 'crystal';
+export const DEPOSITS: readonly Deposit[] = ['forest', 'rock', 'ore', 'crystal'];
 
 export interface Tile {
   i: number;
@@ -22,6 +25,10 @@ export interface Tile {
   b: number;
   /** Ruína de um prédio derrubado (só enfeite). */
   ruin: boolean;
+  /** Etapa 17: quanto recurso ainda tem (floresta, rocha e veio; 0 no resto). */
+  stock: number;
+  /** O que sobrou de um recurso esgotado (só enfeite): 0 nada, 1 toras, 2 cascalho. */
+  left: number;
 }
 
 export interface Building {
@@ -52,6 +59,10 @@ export interface Building {
   moveTo: { q: number; r: number } | null;
   /** Remontando no lugar novo depois de uma mudança (obra que sobe com o prédio já pronto). */
   moved: boolean;
+  /** Etapa 17: serraria, pedreira ou mina sem nada para tirar, ou plantação colhida (parada). */
+  dry: boolean;
+  /** Etapa 17: comida que a plantação ainda dá (0 = colhida, espera replantar; 0 nos outros). */
+  harvest: number;
 }
 
 export type UnitState = 'idle' | 'walk' | 'work' | 'fight' | 'tower' | 'shelter' | 'dead';
@@ -119,6 +130,11 @@ export type SimEvent =
   | { type: 'built'; id: number }
   /** O prédio acabou de ser desmontado em (q, r) e vai ser remontado no lugar novo. */
   | { type: 'packed'; id: number; q: number; r: number }
+  /** Etapa 17: um hexágono de recurso acabou; um prédio ficou sem recurso; recurso novo brotou. */
+  | { type: 'depleted'; i: number; terrain: Deposit }
+  | { type: 'dry'; id: number }
+  | { type: 'sprout'; tiles: number[]; terrain: Deposit }
+  | { type: 'replanted'; id: number }
   | { type: 'destroyed'; id: number; kind: BuildingKind; q: number; r: number }
   | { type: 'hit'; fx: 'espada' | 'garra' | 'pancada' | 'golpe' | 'faisca' | 'cura'; x: number; z: number; dx: number; dz: number }
   | { type: 'spell'; x1: number; z1: number; x2: number; z2: number }
@@ -191,6 +207,10 @@ export interface World {
   waveMods: WaveMod[];
   /** Melhorias da forja (Etapa 5), de 0 a 3 cada. */
   forge: { armas: number; armaduras: number; flechas: number };
+  /** Etapa 17: hexágonos de cada recurso que acabaram e ainda não foram repostos. */
+  regrow: Record<Deposit, number>;
+  /** Sobe quando o terreno muda (recurso acabou ou brotou): a tela refaz o chão. */
+  land: number;
   events: SimEvent[];
 }
 
@@ -229,20 +249,45 @@ export function barnOf(w: World, b: Building): Building | null {
   return null;
 }
 
+/** Estoque cheio de um terreno (0 no que não se esgota). */
+export function fullStock(t: Terrain): number {
+  return (CONFIG.deposits.stock as Partial<Record<Terrain, number>>)[t] ?? 0;
+}
+
+/** Prédio que tira recurso do terreno (e por isso pode ficar sem). */
+export function isExtractor(kind: BuildingKind): boolean {
+  return kind === 'serraria' || kind === 'pedreira' || kind === 'mina';
+}
+
 /**
- * De que lado fica o recurso que o prédio explora: a floresta da serraria, a rocha da pedreira
- * (o primeiro vizinho que achar). Devolve a direção unitária no chão, ou null.
+ * De onde o prédio tira agora (Etapa 17): a floresta da serraria e a rocha da pedreira são o
+ * primeiro vizinho do tipo certo; a mina, o veio debaixo dela. null = esgotado (ou não extrai).
  */
-export function resourceDir(w: World, b: Building): { x: number; z: number } | null {
+export function sourceOf(w: World, b: Building): Tile | null {
+  if (b.kind === 'mina') {
+    const t = tileAt(w, b.q, b.r);
+    return t && (t.terrain === 'ore' || t.terrain === 'crystal') && t.stock > 0 ? t : null;
+  }
   const want = b.kind === 'serraria' ? 'forest' : b.kind === 'pedreira' ? 'rock' : null;
   if (!want) return null;
   for (const [dq, dr] of DIRS) {
-    if (tileAt(w, b.q + dq, b.r + dr)?.terrain !== want) continue;
-    const o = hexToWorld(dq, dr);
-    const d = Math.hypot(o.x, o.z);
-    return { x: o.x / d, z: o.z / d };
+    const t = tileAt(w, b.q + dq, b.r + dr);
+    if (t?.terrain === want && t.stock > 0) return t;
   }
   return null;
+}
+
+/**
+ * De que lado fica o recurso que o prédio explora: a floresta da serraria, a rocha da pedreira
+ * (o vizinho de onde ele tira agora). Devolve a direção unitária no chão, ou null.
+ */
+export function resourceDir(w: World, b: Building): { x: number; z: number } | null {
+  if (b.kind !== 'serraria' && b.kind !== 'pedreira') return null;
+  const t = sourceOf(w, b);
+  if (!t) return null;
+  const o = hexToWorld(t.q - b.q, t.r - b.r);
+  const d = Math.hypot(o.x, o.z);
+  return { x: o.x / d, z: o.z / d };
 }
 
 export function cropOf(w: World, b: Building): Crop {
@@ -339,11 +384,14 @@ export function addBuilding(w: World, kind: BuildingKind, q: number, r: number, 
     burn: 0,
     moveTo: null,
     moved: false,
+    dry: false,
+    harvest: kind === 'fazenda' ? CONFIG.farm.harvest : 0,
   };
   w.buildings.set(b.id, b);
   const t = tileAt(w, q, r)!;
   t.b = b.id;
   t.ruin = false;
+  t.left = 0;
   w.dirty = true;
   return b;
 }
@@ -427,7 +475,7 @@ export function createWorld(seed = 1, R = CONFIG.mapRadius): World {
   for (let q = -R; q <= R; q++)
     for (let r = -R; r <= R; r++) {
       if (!grid.has(q, r)) continue;
-      const t: Tile = { i: grid.idx(q, r), q, r, terrain: 'grass', deco: 0, b: -1, ruin: false };
+      const t: Tile = { i: grid.idx(q, r), q, r, terrain: 'grass', deco: 0, b: -1, ruin: false, stock: 0, left: 0 };
       tiles[t.i] = t;
       list.push(t);
     }
@@ -468,6 +516,8 @@ export function createWorld(seed = 1, R = CONFIG.mapRadius): World {
     report: null,
     forge: { armas: 0, armaduras: 0, flechas: 0 },
     waveMods: [],
+    regrow: { forest: 0, rock: 0, ore: 0, crystal: 0 },
+    land: 0,
     events: [],
   };
   for (const t of list) t.deco = Math.floor(w.rand() * 1000);
@@ -521,6 +571,8 @@ export function createWorld(seed = 1, R = CONFIG.mapRadius): World {
   // Ninguém nasce emparedado: as fendas e o miolo ficam livres.
   for (const i of w.rifts) for (const n of neighbors(w, tiles[i]!)) if (n.terrain !== 'grass') n.terrain = 'grass';
   for (const t of list) if (hexDist(t.q, t.r, 0, 0) <= 2) t.terrain = 'grass';
+  // Etapa 17: cada floresta, rocha e veio começa cheio.
+  for (const t of list) t.stock = fullStock(t.terrain);
 
   // Começo: castelo, duas casas e uma fazenda, quatro trabalhadores.
   const c = addBuilding(w, 'castelo', 0, 0, 1);

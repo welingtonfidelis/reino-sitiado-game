@@ -171,6 +171,28 @@ export function moveBuilding(w: World, id: number, q: number, r: number): string
   return null;
 }
 
+/** Etapa 17: replantar a plantação colhida até o fim. */
+export function replantProblem(w: World, b: Building): string | null {
+  if (b.kind !== 'fazenda') return 'Só plantação se replanta';
+  if (b.moveTo || b.moved) return 'De mudança';
+  if (b.built < 1) return 'Ainda em obra';
+  if (b.harvest > 0) return 'Ainda tem o que colher';
+  return missing(w, CONFIG.farm.replant);
+}
+
+export function replant(w: World, id: number): string | null {
+  const b = w.buildings.get(id);
+  if (!b) return 'Não existe mais';
+  const why = replantProblem(w, b);
+  if (why) return why;
+  pay(w, CONFIG.farm.replant);
+  b.harvest = CONFIG.farm.harvest;
+  b.dry = false;
+  w.dirty = true;
+  w.events.push({ type: 'replanted', id: b.id });
+  return null;
+}
+
 export function recruitProblem(w: World, b: Building): string | null {
   const kind = BUILDINGS[b.kind].recruits;
   if (!kind) return 'Este prédio não treina ninguém';

@@ -185,6 +185,27 @@ export const CONFIG = {
    * monta no outro (o tempo da obra inteira). Enquanto isso ele não funciona.
    */
   move: { pack: 0.75, packMin: 3 },
+  /**
+   * Etapa 17: recursos que acabam e reaparecem. Estoque por hexágono; cada hexágono que acaba
+   * entra na conta do tipo, e no fim da onda, quando a conta chega ao `due`, nasce uma mancha
+   * nova (tamanho entre `size`) longe do castelo, dos portais e das construções.
+   */
+  deposits: {
+    stock: { forest: 300, rock: 400, ore: 250, crystal: 120 },
+    due: { forest: 3, rock: 2, vein: 1 },
+    size: { forest: [4, 6], rock: [2, 3], veins: [1, 2] },
+    /** Distâncias em hexágonos: do castelo (mínimo), dos portais (mínimo), da borda e entre manchas. */
+    castleMin: 6,
+    riftMin: 5,
+    edge: 2,
+    spread: 3,
+    tries: 60,
+  },
+  /**
+   * Etapa 17 (pedido do usuário): a plantação também acaba. Cada uma dá `harvest` de comida e
+   * depois fica colhida, parada, até o jogador replantar pelo menu (custa `replant`).
+   */
+  farm: { harvest: 300, replant: { madeira: 10 } as Cost },
   repairShare: 0.5,
   waves: {
     first: 120,

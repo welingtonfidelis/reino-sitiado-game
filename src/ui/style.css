@@ -434,6 +434,15 @@ body {
 .rbtn.focus {
   border-color: var(--gold);
 }
+/* Etapa 17: o Mover do prédio sem recurso pulsa, chamando para a mudança. */
+.rbtn.pulse {
+  border-color: var(--gold);
+  animation: rbtn-pulse 0.9s ease-in-out infinite alternate;
+}
+@keyframes rbtn-pulse {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 0%, transparent); }
+  to { box-shadow: 0 0 16px 4px color-mix(in srgb, var(--gold) 75%, transparent); }
+}
 .rbtn:active {
   transform: scale(0.93);
 }
