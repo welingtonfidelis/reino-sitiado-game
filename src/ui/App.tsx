@@ -142,8 +142,9 @@ function Hud({ game, cam, small }: { game: Game; cam: IsoCamera; small: boolean 
   );
 }
 
-/** O ⋯: som, relatório a cada onda e o diário de avisos. */
+/** O ⋯: som, relatório a cada onda, nova partida e o diário de avisos. */
 function MoreMenu({ game, onClose }: { game: Game; onClose: () => void }) {
+  const [confirmNew, setConfirmNew] = useState(false);
   useEffect(() => {
     game.markRead();
   }, [game.log.length]);
@@ -164,6 +165,30 @@ function MoreMenu({ game, onClose }: { game: Game; onClose: () => void }) {
           <input type="checkbox" checked={game.autoReport} onChange={(e) => game.setAutoReport((e.target as HTMLInputElement).checked)} />
           Relatório a cada onda vencida
         </label>
+        {confirmNew ? (
+          <div class="more-confirm">
+            <p>Começar uma partida nova? O reino de agora (onda {game.world.wave}) se perde.</p>
+            <div class="row">
+              <button
+                class="btn danger"
+                onClick={() => {
+                  onClose();
+                  game.restart(Math.floor(Math.random() * 1e9));
+                }}
+              >
+                <Icon name="novo" /> Sim, começar de novo
+              </button>
+              <button class="btn ghost" onClick={() => setConfirmNew(false)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button class="more-row" onClick={() => setConfirmNew(true)}>
+            <Icon name="novo" />
+            Nova partida
+          </button>
+        )}
         <h3>Diário de avisos</h3>
         <ol class="diary">
           {game.log.length ? (
@@ -277,6 +302,32 @@ function count(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
+/**
+ * Como cada bênção aparece no relatório (pedido do usuário em 2026-11-07, para quem ainda não lê):
+ * um ícone do que melhora, um ícone menor do efeito, o tamanho do ganho e um nome curto.
+ */
+const BOON: Record<BlessingId, { icon: string; extra: string; amount: string; short: string }> = {
+  brasa: { icon: 'arco', extra: 'fogo', amount: '+40%', short: 'Flechas mais fortes' },
+  celeiros: { icon: 'comida', extra: 'casa', amount: '+25%', short: 'Mais comida' },
+  pedraBenta: { icon: 'muralha', extra: 'coracao', amount: '+⅓', short: 'Muralhas se curam' },
+  machados: { icon: 'madeira', extra: 'machado', amount: '+30%', short: 'Mais madeira' },
+  picaretas: { icon: 'pedra', extra: 'ferro', amount: '+30%', short: 'Mais pedra e ferro' },
+  escudos: { icon: 'escudo', extra: 'coracao', amount: '+30%', short: 'Soldados mais fortes' },
+  muralhasGrossas: { icon: 'muralha', extra: 'escudo', amount: '+40%', short: 'Muralhas mais duras' },
+  vigia: { icon: 'castelo', extra: 'arco', amount: '×2', short: 'Castelo atira mais forte' },
+  bracos: { icon: 'pessoa', extra: 'relogio', amount: '+40%', short: 'Gente chega mais rápido' },
+  coroa: { icon: 'ouro', extra: 'coroa', amount: '+30%', short: 'Mais ouro' },
+};
+/** Cor de cada tipo de bênção (a mesma no ícone, no ganho e na borda). */
+const BOON_COLOR: Record<string, string> = {
+  Defesa: '#f0a060',
+  Economia: '#8cc56a',
+  Muralhas: '#9fb4f0',
+  Tropas: '#6cc0c0',
+  Moradia: '#e0b860',
+  Ouro: '#e9b949',
+};
+
 function Report({ game }: { game: Game }) {
   const w = game.world;
   const r = w.report!;
@@ -298,18 +349,83 @@ function Report({ game }: { game: Game }) {
   return (
     <div class="overlay">
       <article class="report-card report">
-        <header>
-          <small>Relatório</small>
-          <h2>Onda {r.wave} resistida</h2>
-          <p>{r.fallen.length ? 'O castelo aguentou, mas não sem perdas.' : 'O castelo aguentou e ninguém caiu.'}</p>
+        <header class="win-head">
+          <div class="win-badge" aria-hidden="true">
+            <Icon name="coroa" />
+          </div>
+          <div class="win-title">
+            <small>Vitória!</small>
+            <h2>Onda {r.wave} vencida</h2>
+            <p>{r.fallen.length ? 'O castelo aguentou, mas não sem perdas.' : 'O castelo aguentou e ninguém caiu.'}</p>
+          </div>
+          <div class="loot" title="Prêmio em ouro">
+            <Icon name="ouro" />
+            <strong>+{r.gold}</strong>
+            <span>ouro</span>
+          </div>
         </header>
-        <div class="report-stats">
-          <div><span>Monstros abatidos</span><strong>{r.kills}</strong></div>
-          <div><span>Perdas</span><strong>{losses}</strong></div>
-          <div><span>Estragos</span><strong>{damage}</strong></div>
-          <div><span>Colheita</span><strong>+{Math.floor(r.prod.comida)} de comida</strong></div>
-          <div><span>Serraria, pedreira e mina</span><strong>{works}</strong></div>
-          <div><span>Saque da onda</span><strong style="color: var(--gold)">+{r.gold} de ouro</strong></div>
+        {needChoice ? (
+          <section class="boons" aria-label="Escolha uma bênção">
+            <h3>
+              <Icon name="estrela" /> Escolha um presente para o reino
+            </h3>
+            <div class="boon-grid">
+              {r.choices.map((id) => {
+                const b = BLESSINGS[id];
+                const look = BOON[id];
+                const color = BOON_COLOR[b.tag] ?? 'var(--gold)';
+                return (
+                  <button class={`boon${pick === id ? ' active' : ''}`} style={{ '--boon': color } as Record<string, string>} aria-pressed={pick === id} aria-label={`${b.name}: ${b.text}`} onClick={() => setPick(id)}>
+                    <span class="boon-art" aria-hidden="true">
+                      <Icon name={look.icon} />
+                      <span class="boon-extra">
+                        <Icon name={look.extra} />
+                      </span>
+                    </span>
+                    <span class="boon-amount" aria-hidden="true">
+                      <Icon name="melhorar" />
+                      {look.amount}
+                    </span>
+                    <strong>{look.short}</strong>
+                    <small>{b.name}</small>
+                    {pick === id ? (
+                      <span class="boon-check" aria-hidden="true">
+                        <Icon name="check" />
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+            <p class="boon-detail">{pick ? BLESSINGS[pick].text : 'Toque num cartão para escolher. Depois toque em Continuar.'}</p>
+          </section>
+        ) : null}
+        <div class="report-stats icons">
+          <div title="Monstros abatidos">
+            <Icon name="caveira" />
+            <strong>{r.kills}</strong>
+            <span>monstros abatidos</span>
+          </div>
+          <div title="Perdas">
+            <Icon name="pessoa" />
+            <strong>{losses}</strong>
+            <span>perdas</span>
+          </div>
+          <div title="Estragos">
+            <Icon name="muralha" />
+            <strong>{damage}</strong>
+            <span>estragos</span>
+          </div>
+          <div title="Colheita">
+            <Icon name="comida" />
+            <strong>+{Math.floor(r.prod.comida)}</strong>
+            <span>comida</span>
+          </div>
+          <div title="Serraria, pedreira e mina">
+            <Icon name="madeira" />
+            <strong>{works}</strong>
+            <span>serraria, pedreira e mina</span>
+          </div>
         </div>
         {r.fallen.length ? (
           <>
@@ -319,22 +435,6 @@ function Report({ game }: { game: Game }) {
                 <p class="epitaph">{f.text}</p>
               ))}
               {r.fallen.length > 6 ? <p class="sub">E mais {r.fallen.length - 6}.</p> : null}
-            </div>
-          </>
-        ) : null}
-        {needChoice ? (
-          <>
-            <h3>
-              Escolha uma bênção <span class="muted" style="font-family: var(--font-sans); font-size: 0.8rem">a cada 4 ondas</span>
-            </h3>
-            <div class="blessings">
-              {r.choices.map((id) => (
-                <button class={`decree${pick === id ? ' active' : ''}`} onClick={() => setPick(id)}>
-                  <strong>{BLESSINGS[id].name}</strong>
-                  <span>{BLESSINGS[id].text}</span>
-                  <em>{BLESSINGS[id].tag}</em>
-                </button>
-              ))}
             </div>
           </>
         ) : null}

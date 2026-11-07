@@ -125,21 +125,264 @@ body {
   max-height: calc(100vh - 32px);
   overflow-y: auto;
 }
-.report .blessings {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem;
-}
 .report .report-actions {
   flex-wrap: wrap;
+  /* Continuar sempre à vista no pé do relatório, mesmo no celular, sem precisar rolar. */
+  position: sticky;
+  bottom: -1.2rem;
+  margin: 0.8rem -1.15rem -1.2rem;
+  padding: 10px 1.15rem calc(12px + env(safe-area-inset-bottom));
+  background: var(--report-bg);
+  border-top: 1px solid #33291d;
 }
 .report .report-actions .btn {
   margin: 0;
 }
+
+/* Vitória (2026-11-07): coroa, prêmio em ouro grande e bênçãos em cartões com figura. */
+.report-card header.win-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.win-badge {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #6a4a1a, #2a1f10);
+  border: 2px solid var(--gold);
+  color: var(--gold);
+}
+.win-badge .ico {
+  width: 28px;
+  height: 28px;
+}
+.win-title {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.win-title small {
+  color: var(--good);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.loot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 12px;
+  border: 1px solid var(--tag-gold-line);
+  border-radius: 12px;
+  background: rgba(233, 185, 73, 0.1);
+  color: var(--gold);
+}
+.loot .ico {
+  width: 26px;
+  height: 26px;
+}
+.loot strong {
+  font-size: 1.3rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.loot span {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.boons h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 0;
+}
+.boons h3 .ico {
+  color: var(--gold);
+}
+.boon-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.boon {
+  --boon: var(--gold);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 14px 8px 12px;
+  border: 2px solid color-mix(in srgb, var(--boon) 45%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--boon) 8%, var(--panel));
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.1s, border-color 0.1s, box-shadow 0.1s;
+}
+.boon:hover {
+  border-color: var(--boon);
+}
+.boon:active {
+  transform: scale(0.97);
+}
+.boon.active {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--boon) 18%, var(--panel));
+  box-shadow: 0 0 0 3px rgba(233, 185, 73, 0.35), 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.boon-art {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--boon) 20%, transparent);
+  border: 2px solid color-mix(in srgb, var(--boon) 60%, transparent);
+  color: var(--boon);
+}
+.boon-art > .ico {
+  width: 34px;
+  height: 34px;
+  stroke-width: 2;
+}
+.boon-extra {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 2px solid var(--boon);
+  color: var(--text);
+}
+.boon-extra .ico {
+  width: 16px;
+  height: 16px;
+}
+.boon-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--boon);
+  font-variant-numeric: tabular-nums;
+}
+.boon-amount .ico {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.6;
+}
+.boon strong {
+  font-size: 0.92rem;
+  line-height: 1.2;
+  color: var(--heading);
+}
+.boon small {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.boon-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--gold);
+  color: var(--on-gold);
+}
+.boon-check .ico {
+  width: 16px;
+  height: 16px;
+  stroke-width: 3;
+}
+.boon-detail {
+  margin: 10px 0 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--stat-bg);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--status-text);
+}
+.report-stats.icons div {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+}
+.report-stats.icons .ico {
+  grid-row: span 2;
+  width: 20px;
+  height: 20px;
+  color: var(--heading);
+}
+.report-stats.icons strong {
+  font-size: 0.95rem;
+}
+.report-stats.icons span {
+  font-size: 0.7rem;
+}
 @media (max-width: 720px) {
-  .report .blessings,
   .report .report-stats {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 420px) {
+  .boon-grid {
+    gap: 6px;
+  }
+  .boon {
+    padding: 12px 4px 10px;
+  }
+  .boon-art {
+    width: 54px;
+    height: 54px;
+  }
+  .boon-art > .ico {
+    width: 28px;
+    height: 28px;
+  }
+  .boon-amount {
+    font-size: 1.15rem;
+  }
+  .boon strong {
+    font-size: 0.8rem;
+  }
+  .boon small {
+    display: none;
+  }
+  .loot {
+    padding: 4px 8px;
+  }
+  .win-badge {
+    width: 42px;
+    height: 42px;
+  }
+  .report-card h2 {
+    font-size: 1.35rem;
   }
 }
 
@@ -733,6 +976,29 @@ button.chip {
   width: 1.1rem;
   height: 1.1rem;
   accent-color: var(--gold);
+}
+.more-confirm {
+  padding: 10px;
+  border: 1px solid var(--bad);
+  border-radius: 10px;
+  background: var(--death-bg);
+}
+.more-confirm p {
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+.more-confirm .row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+.more-confirm .btn {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .more-menu h3 {
   margin: 8px 0 0;

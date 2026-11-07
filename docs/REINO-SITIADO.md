@@ -185,6 +185,14 @@ Regra do usuário: usar os efeitos do pixelfx sempre que der (https://patch-gg.g
   - "Chamar agora", com o ouro pelo tempo que sobra;
   - "Continuar", que mostra quanto falta para a onda.
 - O saque e as bênçãos ficam em `src/sim/blessings.ts`. O aviso solto de "onda resistida" saiu: o relatório faz esse papel.
+- **Mais visual (2026-11-07):** o filho do usuário, de 4 anos, joga e não entendia a escolha só com texto.
+  - O topo diz "Vitória!", com uma coroa, e o prêmio em ouro vem numa moeda grande ("+40 ouro").
+  - A escolha vem logo depois do título: "Escolha um presente para o reino".
+  - Cada bênção é um cartão com o ícone do que melhora (arco, escudo, muralha, castelo, recurso, pessoa) e um ícone menor do efeito (fogo, coração, relógio, coroa), o ganho grande na cor do tipo ("↑ +40%", "×2", "+⅓") e um nome curto ("Flechas mais fortes"); o nome oficial vem pequeno embaixo.
+  - O escolhido fica dourado com um ✓, e a frase completa aparece embaixo dos cartões.
+  - Os números da onda ganham ícones (monstros, perdas, estragos, comida, produção).
+  - Os botões ficam presos no pé do relatório, sempre à vista no celular.
+  - Visual de cada bênção em `BOON` e `BOON_COLOR` (`src/ui/App.tsx`).
 
 ## 8. Tropas e prédios novos (Etapa 5)
 
@@ -396,7 +404,7 @@ Pedido do usuário em 2026-11-06, depois das pranchetas "HUD hoje no celular" e 
 - **Onda:** número e monstros vivos; embaixo, o modificador. No calmo, "em 1:24 · chamar" (ou "Blindados · em 1:24" quando a próxima tem modificador), e tocar chama a onda.
 - **Ritmo:** pausar (vira ▶ dourado quando pausado) e um botão que alterna 1×, 2× e 3× e tira da pausa.
 - **Recursos:** uma faixa, números curtos a partir de 1.000 (1,2k, 12k). O cristal só aparece com estoque ou com uma mina no veio de cristal. As tropas saíram dali e viraram o número no Selecionar.
-- **⋯:** som, relatório a cada onda vencida e o diário de avisos (os 40 últimos, o mais novo primeiro, com a onda).
+- **⋯:** som, relatório a cada onda vencida, **Nova partida** (com confirmação, porque apaga o jogo salvo; pedido do usuário em 2026-11-07) e o diário de avisos (os 40 últimos, o mais novo primeiro, com a onda).
 - **Avisos:** no celular (largura até 599 ou altura até 499) não aparecem na tela; vão para o diário, e o ⋯ ganha um ponto vermelho. No computador continuam embaixo à esquerda, e também vão para o diário.
 - **Botões flutuantes embaixo à direita, sem fundo** (pedido do usuário, depois da primeira versão com o martelo no meio): o martelo dourado no canto (Construir, 60 px) e o Selecionar ao lado dele (52 px, com o número de tropas; só aparece com tropas), alinhados pela base e com 28 px entre eles. No computador ganham rótulo embaixo, e os avisos ficam no canto de baixo à esquerda.
 - **Construir em leque:**

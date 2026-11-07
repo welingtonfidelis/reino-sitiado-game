@@ -37,6 +37,13 @@ export const ICONS: Record<string, string> = {
   capela: 'M12 2v5M10 4h4M5 21V11l7-4 7 4v10zM10 21v-5h4v5',
   ferradura: 'M7 4v8a5 5 0 0 0 10 0V4M5 4h4M15 4h4M8 9h.01M16 9h.01M8 13h.01M16 13h.01',
   estrela: 'M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z',
+  // Relatório de vitória (bênçãos com figura) e Nova partida.
+  coracao: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z',
+  relogio: 'M12 3a9 9 0 1 0 .01 0M12 7v5l3 2',
+  coroa: 'M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5zM5 19h14',
+  pessoa: 'M12 4a3 3 0 1 0 .01 0M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6',
+  novo: 'M4 12a8 8 0 1 0 2.3-5.7M4 4v5h5',
+  check: 'M5 12l5 5 9-10',
   // Menu circular do prédio.
   recrutar: 'M9 4.5a3 3 0 1 0 0.01 0M3.5 20c0-3.3 2.4-5.5 5.5-5.5s5.5 2.2 5.5 5.5M18.5 8v6M15.5 11h6',
   recolher: 'M4 21V9l8-5 8 5v12M10 21v-5h4v5',
