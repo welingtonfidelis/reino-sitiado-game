@@ -10,6 +10,7 @@ import { IsoCamera } from './render/camera.ts';
 import { World3D } from './render/world3d.ts';
 import { FxLayer } from './render/fx.ts';
 import { Sound } from './audio/sound.ts';
+import { Music } from './audio/music.ts';
 import type { Sfx } from './audio/sound.ts';
 import { App } from './ui/App.tsx';
 
@@ -128,6 +129,9 @@ document.addEventListener('visibilitychange', () => {
 });
 
 const sound = new Sound(!game.sound);
+view.onFirework = () => sound.play('fogos');
+const music = new Music(() => sound.audio());
+game.onSticker = () => sound.play('figurinha');
 const HIT_SFX: Record<string, Sfx> = { espada: 'golpe', golpe: 'golpe', garra: 'golpe', pancada: 'golpe', cura: 'cura', faisca: 'golpe' };
 
 let seenWorld = game.world;
@@ -145,6 +149,9 @@ function frame(now: number): void {
     cam.apply();
   }
   const w = game.world;
+  view.season = game.season;
+  view.focus.x = cam.target.x;
+  view.focus.z = cam.target.z;
   if (w !== seenWorld) {
     seenWorld = w;
     view.clearChars();
@@ -158,6 +165,9 @@ function frame(now: number): void {
   view.camYaw = cam.yaw;
   view.selectedUnits = game.units;
   sound.muted = !game.sound;
+  // Música (Etapa 16): calma entre as ondas, de batalha na onda, some na derrota.
+  music.enabled = game.sound && game.music;
+  music.update(w.lost ? 'off' : w.waveState === 'calm' || !game.started ? 'calm' : 'battle');
   for (const e of game.frame) {
     if (e.type === 'shot') sound.play('arco');
     else if (e.type === 'hit') sound.play(HIT_SFX[e.fx] ?? 'golpe');
@@ -172,7 +182,9 @@ function frame(now: number): void {
   view.syncStatic(w);
   const worldDt = game.started && game.speed > 0 && !w.lost ? dt * game.speed : 0;
   // Na derrota o mundo congela, mas a queda do castelo e a poeira dela andam em tempo real.
-  const fxDt = w.lost && game.fallT >= 0 && game.fallT < FALL_TIME + 1.5 ? Math.min(dt, 0.1) : worldDt;
+  const falling = w.lost && game.fallT >= 0 && game.fallT < FALL_TIME + 1.5;
+  // Festa da vitória (Etapa 16): fogos e comemoração andam mesmo com o relatório segurando o jogo.
+  const fxDt = falling || view.partying ? Math.min(dt, 0.1) : worldDt;
   view.syncDynamic(w, game.frame, worldDt, fxDt);
   // Fantasma ao construir/mover, contorno no prédio selecionado.
   const m = game.mode;
@@ -196,6 +208,8 @@ requestAnimationFrame(frame);
 // Para testar pelo console e pelo navegador do Claude.
 Object.assign(window, {
   game,
+  music,
+  sound,
   renderer,
   view,
   cam,

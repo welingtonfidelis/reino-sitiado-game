@@ -4,7 +4,7 @@ Tower defense sem fim em 2.5D isométrico. O jogador ergue um reino em volta do 
 
 Nome provisório. Proposta visual (canvas, design system Vigília): https://claude.ai/artifact/E2kdbKNuRkqvb9bmsePrsy
 
-Repositório: https://github.com/welingtonfidelis/reino-sitiado-game (criado pelo usuário em 2026-11-06). As etapas 1 a 12 estão na `main`; cada etapa tem o seu commit ("Etapa N: …" no `git log`). O jogo é publicado no GitHub Pages a cada push na `main`: https://welingtonfidelis.github.io/reino-sitiado-game/ (`.github/workflows/pages.yml`; a build usa `--base=/reino-sitiado-game/`). Commit e push só quando o usuário pedir.
+Repositório: https://github.com/welingtonfidelis/reino-sitiado-game (criado pelo usuário em 2026-11-06). As etapas 1 a 16 estão na `main`; cada etapa tem o seu commit ("Etapa N: …" no `git log`). O jogo é publicado no GitHub Pages a cada push na `main`: https://welingtonfidelis.github.io/reino-sitiado-game/ (`.github/workflows/pages.yml`; a build usa `--base=/reino-sitiado-game/`). Commit e push só quando o usuário pedir.
 
 ## 1. Decisões
 
@@ -467,7 +467,24 @@ Pedido do usuário: um celeiro no centro, num hexágono, e as plantações em vo
 - **Robô:** quando não há vaga em volta dos celeiros, ergue outro. Com 12 mapas, 22,4 ondas em média, contra 21,3 antes; a diferença é ruído, a dificuldade não muda.
 - Código: `site: 'nearBarn'` em `src/sim/config.ts` e `placeProblem`; desenho em `world3d.ts` (`farmModel` e o celeiro no `syncStatic`).
 
-## 19. Arquitetura
+## 19. Festa, mundo vivo, estações, música e álbum (Etapa 16)
+
+Pedido do usuário em 2026-11-07, a partir de uma lista de ideias para o jogador não enjoar: a festa da vitória, o mundo vivo e o álbum de figurinhas, mais clima e estações e música ambiente. Sem esqueletos saindo do chão: todo monstro vem de outra dimensão, pelos portais.
+
+- **Festa da vitória:** ao vencer a onda, fogos estouram em volta do castelo (com som de assobio e estalo), cai confete e todo mundo que não está lutando comemora (animação Cheering). Dura 3,4 s; numa onda de chefe, 6 s, com mais fogos e mais confete. O relatório espera a festa (`PARTY_TIME`, 3,2 s) e, enquanto ele está aberto, a festa continua andando (os personagens e os efeitos usam o tempo real).
+- **Gente parada:** trabalhador sem serviço senta no chão; soldado, cavaleiro, Bárbaro e Cavaleiro Negro fazem flexões de vez em quando; os outros acenam. Cada um no seu ritmo (`idlePose` em `world3d.ts`).
+- **Bichos:** uma borboleta voando em cada plantação (fora do inverno), três pássaros cruzando o céu e um peixe pulando num lago a cada poucos segundos (no inverno, não). Tudo com folhas do pixelfx (seção 6 e `LICENSES.md`).
+- **Sombras de nuvem:** manchas escuras andando devagar pelo chão (ruído no sombreador do chão).
+- **Estações** (só no visual): mudam a cada 5 ondas. Ondas 1 a 5 primavera, 6 a 10 verão, 11 a 15 outono, 16 a 20 inverno, e de novo. Na calmaria vale a onda que vem; a troca entra depois da festa e do relatório, com um cartão grande no meio da tela (figura e nome) e um selinho da estação no canto da caveira da onda.
+  - Primavera: metade das árvores com flor rosa, grama viva, pétalas caindo; chuva em algumas ondas.
+  - Verão: verde escuro, grama mais quente, pólen no ar.
+  - Outono: copas laranja e vermelhas, grama amarelada, folhas caindo; chuva em metade das ondas (a luz cai um pouco).
+  - Inverno: neve no chão em manchas, nos telhados, nas pedras e nas copas; flocos caindo; sem borboletas nem peixes.
+  - Código: `seasonOf` em `src/sim/config.ts`; materiais, tempo e partículas em `src/render/season.ts` (as árvores ganham uma cópia do material; o resto, neve no que olha para cima).
+- **Música ambiente** (`src/audio/music.ts`), feita na hora como os sons: na calmaria, um tema calmo em dó maior (dedilhado, acordes macios e baixo, 84 bpm); na onda, um tema de batalha em lá menor com tambores (116 bpm). São 16 compassos: 8 com a melodia inteira e 8 só com umas notas soltas. Troca suave entre os dois e silêncio na derrota. Liga e desliga no ⋯ ("Música", guardado no navegador); só toca com o som ligado. Fica bem abaixo dos efeitos.
+- **Álbum de figurinhas** (`src/game/album.ts`): 25 conquistas que ficam de uma partida para outra (no navegador, `reino.album`). Cada uma é uma figura grande com cor própria; quando ganha, aparece embaixo, no meio da tela, com "Figurinha nova!" e um arpejo, e o ⋯ ganha um ponto vermelho. O álbum abre pelo ⋯ ("Álbum de figurinhas 3/25"): as ganhas coloridas (as novas brilham), as que faltam em cinza com a dica embaixo, para quem lê junto. Exemplos: 4 casas, primeira torre, torre com 4 arqueiros, 6 plantações num celeiro, as 6 plantas, castelo nível 4, 20 tropas, 1000 de ouro, primeiro herói, os 4 heróis, herói nível 5, ondas 5, 10, 20 e 30, chefe vencido, onda sem caídos, primeiro inverno, 100 e 1000 monstros.
+
+## 20. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
@@ -482,11 +499,13 @@ Pedido do usuário: um celeiro no centro, num hexágono, e as plantações em vo
   - `ground.ts`: chão contínuo. Seis triângulos por hexágono, sem fresta; a cor de cada vértice mistura os terrenos vizinhos com ruído, então não se vê ladrilho. A borda do mapa ganha uma encosta de terra, e as linhas da grade são uma malha à parte.
   - `world3d.ts`: natureza, prédios e muralhas instanciados (refeitos quando `world.ver` muda); personagens com esqueleto; flechas e barras de vida instanciadas.
   - `camera.ts`: câmera isométrica com arrastar, pinça, roda e toque.
+  - `season.ts`: estações (tom da grama e das copas, neve, sombras de nuvem) e o tempo que cai do céu (Etapa 16).
+- `src/audio/`: `sound.ts` com os efeitos sonoros e `music.ts` com a música ambiente, tudo feito na hora pelo Web Audio.
 - **Muralha:** cada trecho desenha meio muro até cada vizinho que também é muralha e um poste nas curvas e pontas. O portão segue a linha dos dois vizinhos opostos.
-- `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
+- `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. `album.ts`: as figurinhas e o que guarda no navegador. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
 - `src/ui/App.tsx`: HUD, ⋯, botões flutuantes, avisos e telas de começo e fim. O menu do prédio e o leque do Construir ficam em `src/ui/Radial.tsx` (seções 14 e 15).
 
-## 20. Etapas
+## 21. Etapas
 
 | Etapa | O que | Situação |
 | --- | --- | --- |
@@ -505,8 +524,9 @@ Pedido do usuário: um celeiro no centro, num hexágono, e as plantações em vo
 | 13 | Queda do castelo antes do diálogo de derrota (seção 16) | Pronta em 2026-11-07. Vista no navegador do Mac (tremor, meio da queda e fim); falta jogar no iPhone e ouvir o estrondo. |
 | 14 | Heróis: Bárbaro, Atiradora, Druida e Cavaleiro Negro, comprados no castelo (seção 17) | Pronta em 2026-11-07. Vista no navegador do Mac (compra, giro, os quatro modelos, submenu); falta jogar no iPhone. |
 | 15 | Fazenda com celeiro: plantações hexagonais em volta, uma planta por plantação (seção 18) | Pronta em 2026-11-07. Vista no navegador do Mac; falta jogar no iPhone. |
+| 16 | Festa da vitória, mundo vivo, estações com tempo, música ambiente e álbum de figurinhas (seção 19) | Pronta em 2026-11-07, na `main`. Vista no navegador do Mac (festa, as quatro estações, chuva, figurinha, álbum no computador e no celular); a música foi conferida por medição, falta ouvir e jogar no iPhone. |
 
-## 21. Arte e licenças
+## 22. Arte e licenças
 
 Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art` (lista em `tools/art-manifest.ts`). Detalhes em `LICENSES.md`.
 
@@ -518,7 +538,7 @@ Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art`
 | Mystery Monthly | fazendeiros, lobisomem, orc saqueador e machado, orc bruto |
 | Resource Bits | minério |
 | RPG Tools Bits | pá, machado, picareta e martelo |
-| Character Animations | todas as animações |
+| Character Animations | todas as animações (Simulation, da Etapa 16: comemorar, acenar, sentar e flexões) |
 | Heróis (Etapa 14) | Barbarian, Rogue_Hooded e Druid (Adventurers) com machado de duas mãos, besta e cajado; BlackKnight (Mystery Monthly 5) com espada e escudo |
 
 Os efeitos vêm do pixelfx (MIT); detalhes na seção 6 e em `LICENSES.md`.

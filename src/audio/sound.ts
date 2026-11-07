@@ -3,9 +3,9 @@
  * mínimo, para cem flechas por segundo não virarem um chiado. O áudio só liga depois do
  * primeiro toque (exigência do iPhone).
  */
-export type Sfx = 'arco' | 'golpe' | 'morte' | 'pronto' | 'onda' | 'vitoria' | 'castelo' | 'magia' | 'cura' | 'nivel' | 'queda';
+export type Sfx = 'arco' | 'golpe' | 'morte' | 'pronto' | 'onda' | 'vitoria' | 'castelo' | 'magia' | 'cura' | 'nivel' | 'queda' | 'fogos' | 'figurinha';
 
-const GAP: Record<Sfx, number> = { arco: 0.07, golpe: 0.09, morte: 0.08, pronto: 0.2, onda: 1, vitoria: 1, castelo: 0.4, magia: 0.12, cura: 0.3, nivel: 1, queda: 3 };
+const GAP: Record<Sfx, number> = { arco: 0.07, golpe: 0.09, morte: 0.08, pronto: 0.2, onda: 1, vitoria: 1, castelo: 0.4, magia: 0.12, cura: 0.3, nivel: 1, queda: 3, fogos: 0.12, figurinha: 0.8 };
 
 export class Sound {
   private ctx: AudioContext | null = null;
@@ -22,6 +22,12 @@ export class Sound {
     };
     addEventListener('pointerdown', wake, { passive: true });
     addEventListener('keydown', wake);
+  }
+
+  /** Contexto e saída para a música (Etapa 16); null até o navegador deixar tocar. */
+  audio(): { ctx: AudioContext; out: GainNode } | null {
+    if (!this.ctx || !this.out || this.ctx.state !== 'running') return null;
+    return { ctx: this.ctx, out: this.out };
   }
 
   private ensure(): AudioContext | null {
@@ -57,9 +63,9 @@ export class Sound {
     o.stop(t + dur + 0.02);
   }
 
-  private noise(dur: number, vol: number, filter: BiquadFilterType, f0: number, f1: number): void {
+  private noise(dur: number, vol: number, filter: BiquadFilterType, f0: number, f1: number, delay = 0): void {
     const c = this.ctx!;
-    const t = c.currentTime;
+    const t = c.currentTime + delay;
     const s = c.createBufferSource();
     s.buffer = this.noiseBuf;
     // A amostra tem 1 s: em laço, os sons longos (o castelo desabando) não acabam no meio.
@@ -119,6 +125,19 @@ export class Sound {
         this.noise(2.2, 0.45, 'lowpass', 900, 60);
         this.tone('sine', 70, 28, 1.8, 0.45);
         this.tone('sine', 55, 25, 1.2, 0.35, 1.1);
+        break;
+      case 'fogos': {
+        // Fogo de artifício: assobio subindo e estalo com chiado.
+        const f = 600 + Math.random() * 500;
+        this.tone('sine', f, f * 2.2, 0.25, 0.05);
+        this.noise(0.35, 0.22, 'bandpass', 2200, 700, 0.22);
+        this.tone('sine', 120, 50, 0.2, 0.18, 0.22);
+        break;
+      }
+      case 'figurinha':
+        // Figurinha nova: arpejo brilhante subindo e um brilho no fim.
+        [784, 988, 1175, 1568].forEach((f, i) => this.tone('triangle', f, f, 0.22, 0.1, i * 0.07));
+        this.tone('sine', 2093, 2637, 0.4, 0.05, 0.28);
         break;
       case 'nivel':
         [392, 523, 659, 784].forEach((f, i) => this.tone('triangle', f, f, 0.3, 0.12, i * 0.1));

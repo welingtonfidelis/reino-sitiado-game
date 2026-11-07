@@ -136,7 +136,7 @@ export const ART: [string, string][] = [
   [`${RB}/Iron_Nuggets.bin`, 'resource/Iron_Nuggets.bin'],
   [`${RB}/resource_bits_texture.png`, 'resource/resource_bits_texture.png'],
   // Animações (os personagens não trazem nenhuma).
-  ...['General', 'MovementBasic', 'CombatMelee', 'CombatRanged', 'Tools'].map(
+  ...['General', 'MovementBasic', 'CombatMelee', 'CombatRanged', 'Tools', 'Simulation'].map(
     (n) => [`${CA}/Rig_Medium/Rig_Medium_${n}.glb`, `anims/Rig_Medium_${n}.glb`] as [string, string],
   ),
   ...['General', 'MovementBasic', 'CombatMelee'].map(

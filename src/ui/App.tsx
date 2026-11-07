@@ -4,12 +4,13 @@
  * avisos e as telas de começo e fim.
  */
 import { useEffect, useReducer, useState } from 'preact/hooks';
-import { BUILDINGS, CONFIG, RES_ORDER, castle, castleCap, housing, troops, workers, missing, waveSize, MONSTERS, BLESSINGS, repairAllCost, modsForWave, waveSizeWithMods, WAVE_MODS, tileAt, hexToWorld } from '../sim/index.ts';
+import { SEASON_ICON, SEASON_NAME, BUILDINGS, CONFIG, RES_ORDER, castle, castleCap, housing, troops, workers, missing, waveSize, MONSTERS, BLESSINGS, repairAllCost, modsForWave, waveSizeWithMods, WAVE_MODS, tileAt, hexToWorld } from '../sim/index.ts';
 import type { BlessingId, Category, MonsterKind, Res, UnitKind } from '../sim/index.ts';
 import { FALL_TIME, Game } from '../game/game.ts';
 import type { IsoCamera } from '../render/camera.ts';
 import { Icon, RES_LABEL, costText, short } from './common.tsx';
 import { BuildFan, RadialMenu } from './Radial.tsx';
+import { STICKERS } from '../game/album.ts';
 
 
 function clock(s: number): string {
@@ -40,6 +41,7 @@ const SMALL = '(max-width: 599px), (max-height: 499px)';
  */
 function Hud({ game, cam, small }: { game: Game; cam: IsoCamera; small: boolean }) {
   const [more, setMore] = useState(false);
+  const [album, setAlbum] = useState(false);
   const w = game.world;
   const pop = workers(w);
   const room = Math.min(housing(w), castleCap(w));
@@ -75,7 +77,7 @@ function Hud({ game, cam, small }: { game: Game; cam: IsoCamera; small: boolean 
         </button>
         {calm ? (
           <button class="chip wave-chip" title="Chamar a onda agora rende ouro pelo tempo que sobrou" onClick={() => game.callWave()}>
-            <Icon name="caveira" />
+            <WaveIcon season={game.season} />
             <span class="wave-lines">
               <strong>Onda {w.wave + 1}</strong>
               {/* Com modificador, ele vai na segunda linha com o tempo (na primeira, cortava no celular). */}
@@ -84,7 +86,7 @@ function Hud({ game, cam, small }: { game: Game; cam: IsoCamera; small: boolean 
           </button>
         ) : (
           <div class="chip wave-chip attack" role="status">
-            <Icon name="caveira" />
+            <WaveIcon season={game.season} />
             <span class="wave-lines">
               <strong>
                 Onda {w.wave} · {left}
@@ -123,7 +125,7 @@ function Hud({ game, cam, small }: { game: Game; cam: IsoCamera; small: boolean 
           }}
         >
           <Icon name="mais" />
-          {small && game.unread ? <span class="dot" /> : null}
+          {(small && game.unread) || game.album.fresh.size ? <span class="dot" /> : null}
         </button>
       </div>
       {boss ? (
@@ -137,13 +139,109 @@ function Hud({ game, cam, small }: { game: Game; cam: IsoCamera; small: boolean 
           </div>
         </div>
       ) : null}
-      {more ? <MoreMenu game={game} onClose={() => setMore(false)} /> : null}
+      {more ? (
+        <MoreMenu
+          game={game}
+          onClose={() => setMore(false)}
+          onAlbum={() => {
+            setMore(false);
+            setAlbum(true);
+          }}
+        />
+      ) : null}
+      {album ? <AlbumView game={game} onClose={() => setAlbum(false)} /> : null}
+    </div>
+  );
+}
+
+/**
+ * Etapa 16: o álbum de figurinhas. Figura grande colorida quando ganha; cinza com a dica quando
+ * falta (para quem lê junto). As novas brilham até fechar o álbum.
+ */
+function AlbumView({ game, onClose }: { game: Game; onClose: () => void }) {
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    addEventListener('keydown', key);
+    return () => {
+      removeEventListener('keydown', key);
+      game.albumSeen();
+    };
+  }, []);
+  return (
+    <div class="album-backdrop" onPointerDown={onClose}>
+      <section class="panel album" role="dialog" aria-label="Álbum de figurinhas" onPointerDown={(e) => e.stopPropagation()}>
+        <header>
+          <Icon name="album" />
+          <h2>Álbum de figurinhas</h2>
+          <span class="album-count">
+            {game.album.count}/{STICKERS.length}
+          </span>
+          <button class="round" aria-label="Fechar o álbum" onClick={onClose}>
+            <Icon name="fechar" />
+          </button>
+        </header>
+        <div class="album-grid">
+          {STICKERS.map((s) => {
+            const got = !!game.album.got[s.id];
+            return (
+              <div key={s.id} class={`sticker${got ? ' got' : ''}${game.album.fresh.has(s.id) ? ' fresh' : ''}`} style={{ '--c': s.color }} title={s.hint}>
+                <span class="sticker-face">
+                  <Icon name={s.icon} />
+                </span>
+                <strong>{s.name}</strong>
+                <small>{s.hint}</small>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/** Figurinha nova: a figura grande aparece embaixo, no meio, por uns segundos. */
+function StickerPop({ game }: { game: Game }) {
+  const s = game.sticker;
+  if (!s) return null;
+  return (
+    <div class="sticker-pop" key={s.id} role="status" style={{ '--c': s.color }}>
+      <span class="sticker-face">
+        <Icon name={s.icon} />
+      </span>
+      <span class="sticker-pop-text">
+        <small>Figurinha nova!</small>
+        <strong>{s.name}</strong>
+      </span>
+    </div>
+  );
+}
+
+/** Caveira da onda com a estação de agora num selinho no canto. */
+function WaveIcon({ season }: { season: number }) {
+  return (
+    <span class="wave-ico" title={SEASON_NAME[season]}>
+      <Icon name="caveira" />
+      <span class={`season-dot s${season}`}>
+        <Icon name={SEASON_ICON[season] ?? 'flor'} />
+      </span>
+    </span>
+  );
+}
+
+/** Estação nova: figura grande no meio da tela por uns segundos (quem joga ainda não lê). */
+function SeasonCard({ season }: { season: number }) {
+  return (
+    <div class={`season-card s${season}`} role="status" aria-label={`Chegou o ${SEASON_NAME[season]}`.replace('o Primavera', 'a Primavera')}>
+      <span class="season-big">
+        <Icon name={SEASON_ICON[season] ?? 'flor'} />
+      </span>
+      <strong>{SEASON_NAME[season]}</strong>
     </div>
   );
 }
 
 /** O ⋯: som, relatório a cada onda, nova partida e o diário de avisos. */
-function MoreMenu({ game, onClose }: { game: Game; onClose: () => void }) {
+function MoreMenu({ game, onClose, onAlbum }: { game: Game; onClose: () => void; onAlbum: () => void }) {
   const [confirmNew, setConfirmNew] = useState(false);
   useEffect(() => {
     game.markRead();
@@ -157,9 +255,21 @@ function MoreMenu({ game, onClose }: { game: Game; onClose: () => void }) {
     <>
       <div class="more-backdrop" onPointerDown={onClose} />
       <section class="panel more-menu" aria-label="Opções">
+        <button class="more-row album-row" onClick={onAlbum}>
+          <Icon name="album" />
+          <span>Álbum de figurinhas</span>
+          <span class="album-count">
+            {game.album.count}/{STICKERS.length}
+          </span>
+          {game.album.fresh.size ? <span class="fresh-dot" aria-label={`${game.album.fresh.size} novas`} /> : null}
+        </button>
         <button class="more-row" onClick={() => game.setSound(!game.sound)}>
           <Icon name={game.sound ? 'som' : 'mudo'} />
           {game.sound ? 'Som ligado' : 'Som desligado'}
+        </button>
+        <button class={`more-row${game.sound ? '' : ' off'}`} disabled={!game.sound} onClick={() => game.setMusic(!game.music)}>
+          <Icon name={game.music && game.sound ? 'musica' : 'semMusica'} />
+          {game.music ? 'Música ligada' : 'Música desligada'}
         </button>
         <label class="more-row">
           <input type="checkbox" checked={game.autoReport} onChange={(e) => game.setAutoReport((e.target as HTMLInputElement).checked)} />
@@ -559,6 +669,8 @@ export function App({ game, cam, touch }: { game: Game; cam: IsoCamera; touch: b
   return (
     <>
       <Hud game={game} cam={cam} small={small} />
+      {game.seasonCard > 0 ? <SeasonCard key={game.season} season={game.season} /> : null}
+      <StickerPop game={game} />
       {small ? null : (
         <div class="toasts">
           {game.toasts.map((t) => (
@@ -600,7 +712,7 @@ export function App({ game, cam, touch }: { game: Game; cam: IsoCamera; touch: b
       {game.units.length > 0 && game.mode.kind === 'none' ? <SelectionBar game={game} touch={touch} /> : null}
       <PlaceBar game={game} touch={touch} />
       {sel && game.mode.kind === 'none' ? <RadialMenu key={sel.id} game={game} cam={cam} b={sel} touch={touch} /> : null}
-      {w.report && !w.lost ? <Report key={w.report.wave} game={game} /> : null}
+      {w.report && !w.lost && game.reportOpen ? <Report key={w.report.wave} game={game} /> : null}
       {!game.started ? <Intro game={game} /> : null}
       {w.lost && (game.fallT < 0 || game.fallT >= FALL_TIME) ? <Lost game={game} /> : null}
     </>

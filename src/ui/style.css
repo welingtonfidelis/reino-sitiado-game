@@ -1157,3 +1157,261 @@ button.chip {
   font-size: 11px;
   color: var(--muted);
 }
+
+/* Etapa 16: estação no canto da caveira da onda e o cartão grande quando ela muda. */
+.wave-ico {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.season-dot {
+  position: absolute;
+  right: -7px;
+  bottom: -6px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 1.5px rgba(20, 16, 12, 0.9);
+}
+.wave-chip .season-dot .ico {
+  width: 11px;
+  height: 11px;
+  color: #fff;
+  stroke-width: 2.4;
+}
+.s0 { --season: #e98ab4; }
+.s1 { --season: #e9b949; }
+.s2 { --season: #d9772e; }
+.s3 { --season: #8fb8e0; }
+.season-dot {
+  background: var(--season);
+}
+.season-card {
+  position: fixed;
+  left: 50%;
+  top: 34%;
+  transform: translate(-50%, -50%);
+  z-index: 30;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  animation: season-in 3.6s ease forwards;
+}
+.season-big {
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--season) 70%, #fff), var(--season));
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45), 0 0 0 4px rgba(20, 16, 12, 0.85);
+}
+.season-big .ico {
+  width: 64px;
+  height: 64px;
+  color: #fff;
+  stroke-width: 2;
+}
+.season-card strong {
+  font-family: var(--font-serif);
+  font-weight: normal;
+  font-size: 26px;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+}
+@keyframes season-in {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  20% { transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -62%) scale(0.96); }
+}
+.more-row:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Etapa 16: álbum de figurinhas (no ⋯), a figurinha nova na tela e o cartão do álbum. */
+.album-row {
+  position: relative;
+}
+.album-row > span:first-of-type {
+  flex: 1;
+}
+.album-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  font-size: 0.85rem;
+}
+.fresh-dot {
+  position: absolute;
+  left: 22px;
+  top: 8px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--bad);
+  box-shadow: 0 0 0 2px var(--panel-2);
+}
+.album-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(10, 8, 6, 0.6);
+  pointer-events: auto;
+}
+.album {
+  width: min(720px, 100%);
+  max-height: min(640px, calc(100vh - 32px));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px 14px;
+  gap: 10px;
+}
+.album header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.album header > .ico {
+  width: 26px;
+  height: 26px;
+  color: var(--gold);
+}
+.album h2 {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: normal;
+  font-size: 1.2rem;
+  color: var(--heading);
+}
+.album header .album-count {
+  font-size: 1.05rem;
+}
+.album-grid {
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+  padding: 2px;
+}
+.sticker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  padding: 10px 6px 8px;
+  border-radius: 12px;
+  border: 1.5px dashed var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+.sticker .sticker-face {
+  background: #3a342c;
+  box-shadow: none;
+}
+.sticker .sticker-face .ico {
+  color: #6c6458;
+}
+.sticker strong {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted, #a99f90);
+}
+.sticker small {
+  font-size: 0.7rem;
+  line-height: 1.2;
+  color: var(--muted, #8d8475);
+}
+.sticker.got {
+  border: 1.5px solid color-mix(in srgb, var(--c) 60%, transparent);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+}
+.sticker.got .sticker-face {
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 60%, #fff), var(--c));
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.85), 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+.sticker.got .sticker-face .ico {
+  color: #fff;
+}
+.sticker.got strong {
+  color: var(--text);
+}
+.sticker.fresh {
+  animation: sticker-glow 1.2s ease-in-out infinite alternate;
+}
+@keyframes sticker-glow {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c) 0%, transparent); }
+  to { box-shadow: 0 0 14px 2px color-mix(in srgb, var(--c) 70%, transparent); }
+}
+.sticker-face {
+  width: 58px;
+  height: 58px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.sticker-face .ico {
+  width: 32px;
+  height: 32px;
+  stroke-width: 2.2;
+}
+.sticker-pop {
+  position: fixed;
+  left: 50%;
+  bottom: 112px;
+  z-index: 35;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 18px 8px 8px;
+  border-radius: 999px;
+  background: rgba(24, 20, 16, 0.94);
+  border: 1.5px solid var(--c);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  animation: sticker-in 3.4s ease forwards;
+}
+.sticker-pop .sticker-face {
+  width: 64px;
+  height: 64px;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 60%, #fff), var(--c));
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9);
+}
+.sticker-pop .sticker-face .ico {
+  width: 38px;
+  height: 38px;
+  color: #fff;
+}
+.sticker-pop-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.sticker-pop-text small {
+  color: var(--gold);
+  font-size: 0.75rem;
+}
+.sticker-pop-text strong {
+  font-family: var(--font-serif);
+  font-weight: normal;
+  font-size: 1.2rem;
+  color: #fff;
+}
+@keyframes sticker-in {
+  0% { opacity: 0; transform: translate(-50%, 30px) scale(0.6) rotate(-8deg); }
+  10% { opacity: 1; transform: translate(-50%, 0) scale(1.08) rotate(3deg); }
+  18% { transform: translate(-50%, 0) scale(1) rotate(0); }
+  85% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, 10px) scale(0.95); }
+}

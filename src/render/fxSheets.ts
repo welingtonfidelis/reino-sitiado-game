@@ -47,6 +47,16 @@ export const FX_SHEETS = {
   pisao: { file: 'pisao.png', w: 1918, h: 84, cols: 14, cw: 137, ch: 42, frames: 22, fps: 15, loop: false, ox: 70, oy: 28 },
   /** Blessing (pixelfx `holy/blessing`). */
   bencao: { file: 'bencao.png', w: 1410, h: 125, cols: 30, cw: 47, ch: 125, frames: 30, fps: 10, loop: true, ox: 23, oy: 109 },
+  /** Firework burst (pixelfx `explosions/firework-burst`). */
+  fogos: { file: 'fogos.png', w: 1900, h: 880, cols: 10, cw: 190, ch: 220, frames: 31, fps: 10, loop: false, ox: 98, oy: 82 },
+  /** Confetti (pixelfx `ui/confetti`). */
+  confete: { file: 'confete.png', w: 1970, h: 384, cols: 10, cw: 197, ch: 96, frames: 33, fps: 10, loop: false, ox: 96, oy: 81 },
+  /** Butterfly (pixelfx `critters/butterfly`). */
+  borboleta: { file: 'borboleta.png', w: 1976, h: 148, cols: 19, cw: 104, ch: 74, frames: 32, fps: 10, loop: true, ox: 52, oy: 38 },
+  /** Bird (pixelfx `critters/bird`). */
+  passaro: { file: 'passaro.png', w: 1200, h: 39, cols: 24, cw: 50, ch: 39, frames: 24, fps: 10, loop: true, ox: 35, oy: 18 },
+  /** Splash (pixelfx `water/splash`). */
+  respingo: { file: 'respingo.png', w: 1935, h: 204, cols: 15, cw: 129, ch: 102, frames: 24, fps: 10, loop: false, ox: 68, oy: 79 },
 } as const;
 
 export type FxKey = keyof typeof FX_SHEETS;

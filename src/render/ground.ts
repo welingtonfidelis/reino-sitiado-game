@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { HEX, hexToWorld, worldToHex } from '../sim/index.ts';
 import type { Terrain, World } from '../sim/index.ts';
+import { GROUND_SEASON, SEASON_U } from './season.ts';
 
 /** Tom por cima da textura (1 = como a textura) e quanto de solo aparece em cada terreno. */
 const LOOK: Record<Terrain, { tint: [number, number, number]; soil: number }> = {
@@ -188,19 +189,23 @@ function groundMaterial(): THREE.MeshLambertMaterial {
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uGrass = { value: TEX!.grama };
     sh.uniforms.uSoil = { value: TEX!.solo };
+    sh.uniforms.uSnow = SEASON_U.uSnow;
+    sh.uniforms.uGrassTint = SEASON_U.uGrassTint;
+    sh.uniforms.uTime = SEASON_U.uTime;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float aSoil;\nvarying float vSoil;\nvarying vec2 vGround;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSoil = aSoil;\nvGround = (modelMatrix * vec4(position, 1.0)).xz;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform sampler2D uGrass;\nuniform sampler2D uSoil;\nvarying float vSoil;\nvarying vec2 vGround;')
+      .replace('#include <common>', '#include <common>\nuniform sampler2D uGrass;\nuniform sampler2D uSoil;\nvarying float vSoil;\nvarying vec2 vGround;' + GROUND_SEASON.head)
       .replace(
         '#include <map_fragment>',
         `// Grama e solo pela posição no mundo (um quadro de textura a cada 3,5 m): não segue a grade.
-        vec3 grass = texture2D(uGrass, vGround / 3.5).rgb;
+        vec3 grass = texture2D(uGrass, vGround / 3.5).rgb * uGrassTint;
         vec3 soil = texture2D(uSoil, vGround / 2.6 + 0.37).rgb;
         float s = smoothstep(0.25, 0.75, vSoil);
         diffuseColor.rgb *= mix(grass, soil, s) * 1.25;`,
-      );
+      )
+      .replace('#include <color_fragment>', '#include <color_fragment>\n' + GROUND_SEASON.body);
   };
   return m;
 }

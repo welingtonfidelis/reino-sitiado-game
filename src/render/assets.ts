@@ -143,7 +143,7 @@ const WEAPONS = {
 } as const;
 export type WeaponKey = keyof typeof WEAPONS;
 
-const ANIMS_MEDIUM = ['General', 'MovementBasic', 'CombatMelee', 'CombatRanged', 'Tools'].map((n) => `anims/Rig_Medium_${n}.glb`);
+const ANIMS_MEDIUM = ['General', 'MovementBasic', 'CombatMelee', 'CombatRanged', 'Tools', 'Simulation'].map((n) => `anims/Rig_Medium_${n}.glb`);
 const ANIMS_LARGE = ['General', 'MovementBasic', 'CombatMelee'].map((n) => `anims/Rig_Large_${n}.glb`);
 
 export interface Art {

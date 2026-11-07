@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { LARGE, cloneChar, findBone } from './assets.ts';
 import type { Art, CharKey, WeaponKey } from './assets.ts';
 
-export type Pose = 'idle' | 'walk' | 'run' | 'attack' | 'shoot' | 'aim' | 'dig' | 'chop' | 'pick' | 'cast' | 'heal' | 'repair' | 'death' | 'shoot2' | 'chop2' | 'spin';
+export type Pose = 'idle' | 'walk' | 'run' | 'attack' | 'shoot' | 'aim' | 'dig' | 'chop' | 'pick' | 'cast' | 'heal' | 'repair' | 'death' | 'shoot2' | 'chop2' | 'spin' | 'cheer' | 'wave' | 'sit' | 'pushups';
 
 const MEDIUM: Record<Pose, string> = {
   idle: 'Idle_A',
@@ -26,6 +26,11 @@ const MEDIUM: Record<Pose, string> = {
   shoot2: 'Ranged_2H_Shoot',
   chop2: 'Melee_2H_Attack_Chop',
   spin: 'Melee_2H_Attack_Spin',
+  // Etapa 16: festa da vitória e gente parada (Rig_Medium_Simulation).
+  cheer: 'Cheering',
+  wave: 'Waving',
+  sit: 'Sit_Floor_Idle',
+  pushups: 'Push_Ups',
 };
 const BIG: Record<Pose, string> = {
   idle: 'Idle_A',
@@ -44,6 +49,10 @@ const BIG: Record<Pose, string> = {
   shoot2: 'Melee_2H_Attack',
   chop2: 'Melee_2H_Attack',
   spin: 'Melee_2H_Attack',
+  cheer: 'Idle_A',
+  wave: 'Idle_A',
+  sit: 'Idle_A',
+  pushups: 'Idle_A',
 };
 
 const GEAR: Partial<Record<CharKey, { r?: WeaponKey; l?: WeaponKey }>> = {

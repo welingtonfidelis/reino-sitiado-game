@@ -253,3 +253,14 @@ export const HERO_INFO: Record<HeroKind, { short: string; special: string; text:
   druida: { short: 'Druida', special: 'Raízes', text: 'Faz raízes prenderem a horda em volta por 3 s e cura quem é do reino ali perto.' },
   cavaleiroNegro: { short: 'C. Negro', special: 'Pisão', text: 'Bate no chão: fere e atordoa todos em volta por 2 s. Dá o dobro de dano nos chefes.' },
 };
+
+/**
+ * Etapa 16: estações do ano (só no visual). Mudam a cada 5 ondas: 1 a 5 primavera, 6 a 10 verão,
+ * 11 a 15 outono, 16 a 20 inverno, e de novo. Na calmaria vale a onda que vem.
+ */
+export const SEASON_NAME = ['Primavera', 'Verão', 'Outono', 'Inverno'] as const;
+export const SEASON_ICON = ['flor', 'sol', 'folha', 'neve'] as const;
+export function seasonOf(wave: number, calm: boolean): number {
+  const n = Math.max(1, wave + (calm ? 1 : 0));
+  return Math.floor((n - 1) / 5) % 4;
+}

@@ -32,8 +32,14 @@ export const FX_SCALE: Record<FxKey, number> = {
   raizes: 0.009,
   pisao: 0.02,
   bencao: 0.012,
+  // Etapa 16: festa e mundo vivo.
+  fogos: 0.02,
+  confete: 0.028,
+  borboleta: 0.009,
+  passaro: 0.03,
+  respingo: 0.008,
 };
-const CAP: Record<FxKey, number> = { faisca: 96, pancada: 64, espada: 48, garra: 64, poof: 64, explosao: 8, fogo: 48, portal: 4, nivel: 2, moedas: 2, mana: 32, cura: 48, golpe: 32, morcego: 128, alma: 32, bloom: 24, giro: 8, chuva: 8, raizes: 24, pisao: 8, bencao: 8 };
+const CAP: Record<FxKey, number> = { faisca: 96, pancada: 64, espada: 48, garra: 64, poof: 64, explosao: 8, fogo: 48, portal: 4, nivel: 2, moedas: 2, mana: 32, cura: 48, golpe: 32, morcego: 128, alma: 32, bloom: 24, giro: 8, chuva: 8, raizes: 24, pisao: 8, bencao: 8, fogos: 16, confete: 4, borboleta: 24, passaro: 8, respingo: 6 };
 
 const VERT = /* glsl */ `
 attribute vec4 aPos;   // xyz âncora, w = escala (m por px)

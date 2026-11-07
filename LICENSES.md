@@ -22,7 +22,7 @@ copiados por `npm run art` conforme `tools/art-manifest.ts`.
 | KayKit Resource Bits 1.0 | Iron_Nuggets e a textura do pack |
 | KayKit Adventurers 2.0 (Etapa 14) | Barbarian, Rogue_Hooded, Druid; axe_2handed, crossbow_2handed, druid_staff e as texturas barbarian, rogue e druid |
 | KayKit Mystery Monthly 5 (Etapa 14) | BlackKnight, BlackKnight_Sword, BlackKnight_Shield e a textura |
-| KayKit Character Animations 1.1 | Rig_Medium (General, MovementBasic, CombatMelee, CombatRanged, Tools) e Rig_Large (General, MovementBasic, CombatMelee) |
+| KayKit Character Animations 1.1 | Rig_Medium (General, MovementBasic, CombatMelee, CombatRanged, Tools, Simulation) e Rig_Large (General, MovementBasic, CombatMelee). Da Simulation (Etapa 16): Cheering, Waving, Sit_Floor_Idle e Push_Ups |
 
 ## pixelfx (Patch e Hugo Duprez) — MIT
 
@@ -52,6 +52,11 @@ do pixelfx, https://github.com/patch-gg/pixelfx (commit a84159688af3ca37a4be05a0
 | raizes | nature/root-snare (raízes da Druida) |
 | pisao | impacts/heavy-landing (pisão do Cavaleiro Negro) |
 | bencao | holy/blessing (herói chegando ou voltando) |
+| fogos | explosions/firework-burst (festa da vitória, Etapa 16) |
+| confete | ui/confetti (festa da vitória) |
+| borboleta | critters/butterfly (borboletas nas plantações) |
+| passaro | critters/bird (pássaros cruzando o céu) |
+| respingo | water/splash (peixe pulando no lago) |
 
 Mudanças nossas: ritmo de quadros menor nos efeitos longos e o texto do "subir de nível". O código
 do pixelfx não vai no jogo nem no repositório.

@@ -48,6 +48,12 @@ const EFFECTS: { key: string; file: string; fps: number; opts?: Record<string, u
   { key: 'raizes', file: 'nature/root-snare', fps: 15 },
   { key: 'pisao', file: 'impacts/heavy-landing', fps: 15 },
   { key: 'bencao', file: 'holy/blessing', fps: 12 },
+  // Etapa 16: festa da vitória e mundo vivo (folhas grandes a poucos quadros por segundo).
+  { key: 'fogos', file: 'explosions/firework-burst', fps: 10 },
+  { key: 'confete', file: 'ui/confetti', fps: 10 },
+  { key: 'borboleta', file: 'critters/butterfly', fps: 12 },
+  { key: 'passaro', file: 'critters/bird', fps: 12 },
+  { key: 'respingo', file: 'water/splash', fps: 12 },
 ];
 
 const MAX_W = 2048;

@@ -56,6 +56,13 @@ export const ICONS: Record<string, string> = {
   voltar: 'M10 6l-6 6 6 6M4 12h16',
   fogo: 'M12 3c1 3 4.5 4.5 4.5 9a4.5 4.5 0 0 1-9 0c0-2.2 1-3.6 2.2-4.6 0 2 .8 3.1 2 3.1 0-3-1.6-4.6.3-7.5z',
   fechar: 'M6 6l12 12M18 6L6 18',
+  musica: 'M3 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0M14 16a3 3 0 1 0 6 0a3 3 0 1 0-6 0M9 18V5l11-2v13',
+  semMusica: 'M3 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0M14 16a3 3 0 1 0 6 0a3 3 0 1 0-6 0M9 18V5l11-2v13M3 3l18 18',
+  album: 'M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5zM5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3M9 7h6v5H9z',
+  // Etapa 16: estações (a folha já existia) e o álbum de figurinhas.
+  flor: 'M10 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0M9 6a3 3 0 1 0 6 0a3 3 0 1 0-6 0M9 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0M3 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0M15 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0',
+  sol: 'M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1',
+  neve: 'M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7M9.5 3.5L12 6l2.5-2.5M9.5 20.5L12 18l2.5 2.5M4 9.6l3.4 1-1-3.4M20 14.4l-3.4-1 1 3.4M4 14.4l3.4-1-1 3.4M20 9.6l-3.4 1 1-3.4',
 };
 
 export function Icon({ name, style }: { name: string; style?: string }) {

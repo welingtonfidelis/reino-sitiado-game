@@ -33,8 +33,11 @@ import {
   callArchers,
   hexToWorld,
   buyHero,
+  seasonOf,
 } from '../sim/index.ts';
 import type { BlessingId, BuildingKind, ForgeLine, HeroKind, SimEvent, World } from '../sim/index.ts';
+import { Album } from './album.ts';
+import type { Sticker } from './album.ts';
 
 export type Mode = { kind: 'none' } | { kind: 'build'; b: BuildingKind } | { kind: 'move'; id: number } | { kind: 'rally'; id: number };
 export type Tone = 'good' | 'bad' | 'warn' | 'gold' | 'info';
@@ -47,6 +50,12 @@ export interface Toast {
 
 /** Quanto dura a queda do castelo antes do diálogo de derrota (s). */
 export const FALL_TIME = 3.4;
+/** Quanto dura a festa da vitória antes do relatório (s). */
+export const PARTY_TIME = 3.2;
+/** Etapa 16: quanto tempo o cartão da estação nova fica na tela. */
+export const SEASON_CARD = 3.6;
+/** Quanto tempo a figurinha nova fica na tela. */
+export const STICKER_TIME = 3.4;
 
 export class Game {
   world: World;
@@ -71,12 +80,31 @@ export class Game {
   fallT = -1;
   /** Onde o castelo estava quando caiu (a câmera vai até lá). */
   fallAt: { x: number; z: number } | null = null;
+  /** Etapa 16: o relatório espera a festa da vitória (s até abrir; -1 sem relatório na fila). */
+  reportT = -1;
+  /** O relatório está aberto (e o jogo, parado). */
+  reportOpen = false;
+  /** Etapa 16: estação mostrada (troca depois da festa e do relatório). */
+  season = 0;
+  /** Segundos que faltam do cartão grande da estação nova (0: escondido). */
+  seasonCard = 0;
+  /** Etapa 16: álbum de figurinhas (fica entre partidas) e a figurinha nova na tela. */
+  album = new Album();
+  sticker: Sticker | null = null;
+  stickerT = 0;
+  /** Chamado a cada figurinha nova (o main toca o som). */
+  onSticker: (() => void) | null = null;
+  private stickerQueue: Sticker[] = [];
+  private albumEvents: SimEvent[] = [];
+  private albumT = 0;
   /** Eventos do último quadro (a tela usa para flechas). */
   frame: SimEvent[] = [];
   /** Abre o relatório a cada onda? Desligado, só abre quando há bênção para escolher. */
   autoReport = readPref('reino.relatorio', true);
   /** Som ligado? (preferência do navegador) */
   sound = readPref('reino.som', true);
+  /** Música ambiente ligada? (Etapa 16; só toca com o som ligado) */
+  music = readPref('reino.musica', true);
   /** Velocidade de antes do relatório (o jogo para enquanto ele está aberto). */
   private before = 1;
   private acc = 0;
@@ -106,6 +134,10 @@ export class Game {
     this.resumeSpeed = 1;
     this.fallT = -1;
     this.fallAt = null;
+    this.reportT = -1;
+    this.reportOpen = false;
+    this.season = 0;
+    this.seasonCard = 0;
     this.started = true;
     this.emit();
   }
@@ -146,6 +178,25 @@ export class Game {
       this.fallT += Math.min(dt, 0.1);
       if (before < FALL_TIME && this.fallT >= FALL_TIME) this.emit();
     }
+    if (this.reportT >= 0) {
+      this.reportT -= Math.min(dt, 0.1);
+      if (this.reportT < 0) this.openReport();
+    }
+    // Estação nova: entra depois da festa e do relatório, com o cartão grande no meio da tela.
+    const s = seasonOf(this.world.wave, this.world.waveState === 'calm');
+    if (s !== this.season && this.reportT < 0 && !this.reportOpen && !this.world.lost) {
+      this.season = s;
+      this.seasonCard = SEASON_CARD;
+      this.emit();
+    }
+    this.stepSticker(dt);
+    if (this.seasonCard > 0) {
+      this.seasonCard -= Math.min(dt, 0.1);
+      if (this.seasonCard <= 0) {
+        this.seasonCard = 0;
+        this.emit();
+      }
+    }
     if (!this.started || this.speed === 0 || this.world.lost) return;
     this.acc += Math.min(dt, 0.1) * this.speed;
     const h = 1 / CONFIG.tps;
@@ -163,6 +214,7 @@ export class Game {
       this.units = this.units.filter(alive);
       this.emit();
     }
+    this.checkAlbum(dt);
     for (const e of this.frame) {
       if (e.type === 'toast') this.toast(e.text, e.tone);
       else if (e.type === 'waveStart') this.toast(`Onda ${e.wave}: a horda saiu da fenda.`, 'bad');
@@ -176,11 +228,8 @@ export class Game {
           this.toast(`Onda ${r.wave} resistida: +${r.gold} de ouro${fallen}.`, 'gold');
           continue;
         }
-        if (this.speed > 0) this.before = this.speed;
-        this.speed = 0;
-        this.mode = { kind: 'none' };
-        this.selected = -1;
-        this.emit();
+        // Etapa 16: primeiro a festa (fogos, confete, gente comemorando), depois o relatório.
+        this.reportT = PARTY_TIME;
       }
       else if (e.type === 'destroyed' && e.id === this.selected) this.selected = -1;
       if (e.type === 'destroyed' && e.kind === 'castelo') {
@@ -238,6 +287,10 @@ export class Game {
     this.units = [];
     this.started = true;
     this.speed = w.report ? 0 : 1;
+    this.reportOpen = !!w.report;
+    this.reportT = -1;
+    this.season = seasonOf(w.wave, w.waveState === 'calm');
+    this.seasonCard = 0;
     this.emit();
     return true;
   }
@@ -428,6 +481,12 @@ export class Game {
   toggleShelter(): void {
     this.result(toggleShelter(this.world));
   }
+  setMusic(on: boolean): void {
+    this.music = on;
+    writePref('reino.musica', on);
+    this.emit();
+  }
+
   setSound(on: boolean): void {
     this.sound = on;
     writePref('reino.som', on);
@@ -441,8 +500,56 @@ export class Game {
   }
 
   /** Fecha o relatório (com a bênção escolhida, quando há escolha) e volta a andar. */
+  /** Abre o relatório da onda e para o jogo até escolher. */
+  /**
+   * Figurinhas: olha as regras a cada meio segundo, e já no quadro do fim da onda (o relatório
+   * ainda tem os caídos dela). As novas aparecem uma de cada vez, fora do relatório.
+   */
+  private checkAlbum(dt: number): void {
+    for (const e of this.frame) if (e.type === 'waveEnd' || e.type === 'heroLevel') this.albumEvents.push(e);
+    this.albumT += dt;
+    const now = this.frame.some((e) => e.type === 'waveEnd');
+    if (now || this.albumT >= 0.5) {
+      this.albumT = 0;
+      this.stickerQueue.push(...this.album.check({ w: this.world, events: this.albumEvents }));
+      this.albumEvents = [];
+    }
+  }
+
+  private stepSticker(dt: number): void {
+    if (this.sticker) {
+      this.stickerT -= Math.min(dt, 0.1);
+      if (this.stickerT > 0) return;
+      this.sticker = null;
+      this.emit();
+    }
+    if (this.reportOpen || !this.stickerQueue.length) return;
+    this.sticker = this.stickerQueue.shift()!;
+    this.stickerT = STICKER_TIME;
+    this.onSticker?.();
+    this.emit();
+  }
+
+  /** O álbum foi aberto: as novas deixam de ser novas. */
+  albumSeen(): void {
+    this.album.seen();
+    this.emit();
+  }
+
+  private openReport(): void {
+    this.reportT = -1;
+    if (!this.world.report || this.world.lost) return;
+    if (this.speed > 0) this.before = this.speed;
+    this.speed = 0;
+    this.reportOpen = true;
+    this.mode = { kind: 'none' };
+    this.selected = -1;
+    this.emit();
+  }
+
   closeReport(id: BlessingId | null, thenCall = false): void {
     if (!this.result(chooseBlessing(this.world, id))) return;
+    this.reportOpen = false;
     this.speed = this.before || 1;
     if (thenCall) this.callWave();
     this.emit();

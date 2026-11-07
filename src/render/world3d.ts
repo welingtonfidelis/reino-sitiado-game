@@ -10,6 +10,7 @@ import type { Building, BuildingKind, Crop, SimEvent, UnitKind, World } from '..
 import type { Art, CharKey, StaticKey, StaticModel } from './assets.ts';
 import { CharView } from './chars.ts';
 import { buildGround } from './ground.ts';
+import { SEASON_U, SeasonLook, Weather, leafy, snowy, weatherOf } from './season.ts';
 import type { FxLayer } from './fx.ts';
 import type { Pose } from './chars.ts';
 
@@ -141,6 +142,17 @@ const HOME: Record<BuildingKind, StaticKey> = {
 };
 
 /** Altura do topo de cada prédio (para barras e para o arqueiro na torre). */
+/**
+ * Gente parada (Etapa 16): trabalhador sem serviço senta para descansar; tropas de corpo a corpo
+ * fazem flexões de vez em quando; as outras acenam. Cada um no seu ritmo (pelo id).
+ */
+function idlePose(kind: UnitKind, id: number, t: number): Pose {
+  if (kind === 'trabalhador') return 'sit';
+  const phase = (t + id * 3.7) % 18;
+  if (kind === 'soldado' || kind === 'cavaleiro' || kind === 'barbaro' || kind === 'cavaleiroNegro') return phase < 4 ? 'pushups' : 'idle';
+  return phase < 2.5 ? 'wave' : 'idle';
+}
+
 /** Pose de luta por tipo (os heróis usam as de duas mãos). */
 const FIGHT_POSE: Partial<Record<UnitKind, Pose>> = { arqueiro: 'shoot', mago: 'cast', clerigo: 'heal', atiradora: 'shoot2', barbaro: 'chop2', druida: 'cast' };
 /** Tamanho dos golpes especiais na tela (o giro cobre o raio do golpe). */
@@ -320,6 +332,11 @@ export class World3D {
   private pitchFire = new Map<number, number[]>();
   private hemi!: THREE.HemisphereLight;
   private night = 0;
+  private weather!: Weather;
+  private look = new SeasonLook();
+  private rain = 0;
+  /** Centro da vista (o tempo cai em volta dele). */
+  readonly focus = { x: 0, z: 0 };
 
   constructor(scene: THREE.Scene, art: Art) {
     this.scene = scene;
@@ -335,6 +352,21 @@ export class World3D {
     big('catapulta', 100);
     big('pedraCerco', 40, false);
     for (const k of ['rochaA', 'rochaB', 'rochaC', 'rochaD'] as StaticKey[]) big(k, 300);
+    // Etapa 16: estações. Árvores com copa da estação (cópia do material); o resto ganha neve por cima.
+    const trees = new Set<StaticKey>(['arvoreA', 'arvoreB', 'arvoreC', 'arvoreD']);
+    const leafMats = new Map<THREE.Material, THREE.Material>();
+    for (const [k, set] of this.sets) {
+      if (k === 'flecha' || k === 'pedraCerco') continue;
+      for (const m of set.meshes) {
+        const mat = m.material as THREE.Material;
+        if (trees.has(k)) {
+          let lm = leafMats.get(mat);
+          if (!lm) leafMats.set(mat, (lm = leafy(mat)));
+          m.material = lm;
+        } else snowy(mat);
+      }
+    }
+    this.weather = new Weather(scene);
     const orbGeo = new THREE.SphereGeometry(0.11, 10, 8);
     this.orbs = new THREE.InstancedMesh(orbGeo, new THREE.MeshBasicMaterial({ color: '#b48cff' }), 64);
     this.orbs.count = 0;
@@ -436,6 +468,13 @@ export class World3D {
     this.water = water;
     this.scene.add(ground, grid);
     if (water) this.scene.add(water);
+    // Lugares onde um peixe pode pular (miolo dos lagos).
+    this.waterSpots = [];
+    for (const t of w.tiles) {
+      if (t?.terrain !== 'water') continue;
+      const p = hexToWorld(t.q, t.r);
+      this.waterSpots.push({ x: p.x, z: p.z });
+    }
     for (const m of this.rifts) this.scene.remove(m);
     this.rifts = [];
     w.rifts.forEach((i) => {
@@ -457,6 +496,7 @@ export class World3D {
       this.rifts.push(rim);
     });
     this.ver = -1;
+    this.look.snap(this.season);
   }
 
   private place(set: StaticKey, x: number, y: number, z: number, rot: number, scale = 1, id = -1, sx = scale): void {
@@ -670,11 +710,15 @@ export class World3D {
   }
 
   /** Gente, monstros, flechas e barras: a cada quadro. */
-  /** dt: tempo do mundo (zero na pausa e na derrota); fxDt: tempo dos efeitos e da queda do castelo. */
+  /** dt: tempo do mundo (zero na pausa e na derrota); fxDt: tempo dos efeitos, da queda e da festa. */
   syncDynamic(w: World, events: SimEvent[], dt: number, fxDt = dt): void {
     this.time += dt;
+    this.realTime += fxDt;
     const fx = this.fx;
     this.stepFall(fxDt);
+    this.stepParty(fxDt);
+    // Na festa, a gente comemora mesmo com o jogo parado esperando o relatório.
+    const animDt = this.partying ? fxDt : dt;
     const flip = (dx: number, dz: number) => dx * Math.cos(this.camYaw) - dz * Math.sin(this.camYaw) < 0;
     const castleAt = () => {
       for (const b of w.buildings.values()) if (b.kind === 'castelo') return hexToWorld(b.q, b.r);
@@ -706,6 +750,7 @@ export class World3D {
       } else if (e.type === 'waveEnd') {
         const p = castleAt();
         if (p) fx.play('moedas', p.x, 4.3, p.z);
+        if (p) this.startParty(p.x, p.z, e.wave % CONFIG.bossEvery === 0);
       } else if (e.type === 'upgrade') {
         const p = castleAt();
         if (p) fx.play('nivel', p.x, 0, p.z + 0.9);
@@ -723,10 +768,12 @@ export class World3D {
       else if (u.state === 'walk') pose = u.kind === 'cavaleiro' ? 'run' : 'walk';
       else if ((this.spinUntil.get(u.id) ?? 0) > this.time) pose = 'spin';
       else if (u.state === 'fight') pose = FIGHT_POSE[u.kind] ?? 'attack';
+      else if (this.partying && u.state !== 'tower' && u.state !== 'shelter') pose = 'cheer';
+      else if (u.state === 'idle') pose = idlePose(u.kind, u.id, this.realTime);
       else if (u.state === 'tower' || u.state === 'shelter') {
         // Dentro da torre (as flechas saem das janelas) ou recolhido no castelo: não aparece.
         v.root.visible = false;
-        v.update(dt);
+        v.update(animDt);
         continue;
       } else if (u.state === 'work' && u.kind === 'engenheiro') {
         pose = 'repair';
@@ -743,7 +790,7 @@ export class World3D {
       v.root.position.set(u.x, y, u.z);
       v.root.rotation.y = u.facing;
       v.play(pose);
-      v.update(dt);
+      v.update(animDt);
     }
     const bats = new Set<number>();
     for (const m of w.monsters.values()) {
@@ -893,8 +940,16 @@ export class World3D {
     // Noite sem lua (modificador de onda): a luz cai devagar e volta no fim da onda.
     const nightGoal = w.waveState !== 'calm' && w.waveMods.includes('noite') ? 1 : 0;
     this.night += (nightGoal - this.night) * Math.min(1, dt * 1.5);
-    this.sun.intensity = 1.9 * (1 - 0.65 * this.night);
-    this.hemi.intensity = 1.35 * (1 - 0.45 * this.night);
+    // Estação (Etapa 16): cores andando devagar para a nova, o tempo caindo e a chuva escurecendo.
+    this.look.update(this.season, fxDt);
+    SEASON_U.uTime.value = this.time;
+    const sky = weatherOf(this.season, w.wave, w.waveState !== 'calm', w.seed);
+    this.rain += ((sky === 'chuva' ? 1 : 0) - this.rain) * Math.min(1, fxDt * 0.8);
+    this.weather.update(sky, fxDt, this.focus.x, this.focus.z, this.pxPerMeter * Math.min(devicePixelRatio, 2));
+    const dim = (1 - 0.65 * this.night) * (1 - 0.3 * this.rain);
+    this.sun.intensity = 1.9 * this.look.sunK * dim;
+    this.sun.color.copy(this.look.sun);
+    this.hemi.intensity = 1.35 * (1 - 0.45 * this.night) * (1 - 0.15 * this.rain);
     this.hemi.color.setRGB(0.96 - 0.4 * this.night, 0.97 - 0.32 * this.night, 1);
     if (fx) {
       // Fogo nos prédios com menos da metade da vida.
@@ -943,6 +998,7 @@ export class World3D {
         const p = hexToWorld(t.q, t.r);
         this.portals.push(fx.play('portal', p.x, 0, p.z, { loop: true }));
       }
+      this.stepLife(w, fxDt);
       fx.update(fxDt, this.pxPerMeter);
     }
     // Fendas: só brilham as abertas.
@@ -969,6 +1025,109 @@ export class World3D {
   }
 
   /** Partida nova: para os laços (fogo e portais) e os efeitos em andamento. */
+  // ------------------------------------------------------------ festa e mundo vivo (Etapa 16)
+
+  /** Tempo que anda mesmo na espera do relatório: festa e ritmo da gente parada. */
+  private realTime = 0;
+  private party: { x: number; z: number; t: number; dur: number; boss: boolean; next: number } | null = null;
+  /** Cada fogo que estoura (o main toca o som). */
+  onFirework: (() => void) | null = null;
+  /** Estação de agora (0 primavera, 1 verão, 2 outono, 3 inverno). */
+  season = 0;
+
+  get partying(): boolean {
+    return !!this.party && this.party.t < this.party.dur;
+  }
+
+  /** Onda vencida: fogos e confete sobre o castelo e todo mundo comemora (mais comprido no chefe). */
+  private startParty(x: number, z: number, boss: boolean): void {
+    this.party = { x, z, t: 0, dur: boss ? 6 : 3.4, boss, next: 0.15 };
+    this.fx?.play('confete', x, 3.2, z, { scale: boss ? 1.5 : 1.1 });
+  }
+
+  private stepParty(dt: number): void {
+    const p = this.party;
+    if (!p || p.t >= p.dur) return;
+    p.t += dt;
+    p.next -= dt;
+    if (p.next > 0 || p.t > p.dur - 0.6) return;
+    p.next = p.boss ? 0.22 : 0.4;
+    const a = Math.random() * Math.PI * 2;
+    const r = 1.5 + Math.random() * 3;
+    this.fx?.play('fogos', p.x + Math.cos(a) * r, 2.5 + Math.random() * 2.5, p.z + Math.sin(a) * r * 0.6, { scale: 0.7 + Math.random() * 0.6 });
+    if (p.boss && Math.random() < 0.3) this.fx?.play('confete', p.x + (Math.random() - 0.5) * 4, 3.5, p.z, { scale: 1.2 });
+    this.onFirework?.();
+  }
+
+  private butterflies = new Map<number, number>();
+  private birds: { slot: number; x: number; z: number; vx: number; vz: number; y: number }[] = [];
+  private fishT = 2;
+  private waterSpots: { x: number; z: number }[] = [];
+
+  /**
+   * Mundo vivo: uma borboleta em cada plantação (fora do inverno), três pássaros cruzando o céu
+   * e um peixe pulando num lago de vez em quando. Nada de monstro: eles só vêm pelos portais.
+   */
+  private stepLife(w: World, dt: number): void {
+    const fx = this.fx;
+    if (!fx) return;
+    const warm = this.season !== 3;
+    const seen = new Set<number>();
+    if (warm) {
+      for (const b of w.buildings.values()) {
+        if (b.kind !== 'fazenda' || b.built < 1 || seen.size >= 24) continue;
+        seen.add(b.id);
+        const p = hexToWorld(b.q, b.r);
+        const t = this.realTime * 0.6 + b.id * 1.7;
+        const x = p.x + Math.cos(t) * 0.55 + Math.sin(t * 2.3) * 0.2;
+        const z = p.z + Math.sin(t * 0.8) * 0.5;
+        const y = 0.5 + Math.sin(t * 3) * 0.1;
+        let slot = this.butterflies.get(b.id);
+        if (slot === undefined) {
+          slot = fx.play('borboleta', x, y, z, { loop: true, flip: b.id % 2 === 0 });
+          this.butterflies.set(b.id, slot);
+        }
+        fx.move('borboleta', slot, x, y, z);
+      }
+    }
+    for (const [id, slot] of this.butterflies) {
+      if (seen.has(id)) continue;
+      fx.stop('borboleta', slot);
+      this.butterflies.delete(id);
+    }
+    // Pássaros: atravessam o mapa e somem do outro lado; outro aparece num canto qualquer.
+    const edge = 2 * w.grid.R + 6;
+    while (this.birds.length < 3) {
+      const a = Math.random() * Math.PI * 2;
+      const turn = (Math.random() - 0.5) * 0.8;
+      const vx = -Math.cos(a + turn) * 2.4;
+      const vz = -Math.sin(a + turn) * 2.4;
+      const bird = { slot: -1, x: Math.cos(a) * edge, z: Math.sin(a) * edge, vx, vz, y: 6 + Math.random() * 2 };
+      const left = vx * Math.cos(this.camYaw) - vz * Math.sin(this.camYaw) < 0;
+      bird.slot = fx.play('passaro', bird.x, bird.y, bird.z, { loop: true, flip: left });
+      this.birds.push(bird);
+    }
+    for (let i = this.birds.length - 1; i >= 0; i--) {
+      const b = this.birds[i]!;
+      b.x += b.vx * dt;
+      b.z += b.vz * dt;
+      fx.move('passaro', b.slot, b.x, b.y, b.z);
+      if (Math.hypot(b.x, b.z) > edge + 2) {
+        fx.stop('passaro', b.slot);
+        this.birds.splice(i, 1);
+      }
+    }
+    // Peixe pulando num lago (no inverno a água está fria demais).
+    this.fishT -= dt;
+    if (this.fishT <= 0) {
+      this.fishT = 3 + Math.random() * 4;
+      if (warm && this.waterSpots.length) {
+        const s = this.waterSpots[Math.floor(Math.random() * this.waterSpots.length)]!;
+        fx.play('respingo', s.x + (Math.random() - 0.5) * 0.8, 0, s.z + (Math.random() - 0.5) * 0.8, { scale: 0.8 });
+      }
+    }
+  }
+
   // ------------------------------------------------------------ queda do castelo (Etapa 13)
 
   private fall: { g: THREE.Group; x: number; z: number; t: number; puff: number; boom: number; done: boolean } | null = null;
@@ -1044,6 +1203,11 @@ export class World3D {
     this.batSlots.clear();
     this.burning.clear();
     this.portals = [];
+    this.party = null;
+    for (const i of this.butterflies.values()) this.fx.stop('borboleta', i);
+    for (const b of this.birds) this.fx.stop('passaro', b.slot);
+    this.butterflies.clear();
+    this.birds = [];
   }
 
   clearChars(): void {
