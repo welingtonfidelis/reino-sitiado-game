@@ -271,6 +271,11 @@ function MoreMenu({ game, onClose, onAlbum }: { game: Game; onClose: () => void;
           <Icon name={game.music && game.sound ? 'musica' : 'semMusica'} />
           {game.music ? 'Música ligada' : 'Música desligada'}
         </button>
+        <button class="more-row" onClick={() => game.setQuality(game.quality === 'leve' ? 'normal' : 'leve')}>
+          <Icon name={game.quality === 'leve' ? 'pena' : 'brilho'} />
+          <span>{game.quality === 'leve' ? 'Gráficos leves' : 'Gráficos normais'}</span>
+          <small class="more-hint">{game.quality === 'leve' ? 'roda melhor' : 'mais bonito'}</small>
+        </button>
         <label class="more-row">
           <input type="checkbox" checked={game.autoReport} onChange={(e) => game.setAutoReport((e.target as HTMLInputElement).checked)} />
           Relatório a cada onda vencida

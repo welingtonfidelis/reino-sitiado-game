@@ -57,6 +57,8 @@ export const ICONS: Record<string, string> = {
   fogo: 'M12 3c1 3 4.5 4.5 4.5 9a4.5 4.5 0 0 1-9 0c0-2.2 1-3.6 2.2-4.6 0 2 .8 3.1 2 3.1 0-3-1.6-4.6.3-7.5z',
   fechar: 'M6 6l12 12M18 6L6 18',
   musica: 'M3 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0M14 16a3 3 0 1 0 6 0a3 3 0 1 0-6 0M9 18V5l11-2v13',
+  brilho: 'M12 3l2 6.5L20.5 12 14 14l-2 7-2-7-6.5-2L10 9.5zM19 3v4M17 5h4',
+  pena: 'M5 19C5 11 11 5 19 5c0 8-6 14-14 14zM5 19l8-8M9.5 14.5H13M12 12V9',
   semMusica: 'M3 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0M14 16a3 3 0 1 0 6 0a3 3 0 1 0-6 0M9 18V5l11-2v13M3 3l18 18',
   album: 'M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5zM5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3M9 7h6v5H9z',
   // Etapa 16: estações (a folha já existia) e o álbum de figurinhas.

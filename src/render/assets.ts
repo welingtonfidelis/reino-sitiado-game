@@ -203,6 +203,71 @@ function lambertize(root: THREE.Object3D): void {
   });
 }
 
+/**
+ * As peças de um personagem do KayKit (corpo, cabeça, braços, pernas, chapéu...) vêm separadas,
+ * cada uma um desenho. Como todas usam o mesmo esqueleto, viram uma malha só por material:
+ * 1 ou 2 desenhos por personagem em vez de 6 a 12 (o que mais pesava no tablet).
+ */
+function mergeSkinned(root: THREE.Object3D): void {
+  root.updateMatrixWorld(true);
+  const groups = new Map<THREE.Material, THREE.SkinnedMesh[]>();
+  root.traverse((o) => {
+    if (!(o instanceof THREE.SkinnedMesh) || Array.isArray(o.material)) return;
+    const list = groups.get(o.material) ?? [];
+    list.push(o);
+    groups.set(o.material, list);
+  });
+  for (const [material, list] of groups) {
+    const first = list[0]!;
+    const bones = first.skeleton.bones;
+    // Peça com dois materiais vem num grupo à parte (Nome_1, Nome_2): vale juntar se estiver no
+    // mesmo lugar do mundo e presa do mesmo jeito ao esqueleto.
+    const same = (m: THREE.SkinnedMesh) =>
+      m.skeleton.bones.length === bones.length &&
+      m.skeleton.bones.every((b, i) => b === bones[i]) &&
+      m.bindMatrix.equals(first.bindMatrix) &&
+      m.matrixWorld.equals(first.matrixWorld);
+    if (list.length < 2 || !list.every(same)) continue;
+    const geos = list.map((m) => {
+      const src = m.geometry as THREE.BufferGeometry;
+      const g = new THREE.BufferGeometry();
+      for (const a of ['position', 'normal', 'uv']) {
+        const at = src.getAttribute(a);
+        if (at) g.setAttribute(a, at.clone());
+      }
+      // Os índices e pesos dos ossos podem vir em tipos diferentes de peça para peça.
+      const si = src.getAttribute('skinIndex');
+      const sw = src.getAttribute('skinWeight');
+      const n = src.getAttribute('position').count;
+      const idx = new Uint16Array(n * 4);
+      const wt = new Float32Array(n * 4);
+      for (let i = 0; i < n; i++) {
+        for (let c = 0; c < 4; c++) {
+          idx[i * 4 + c] = si.getComponent(i, c);
+          wt[i * 4 + c] = sw.getComponent(i, c);
+        }
+      }
+      g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4));
+      g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(wt, 4));
+      if (src.index) g.setIndex(src.index.clone());
+      return g;
+    });
+    const keys = (g: THREE.BufferGeometry) => Object.keys(g.attributes).sort().join();
+    if (!geos.every((g) => keys(g) === keys(geos[0]!))) continue;
+    const all = geos.every((g) => g.index) ? geos : geos.map((g) => (g.index ? g.toNonIndexed() : g));
+    const merged = mergeGeometries(all);
+    if (!merged) continue;
+    const mesh = new THREE.SkinnedMesh(merged, material);
+    mesh.name = first.name;
+    mesh.matrix.copy(first.matrix);
+    mesh.matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
+    first.parent!.add(mesh);
+    mesh.updateMatrixWorld(true);
+    mesh.bind(first.skeleton, first.bindMatrix);
+    for (const m of list) m.removeFromParent();
+  }
+}
+
 export async function loadArt(base: string, onProgress?: (k: number) => void): Promise<Art> {
   const manager = new THREE.LoadingManager();
   if (onProgress) manager.onProgress = (_u, done, total) => onProgress(done / total);
@@ -220,6 +285,7 @@ export async function loadArt(base: string, onProgress?: (k: number) => void): P
   const chars = {} as Art['chars'];
   for (const [k, g] of ch) {
     lambertize(g.scene);
+    mergeSkinned(g.scene);
     const box = new THREE.Box3().setFromObject(g.scene);
     chars[k] = { scene: g.scene, scale: CHAR_HEIGHT[k] / (box.max.y - box.min.y || 1) };
   }

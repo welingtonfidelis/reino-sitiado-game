@@ -11,6 +11,7 @@ import type { Art, CharKey, StaticKey, StaticModel } from './assets.ts';
 import { CharView } from './chars.ts';
 import { buildGround } from './ground.ts';
 import { SEASON_U, SeasonLook, Weather, leafy, snowy, weatherOf } from './season.ts';
+import type { QualityLook } from './quality.ts';
 import type { FxLayer } from './fx.ts';
 import type { Pose } from './chars.ts';
 
@@ -346,6 +347,19 @@ export class World3D {
   private weather!: Weather;
   private look = new SeasonLook();
   private rain = 0;
+  /** Pixels de tela por pixel CSS (o que o desenho usa de verdade). */
+  dpr = 1;
+  /** Bichinhos e sombra das nuvens (desligados nos gráficos leves). */
+  private extras = true;
+
+  /** Gráficos normais ou leves: sombra do sol, partículas, bichinhos e nuvens. */
+  setQuality(look: QualityLook): void {
+    this.sun.castShadow = look.shadows;
+    this.weather.density = look.weather;
+    this.extras = look.extras;
+    SEASON_U.uClouds.value = look.extras ? 1 : 0;
+  }
+
   /** Centro da vista (o tempo cai em volta dele). */
   readonly focus = { x: 0, z: 0 };
 
@@ -997,7 +1011,7 @@ export class World3D {
     SEASON_U.uTime.value = this.time;
     const sky = weatherOf(this.season, w.wave, w.waveState !== 'calm', w.seed);
     this.rain += ((sky === 'chuva' ? 1 : 0) - this.rain) * Math.min(1, fxDt * 0.8);
-    this.weather.update(sky, fxDt, this.focus.x, this.focus.z, this.pxPerMeter * Math.min(devicePixelRatio, 2));
+    this.weather.update(sky, fxDt, this.focus.x, this.focus.z, this.pxPerMeter * this.dpr);
     const dim = (1 - 0.65 * this.night) * (1 - 0.3 * this.rain);
     this.sun.intensity = 1.9 * this.look.sunK * dim;
     this.sun.color.copy(this.look.sun);
@@ -1123,6 +1137,14 @@ export class World3D {
   private stepLife(w: World, dt: number): void {
     const fx = this.fx;
     if (!fx) return;
+    if (!this.extras) {
+      // Gráficos leves: sem bichinhos.
+      for (const i of this.butterflies.values()) fx.stop('borboleta', i);
+      for (const b of this.birds) fx.stop('passaro', b.slot);
+      this.butterflies.clear();
+      this.birds = [];
+      return;
+    }
     const warm = this.season !== 3;
     const seen = new Set<number>();
     if (warm) {

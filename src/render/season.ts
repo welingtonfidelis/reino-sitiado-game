@@ -18,6 +18,8 @@ export const SEASON_U = {
   uLeafMix: { value: 0 },
   uLeafKeep: { value: 0.45 },
   uTime: { value: 0 },
+  /** Sombra das nuvens no chão (0 nos gráficos leves). */
+  uClouds: { value: 1 },
 };
 
 interface Look {
@@ -118,6 +120,7 @@ export const GROUND_SEASON = {
 uniform float uSnow;
 uniform vec3 uGrassTint;
 uniform float uTime;
+uniform float uClouds;
 float gHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float gNoise(vec2 p) {
   vec2 i = floor(p);
@@ -127,12 +130,16 @@ float gNoise(vec2 p) {
 }`,
   body: /* glsl */ `
   // Inverno: neve em manchas por cima da grama (o chão batido aparece mais).
-  float sn = uSnow * smoothstep(0.35, 0.6, gNoise(vGround * 0.45) * 0.6 + (1.0 - s) * 0.5);
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.88, 0.95), sn);
+  if (uSnow > 0.001) {
+    float sn = uSnow * smoothstep(0.35, 0.6, gNoise(vGround * 0.45) * 0.6 + (1.0 - s) * 0.5);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.88, 0.95), sn);
+  }
   // Sombra das nuvens passando devagar.
-  vec2 cw = vGround * 0.05 + uTime * vec2(0.025, 0.012);
-  float cl = gNoise(cw) * 0.65 + gNoise(cw * 2.3 + 4.7) * 0.35;
-  diffuseColor.rgb *= 1.0 - smoothstep(0.55, 0.75, cl) * 0.2;`,
+  if (uClouds > 0.5) {
+    vec2 cw = vGround * 0.05 + uTime * vec2(0.025, 0.012);
+    float cl = gNoise(cw) * 0.65 + gNoise(cw * 2.3 + 4.7) * 0.35;
+    diffuseColor.rgb *= 1.0 - smoothstep(0.55, 0.75, cl) * 0.2;
+  }`,
 };
 
 // ------------------------------------------------------------ o que cai do céu
@@ -200,6 +207,8 @@ export class Weather {
   private fade = 0;
   private mat: THREE.ShaderMaterial;
   private t = 0;
+  /** Fração das partículas desenhadas (menos nos gráficos leves). */
+  density = 1;
 
   constructor(scene: THREE.Scene) {
     for (let i = 0; i < N; i++) {
@@ -255,9 +264,10 @@ export class Weather {
     u.uPx!.value = px;
     u.uTime!.value = this.t;
     u.uAlpha!.value = k.alpha * this.fade;
-    this.points.geometry.setDrawRange(0, k.n);
+    const n = Math.round(k.n * this.density);
+    this.points.geometry.setDrawRange(0, n);
     const p = this.pos;
-    for (let i = 0; i < k.n; i++) {
+    for (let i = 0; i < n; i++) {
       const s = this.seed[i]!;
       const j = i * 3;
       p[j + 1]! -= k.fall * (0.75 + s * 0.5) * dt;

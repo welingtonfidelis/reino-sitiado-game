@@ -38,6 +38,8 @@ import {
 import type { BlessingId, BuildingKind, ForgeLine, HeroKind, SimEvent, World } from '../sim/index.ts';
 import { Album } from './album.ts';
 import type { Sticker } from './album.ts';
+import { readQuality, writeQuality } from '../render/quality.ts';
+import type { Quality } from '../render/quality.ts';
 
 export type Mode = { kind: 'none' } | { kind: 'build'; b: BuildingKind } | { kind: 'move'; id: number } | { kind: 'rally'; id: number };
 export type Tone = 'good' | 'bad' | 'warn' | 'gold' | 'info';
@@ -105,6 +107,8 @@ export class Game {
   sound = readPref('reino.som', true);
   /** Música ambiente ligada? (Etapa 16; só toca com o som ligado) */
   music = readPref('reino.musica', true);
+  /** Gráficos normais ou leves (tablet de entrada); guardado no navegador. */
+  quality: Quality = readQuality();
   /** Velocidade de antes do relatório (o jogo para enquanto ele está aberto). */
   private before = 1;
   private acc = 0;
@@ -484,6 +488,12 @@ export class Game {
   setMusic(on: boolean): void {
     this.music = on;
     writePref('reino.musica', on);
+    this.emit();
+  }
+
+  setQuality(q: Quality): void {
+    this.quality = q;
+    writeQuality(q);
     this.emit();
   }
 

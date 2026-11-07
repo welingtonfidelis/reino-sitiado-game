@@ -13,6 +13,8 @@ import { Sound } from './audio/sound.ts';
 import { Music } from './audio/music.ts';
 import type { Sfx } from './audio/sound.ts';
 import { App } from './ui/App.tsx';
+import { QUALITY, readQuality } from './render/quality.ts';
+import type { Quality } from './render/quality.ts';
 
 const params = new URLSearchParams(location.search);
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
@@ -29,8 +31,10 @@ render(
   ui,
 );
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: params.has('snap') });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+// Gráficos leves (tablet de entrada): o antisserrilhado só se escolhe ao abrir; o resto troca na hora.
+const startLook = QUALITY[readQuality()];
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: startLook.antialias, preserveDrawingBuffer: params.has('snap') });
+renderer.setPixelRatio(Math.min(devicePixelRatio, startLook.dpr));
 renderer.shadowMap.enabled = !params.has('semsombra');
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -136,9 +140,25 @@ const HIT_SFX: Record<string, Sfx> = { espada: 'golpe', golpe: 'golpe', garra: '
 
 let seenWorld = game.world;
 let last = performance.now();
+let quality: Quality | null = null;
+function applyQuality(q: Quality): void {
+  quality = q;
+  const look = QUALITY[q];
+  renderer.setPixelRatio(Math.min(devicePixelRatio, look.dpr));
+  resize();
+  view.dpr = renderer.getPixelRatio();
+  view.setQuality(look);
+}
 function frame(now: number): void {
+  // Nos gráficos leves, no máximo 30 quadros por segundo (a folga de 2 ms evita pular quadro à toa).
+  const cap = QUALITY[game.quality].fps;
+  if (cap && now - last < 1000 / cap - 2) {
+    requestAnimationFrame(frame);
+    return;
+  }
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
+  if (game.quality !== quality) applyQuality(game.quality);
   game.update(dt);
   // Queda do castelo (Etapa 13): a câmera vai até ele e aproxima um pouco.
   if (game.fallAt && game.fallT >= 0 && game.fallT < 1.8) {

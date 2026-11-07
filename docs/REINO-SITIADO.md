@@ -505,6 +505,19 @@ Pedidos do usuário depois de jogar:
   - Os arqueiros aparecem na plataforma, um em cada canto.
   - Atirando, viram para o monstro; sem monstro, olham para fora. Na festa, comemoram lá em cima.
   - A flecha sai de 2,0 m de altura, a altura do arqueiro.
+- **Gráficos leves** (o filho do usuário joga num tablet Samsung de entrada): opção no ⋯, "Gráficos normais" (mais bonito) ou "Gráficos leves" (roda melhor), guardada no navegador (`reino.graficos`; `src/render/quality.ts`).
+  - O leve desenha:
+    - na resolução da tela (sem o dobro das telas finas);
+    - sem sombras;
+    - com 35% da chuva, neve, pétalas e folhas;
+    - sem borboletas, pássaros, peixes nem sombra das nuvens;
+    - a 30 quadros por segundo.
+  - O antisserrilhado só muda ao abrir o jogo de novo (o WebGL não troca isso com o jogo aberto).
+  - Sem escolha guardada, um aparelho de toque que o Chrome diz ter 4 GB de memória ou menos já começa no leve. O Safari do iPhone não diz a memória, então lá começa no normal.
+  - A simulação é a mesma nos dois modos.
+- **Personagens numa peça só** (vale para os dois modos): cada personagem do KayKit vem em 6 a 12 peças (corpo, cabeça, braços, pernas, chapéu), cada uma um desenho. Ao carregar, as peças que usam o mesmo material viram uma malha só (`mergeSkinned` em `assets.ts`). São 1 ou 2 desenhos por personagem.
+  - Com 32 personagens na tela, os desenhos por quadro caíram de 403 para 164.
+  - No Mac, o leve desenha cada quadro em cerca de metade do tempo do normal.
 
 ## 20. Arquitetura
 
@@ -522,6 +535,7 @@ Pedidos do usuário depois de jogar:
   - `world3d.ts`: natureza, prédios e muralhas instanciados (refeitos quando `world.ver` muda); personagens com esqueleto; flechas e barras de vida instanciadas.
   - `camera.ts`: câmera isométrica com arrastar, pinça, roda e toque.
   - `season.ts`: estações (tom da grama e das copas, neve, sombras de nuvem) e o tempo que cai do céu (Etapa 16).
+  - `quality.ts`: gráficos normais ou leves (o que cada um liga e desliga, e o palpite pelo aparelho).
 - `src/audio/`: `sound.ts` com os efeitos sonoros e `music.ts` com a música ambiente, tudo feito na hora pelo Web Audio.
 - **Muralha:** cada trecho desenha meio muro até cada vizinho que também é muralha e um poste nas curvas e pontas. O portão segue a linha dos dois vizinhos opostos.
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. `album.ts`: as figurinhas e o que guarda no navegador. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.

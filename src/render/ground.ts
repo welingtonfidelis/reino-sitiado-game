@@ -192,6 +192,7 @@ function groundMaterial(): THREE.MeshLambertMaterial {
     sh.uniforms.uSnow = SEASON_U.uSnow;
     sh.uniforms.uGrassTint = SEASON_U.uGrassTint;
     sh.uniforms.uTime = SEASON_U.uTime;
+    sh.uniforms.uClouds = SEASON_U.uClouds;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float aSoil;\nvarying float vSoil;\nvarying vec2 vGround;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSoil = aSoil;\nvGround = (modelMatrix * vec4(position, 1.0)).xz;');

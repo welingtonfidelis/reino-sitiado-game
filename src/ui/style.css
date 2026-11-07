@@ -972,6 +972,12 @@ button.chip {
   text-align: left;
   cursor: pointer;
 }
+.more-hint {
+  margin-left: auto;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
 .more-row input {
   width: 1.1rem;
   height: 1.1rem;
