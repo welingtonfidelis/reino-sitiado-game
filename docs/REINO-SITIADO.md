@@ -525,10 +525,89 @@ Pedidos do usuário depois de jogar:
   - **Pracinha**: o canto em comum de três casas encostadas ganha um poço (no máximo um a cada 3,5 m), e as casas se afastam um pouco dele.
   - **Taverna e mercado**: um bairro (casas encostadas) de 5 casas ganha taverna na casa mais cercada, e um de 8 ganha também o mercado. O modelo troca, mas as vagas são as mesmas.
   - **Prédios de tropa também** (pedido do usuário): quartel, campo de tiro, capela, estábulo, forja e oficina entram nas ruas como as casas, com quintal e porta virada para a trilha (`LINKED` em `village.ts`). Ficam de fora os prédios de trabalho (celeiro, plantação, serraria, pedreira, mina), as torres (arqueiros, mago, catapulta), as muralhas e as armadilhas.
+- **Mudar de lugar custa tempo** (pedido do usuário). Antes o prédio pulava na hora. Agora:
+  - **Desmontar**: o prédio é desmontado onde está, em 75% do tempo da obra (no mínimo 3 s). Ele baixa dentro do andaime, levanta poeira e mostra uma barra laranja que esvazia. Os trabalhadores dele martelam, e a bandeira azul marca o lugar novo, que fica guardado (`moveTo`).
+  - **Montar**: no lugar novo ele vira obra e sobe dentro do andaime no tempo da obra inteira (`moved`), com barra dourada e os trabalhadores martelando de novo.
+  - **Enquanto isso, não funciona**: não produz, não treina, não atira, a casa não abriga. Os arqueiros descem da torre e voltam sozinhos quando ela fica pronta.
+  - **Limites**: obra nova não muda de lugar ("Espere a obra terminar"), e prédio de mudança não muda de novo. Derrubar no meio devolve só a metade. Se uma fenda abrir no lugar guardado, ele remonta onde estava.
+  - **Onde está**: `moveBuilding` em `commands.ts`; `unpack` e `construction` em `step.ts`; `moverLook` e `syncMovers` em `world3d.ts`. O salvo guarda a mudança no meio.
   - Com 32 personagens na tela, os desenhos por quadro caíram de 403 para 164.
   - No Mac, o leve desenha cada quadro em cerca de metade do tempo do normal.
 
-## 20. Arquitetura
+## 20. Proposta: recursos que acabam e reaparecem (Etapa 17)
+
+Pedido do usuário (2026-11-07): como no Age of Empires, floresta, rocha e veio se esgotam e a extração precisa mudar de lugar (a mudança custa tempo; ver os ajustes da seção 19). Como o jogo não tem fim, o recurso que acaba num lugar aparece em outro. O lugar novo nunca fica em cima de construção, nem perto demais do castelo, nem perto dos portais. **Esperando aprovação; nada disso está feito.**
+
+### O que acaba
+
+| Recurso | Fonte | Estoque inicial (por hexágono) | Quanto dura com 2 trabalhadores |
+| --- | --- | --- | --- |
+| Madeira | floresta vizinha da serraria | 300 | ~9 min por hexágono; uma serraria costuma ter 2 ou 3 vizinhos de floresta, então ~20 a 30 min |
+| Pedra | rocha vizinha da pedreira | 400 | ~20 min por hexágono |
+| Ferro | o veio debaixo da mina | 250 | ~15 min |
+| Cristal | o veio azul debaixo da mina | 120 | ~12 min |
+| Comida | plantação | não acaba (é replantada) | sem fim |
+
+Os números são para começar e se ajustam jogando. A partida de 20 ondas dura uns 30 min, então cada lugar de extração é trocado uma ou duas vezes.
+
+### Simulação
+
+- **Estoque no ladrilho**: cada ladrilho ganha `stock`, cheio na criação do mapa conforme o terreno (`CONFIG.deposits`). O salvo guarda o estoque; um salvo antigo enche pelo terreno.
+- **De onde sai**: a produção tira do ladrilho de onde o trabalhador está tirando. Na serraria e na pedreira é o vizinho do tipo certo que ainda tem estoque (o `resourceDir` passa a escolher esse, e os trabalhadores viram para ele). Na mina é o próprio veio.
+- **Quando um hexágono acaba**:
+  - floresta vira grama com toras caídas;
+  - rocha vira grama com cascalho (abre caminho: a horda e a gente passam a andar por ali);
+  - veio vira terreno comum, e a mina fica "esgotada".
+- **Prédio sem nada para tirar**: para e avisa. Os trabalhadores sentam e ficam livres para outro serviço.
+
+### Onde o recurso novo aparece
+
+**Quando:** a reposição vem no fim de cada onda, nunca no meio do ataque. Para cada tipo, se o estoque que sobra no mapa ficar abaixo de um piso, nasce uma mancha nova:
+- floresta: 4 a 6 hexágonos;
+- rocha: 2 ou 3, com 1 ou 2 veios encostados (ferro ou cristal, alternando como hoje).
+
+**Regras do lugar.** Cada hexágono da mancha precisa obedecer todas:
+1. É grama, sem prédio, sem obra, sem ruína e sem lugar guardado de mudança.
+2. Está a 1 hexágono ou mais de qualquer prédio, para não emparedar nada nem cobrir uma rua.
+3. Está a 6 hexágonos ou mais do castelo (as primeiras, da criação do mapa, ficam a 4 ou 5).
+4. Está a 5 hexágonos ou mais de cada portal, aberto ou ainda fechado.
+5. Fica longe da borda (até R − 2) e fora de água e fenda.
+6. Não tem gente nem monstro em cima (rocha não se atravessa, e ninguém fica preso).
+7. Fica a 3 hexágonos ou mais de outra mancha do mesmo tipo, para o recurso se espalhar pelo mapa.
+
+**Teste final:** a rocha nova não pode fechar caminho. Depois de pôr a mancha, cada portal ainda chega ao castelo e a gente ainda chega a todo prédio. Se não chegar, a mancha é desfeita e o sorteio tenta outro lugar. O sorteio usa `w.rand`, então a mesma semente repete o mesmo mapa.
+
+### Como a criança percebe (ícone antes de texto)
+
+- **O estoque aparece no próprio terreno**:
+  - a floresta rareia (árvore grande, depois média, depois uma só, depois toras);
+  - a rocha encolhe (rochedo, pedras, cascalho);
+  - o minério ao lado da mina diminui.
+- **Esgotado**: ícone sobre o prédio (machado, picareta ou pedra riscada) e o botão Mover pulsando no menu do prédio.
+- **Recurso novo**: as árvores brotam do chão (ou as pedras sobem) em uns 2 s, com brilho. Um balão com o ícone do recurso fica 5 s em cima, e uma nota vai para o diário.
+
+### Arte
+
+Tudo do KayKit local:
+- `log_A`, `log_B` e `Wood_Log_A`/`B` (toras);
+- `gravel` e `rubble_half` (cascalho);
+- as árvores médias e `tree_single_A`/`B` do Medieval, que já estão no projeto.
+
+### Etapas
+
+1. Estoque nos ladrilhos, esgotar e salvar, com testes.
+2. Visual do estoque (rarear e encolher) e aviso de esgotado com o Mover em destaque.
+3. Reposição no fim da onda com as regras de lugar, com testes de cada regra e do caminho.
+4. Brotar com brilho e balão de ícone. O robô de `npm run balance` aprende a mudar a extração; a meta é chegar perto da onda que chega hoje (≈ 22,8).
+5. Ajustar os números jogando (tablet e iPhone).
+
+### Decisões para o usuário
+
+- A plantação continua sem fim? (proposta: sim)
+- O recurso novo aparece sozinho no fim da onda ou precisa ser "descoberto"? (proposta: sozinho)
+- Os estoques acima (uma troca a cada 10 a 20 min) estão bons para começar?
+
+## 21. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
@@ -551,7 +630,7 @@ Pedidos do usuário depois de jogar:
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. `album.ts`: as figurinhas e o que guarda no navegador. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
 - `src/ui/App.tsx`: HUD, ⋯, botões flutuantes, avisos e telas de começo e fim. O menu do prédio e o leque do Construir ficam em `src/ui/Radial.tsx` (seções 14 e 15).
 
-## 21. Etapas
+## 22. Etapas
 
 | Etapa | O que | Situação |
 | --- | --- | --- |
@@ -571,8 +650,9 @@ Pedidos do usuário depois de jogar:
 | 14 | Heróis: Bárbaro, Atiradora, Druida e Cavaleiro Negro, comprados no castelo (seção 17) | Pronta em 2026-11-07. Vista no navegador do Mac (compra, giro, os quatro modelos, submenu); falta jogar no iPhone. |
 | 15 | Fazenda com celeiro: plantações hexagonais em volta, uma planta por plantação (seção 18) | Pronta em 2026-11-07. Vista no navegador do Mac; falta jogar no iPhone. |
 | 16 | Festa da vitória, mundo vivo, estações com tempo, música ambiente e álbum de figurinhas (seção 19) | Pronta em 2026-11-07, na `main`. Vista no navegador do Mac (festa, as quatro estações, chuva, figurinha, álbum no computador e no celular); a música foi conferida por medição, falta ouvir e jogar no iPhone. |
+| 17 | Recursos que acabam e reaparecem longe do castelo, dos portais e das construções (seção 20) | Proposta em 2026-11-07, esperando aprovação. |
 
-## 22. Arte e licenças
+## 23. Arte e licenças
 
 Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art` (lista em `tools/art-manifest.ts`). Detalhes em `LICENSES.md`.
 

@@ -45,6 +45,13 @@ export interface Building {
   rally: { x: number; z: number } | null;
   /** Fosso de piche aceso: segundos de fogo que faltam (Etapa 9). */
   burn: number;
+  /**
+   * Mudança de lugar: o destino enquanto o prédio é desmontado (o `built` desce até 0 e ele
+   * não funciona); null fora disso. O destino fica guardado até a mudança.
+   */
+  moveTo: { q: number; r: number } | null;
+  /** Remontando no lugar novo depois de uma mudança (obra que sobe com o prédio já pronto). */
+  moved: boolean;
 }
 
 export type UnitState = 'idle' | 'walk' | 'work' | 'fight' | 'tower' | 'shelter' | 'dead';
@@ -110,6 +117,8 @@ export type SimEvent =
   | { type: 'toast'; text: string; tone: 'good' | 'bad' | 'warn' | 'gold' | 'info' }
   | { type: 'shot'; x1: number; y1: number; z1: number; x2: number; y2: number; z2: number }
   | { type: 'built'; id: number }
+  /** O prédio acabou de ser desmontado em (q, r) e vai ser remontado no lugar novo. */
+  | { type: 'packed'; id: number; q: number; r: number }
   | { type: 'destroyed'; id: number; kind: BuildingKind; q: number; r: number }
   | { type: 'hit'; fx: 'espada' | 'garra' | 'pancada' | 'golpe' | 'faisca' | 'cura'; x: number; z: number; dx: number; dz: number }
   | { type: 'spell'; x1: number; z1: number; x2: number; z2: number }
@@ -328,6 +337,8 @@ export function addBuilding(w: World, kind: BuildingKind, q: number, r: number, 
     warned: false,
     rally: null,
     burn: 0,
+    moveTo: null,
+    moved: false,
   };
   w.buildings.set(b.id, b);
   const t = tileAt(w, q, r)!;

@@ -36,6 +36,9 @@ export function placeProblem(w: World, kind: BuildingKind, q: number, r: number,
     return null;
   }
   if (t.b >= 0 && t.b !== ignore) return 'Já tem algo aqui';
+  for (const o of w.buildings.values()) {
+    if (o.id !== ignore && o.moveTo && o.moveTo.q === q && o.moveTo.r === r) return 'Lugar guardado para uma mudança';
+  }
   const ns = DIRS.map(([dq, dr]) => tileAt(w, q + dq, r + dr));
   if (def.site === 'ore') return t.terrain === 'ore' || t.terrain === 'crystal' ? null : 'A mina vai em cima de um veio de ferro ou de cristal';
   if (t.terrain !== 'grass') return t.terrain === 'ore' || t.terrain === 'crystal' ? 'Veio de minério: guarde para a mina' : 'Terreno ocupado';
@@ -98,7 +101,8 @@ export function demolish(w: World, id: number): string | null {
   if (!b) return 'Não existe mais';
   const why = demolishProblem(w, b);
   if (why) return why;
-  refundTo(w, paidFor(w, b), b.built >= 1 ? CONFIG.refund : 1);
+  // Obra nova devolve tudo; prédio pronto (ou de mudança) devolve a metade.
+  refundTo(w, paidFor(w, b), b.built >= 1 || b.moveTo || b.moved ? CONFIG.refund : 1);
   if (b.kind === 'casa') w.housesBuilt = Math.max(0, w.housesBuilt - 1);
   destroyBuilding(w, b, false);
   return null;
@@ -115,6 +119,7 @@ export function repairCost(_w: World, b: Building): Cost {
 }
 
 export function repairProblem(w: World, b: Building): string | null {
+  if (b.moveTo || b.moved) return 'De mudança';
   if (b.built < 1) return 'Ainda em obra';
   if (b.hp >= b.maxHp) return 'Sem estrago';
   return missing(w, repairCost(w, b));
@@ -132,35 +137,44 @@ export function repair(w: World, id: number): string | null {
 
 export function moveProblem(w: World, b: Building): string | null {
   if (b.kind === 'castelo') return 'O castelo não sai do lugar';
+  if (b.moveTo || b.moved) return 'Já está de mudança';
+  if (b.built < 1) return 'Espere a obra terminar';
   if (w.waveState !== 'calm') return 'Só entre as ondas';
   return null;
 }
 
+/**
+ * Muda o prédio de lugar, com custo de tempo: ele é desmontado aqui (não funciona enquanto isso)
+ * e depois montado lá como obra (`unpack` e `construction` em step.ts). O lugar novo fica guardado.
+ */
 export function moveBuilding(w: World, id: number, q: number, r: number): string | null {
   const b = w.buildings.get(id);
   if (!b) return 'Não existe mais';
+  if (b.q === q && b.r === r) return 'Já está aqui';
   const why = moveProblem(w, b) ?? placeProblem(w, b.kind, q, r, b.id);
   if (why) return why;
-  tileAt(w, b.q, b.r)!.b = -1;
-  b.q = q;
-  b.r = r;
-  tileAt(w, q, r)!.b = b.id;
+  b.moveTo = { q, r };
   w.dirty = true;
-  // Quem trabalha ou guarnece vai a pé para o lugar novo.
-  for (const uid of [...b.workers, ...b.archers]) {
+  // Torre: os arqueiros descem enquanto ela é desmontada (sobem de novo quando ficar pronta).
+  for (const uid of b.archers) {
     const u = w.units.get(uid);
-    if (u) {
-      u.path = [];
-      u.goal = -1;
-      if (u.state === 'work' || u.state === 'tower') u.state = 'walk';
-    }
+    if (!u || u.state === 'dead') continue;
+    const p = hexToWorld(b.q, b.r);
+    u.tower = -1;
+    u.state = 'idle';
+    u.x = p.x + 0.5;
+    u.z = p.z + 0.5;
+    u.path = [];
+    u.goal = -1;
   }
+  b.archers = [];
   return null;
 }
 
 export function recruitProblem(w: World, b: Building): string | null {
   const kind = BUILDINGS[b.kind].recruits;
   if (!kind) return 'Este prédio não treina ninguém';
+  if (b.moveTo || b.moved) return 'De mudança';
   if (b.built < 1) return 'Ainda em obra';
   if (b.queue >= CONFIG.recruitQueue) return 'Fila cheia';
   return missing(w, UNITS[kind].cost);

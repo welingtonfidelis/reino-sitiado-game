@@ -33,6 +33,7 @@ import {
   workers,
 } from '../src/sim/index.ts';
 import { CROPS, DIRS, MONSTERS, UNITS, buyHero, cropOf, heroCost, heroOf, heroProblem } from '../src/sim/index.ts';
+import { demolish, moveBuilding, moveProblem, packTime, recruitProblem, tileAt } from '../src/sim/index.ts';
 import type { Monster, MonsterKind, World } from '../src/sim/index.ts';
 
 function run(w: World, seconds: number, stop?: (w: World) => boolean): void {
@@ -856,5 +857,98 @@ describe('fazenda em teste: celeiro e plantações em volta', () => {
     const farms = [...w.buildings.values()].filter((b) => b.kind === 'fazenda').sort((a, b) => a.id - b.id);
     expect(farms.length).toBeGreaterThanOrEqual(3);
     expect(farms.map((f) => cropOf(w, f))).toEqual(CROPS.slice(0, farms.length));
+  });
+});
+
+describe('mudar prédio de lugar custa tempo', () => {
+  it('desmonta no lugar, guarda o destino e monta no outro', () => {
+    const w = createWorld(41);
+    calm(w);
+    const [a, d] = freeGrass(w, 2, 3, 6);
+    const b = addBuilding(w, 'quartel', a!.q, a!.r, 1);
+    expect(moveBuilding(w, b.id, a!.q, a!.r)).toBe('Já está aqui');
+    expect(moveBuilding(w, b.id, d!.q, d!.r)).toBeNull();
+    // Ainda no lugar, desmontando: não treina e o destino fica guardado.
+    expect([b.q, b.r]).toEqual([a!.q, a!.r]);
+    expect(placeProblem(w, 'casa', d!.q, d!.r)).toBe('Lugar guardado para uma mudança');
+    expect(recruitProblem(w, b)).toBe('De mudança');
+    expect(moveProblem(w, b)).toBe('Já está de mudança');
+    const pack = packTime('quartel');
+    expect(pack).toBeCloseTo(BUILDINGS.quartel.build * CONFIG.move.pack);
+    run(w, pack / 2);
+    expect(b.built).toBeGreaterThan(0.3);
+    expect(b.built).toBeLessThan(0.7);
+    expect([b.q, b.r]).toEqual([a!.q, a!.r]);
+    // Desmontado: passa para o lugar novo como obra.
+    run(w, pack / 2 + 0.2);
+    expect([b.q, b.r]).toEqual([d!.q, d!.r]);
+    expect(b.moved).toBe(true);
+    expect(b.built).toBeLessThan(0.1);
+    expect(tileAt(w, a!.q, a!.r)!.b).toBe(-1);
+    expect(tileAt(w, d!.q, d!.r)!.b).toBe(b.id);
+    expect(recruitProblem(w, b)).toBe('De mudança');
+    // Montado: volta a funcionar.
+    run(w, BUILDINGS.quartel.build + 0.2);
+    expect(b.built).toBe(1);
+    expect(b.moved).toBe(false);
+    expect(moveProblem(w, b)).toBeNull();
+  });
+
+  it('obra não muda de lugar e a casa para de abrigar durante a mudança', () => {
+    const w = createWorld(42);
+    calm(w);
+    const [a, d, e] = freeGrass(w, 3, 3, 6);
+    const obra = addBuilding(w, 'casa', a!.q, a!.r, 0.5);
+    expect(moveProblem(w, obra)).toBe('Espere a obra terminar');
+    const casa = addBuilding(w, 'casa', d!.q, d!.r, 1);
+    const before = housing(w);
+    expect(moveBuilding(w, casa.id, e!.q, e!.r)).toBeNull();
+    run(w, 0.5);
+    expect(housing(w)).toBe(before - 4);
+  });
+
+  it('torre de mudança: os arqueiros descem', () => {
+    const w = createWorld(43);
+    calm(w);
+    const [a, d] = freeGrass(w, 2, 3, 6);
+    const t = addBuilding(w, 'torre', a!.q, a!.r, 1);
+    const p = hexToWorld(a!.q, a!.r);
+    const u = addUnit(w, 'arqueiro', p.x, p.z);
+    u.tower = t.id;
+    u.state = 'tower';
+    t.archers.push(u.id);
+    expect(moveBuilding(w, t.id, d!.q, d!.r)).toBeNull();
+    expect(t.archers).toEqual([]);
+    expect(u.tower).toBe(-1);
+    expect(u.state).not.toBe('tower');
+  });
+
+  it('derrubar no meio da mudança devolve só a metade', () => {
+    const w = createWorld(44);
+    calm(w);
+    const [a, d] = freeGrass(w, 2, 3, 6);
+    const b = addBuilding(w, 'quartel', a!.q, a!.r, 1);
+    expect(moveBuilding(w, b.id, d!.q, d!.r)).toBeNull();
+    run(w, 1);
+    const wood = w.res.madeira;
+    expect(demolish(w, b.id)).toBeNull();
+    expect(w.res.madeira - wood).toBe(Math.floor(BUILDINGS.quartel.cost.madeira! * CONFIG.refund));
+    // O lugar guardado fica livre de novo.
+    expect(placeProblem(w, 'casa', d!.q, d!.r)).toBeNull();
+  });
+
+  it('salvo no meio da mudança continua a mudança', () => {
+    const w = createWorld(45);
+    calm(w);
+    const [a, d] = freeGrass(w, 2, 3, 6);
+    const b = addBuilding(w, 'quartel', a!.q, a!.r, 1);
+    expect(moveBuilding(w, b.id, d!.q, d!.r)).toBeNull();
+    run(w, 1);
+    const w2 = loadWorld(saveWorld(w))!;
+    const b2 = w2.buildings.get(b.id)!;
+    expect(b2.moveTo).toEqual({ q: d!.q, r: d!.r });
+    run(w2, packTime('quartel') + BUILDINGS.quartel.build + 0.5);
+    expect([b2.q, b2.r]).toEqual([d!.q, d!.r]);
+    expect(b2.built).toBe(1);
   });
 });

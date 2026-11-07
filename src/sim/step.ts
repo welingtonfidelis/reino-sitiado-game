@@ -3,7 +3,7 @@
  * ondas, horda, tropas e defesas. Os eventos vão para `w.events`; quem chama esvazia.
  */
 import { BUILDINGS, CONFIG, MONSTERS, UNITS, isHero } from './config.ts';
-import type { HeroKind, MonsterKind, UnitKind } from './config.ts';
+import type { BuildingKind, HeroKind, MonsterKind, UnitKind } from './config.ts';
 import { hexDist, hexToWorld, worldToHex } from './hex.ts';
 import { allyPath, computeFlow, computeReach } from './path.ts';
 import { BLESSING_EVERY, BLESSING_IDS, emptyStats, epitaph } from './blessings.ts';
@@ -96,14 +96,57 @@ function damageBuilding(w: World, b: Building, dmg: number): void {
   if (b.hp <= 0) destroyBuilding(w, b, true);
 }
 
+/** Segundos para desmontar o prédio numa mudança. */
+export function packTime(kind: BuildingKind): number {
+  return Math.max(CONFIG.move.packMin, BUILDINGS[kind].build * CONFIG.move.pack);
+}
+
 function construction(w: World): void {
   for (const b of w.buildings.values()) {
+    if (b.moveTo) {
+      unpack(w, b);
+      continue;
+    }
     if (b.built >= 1) continue;
     b.built = Math.min(1, b.built + DT / BUILDINGS[b.kind].build);
     if (b.built >= 1) {
+      b.moved = false;
       w.dirty = true;
       w.events.push({ type: 'built', id: b.id });
     }
+  }
+}
+
+/**
+ * Mudança, primeira parte: desmonta no lugar. Quando acaba, o prédio passa para o lugar novo
+ * como obra (`moved`), que a construção monta de novo. Se o lugar novo não serve mais (abriu
+ * uma fenda ali), remonta no mesmo lugar.
+ */
+function unpack(w: World, b: Building): void {
+  b.built = Math.max(0, b.built - DT / packTime(b.kind));
+  if (b.built > 0) return;
+  const to = b.moveTo!;
+  b.moveTo = null;
+  b.moved = true;
+  w.dirty = true;
+  w.events.push({ type: 'packed', id: b.id, q: b.q, r: b.r });
+  const dest = tileAt(w, to.q, to.r);
+  if (!dest || dest.terrain === 'rift' || (dest.b >= 0 && dest.b !== b.id)) {
+    toast(w, `${BUILDINGS[b.kind].name}: o lugar novo ficou ruim, remontando aqui mesmo.`, 'warn');
+    return;
+  }
+  tileAt(w, b.q, b.r)!.b = -1;
+  b.q = to.q;
+  b.r = to.r;
+  dest.b = b.id;
+  dest.ruin = false;
+  // Quem trabalha ali vai a pé para o lugar novo.
+  for (const id of b.workers) {
+    const u = w.units.get(id);
+    if (!u || u.state === 'dead') continue;
+    u.path = [];
+    u.goal = -1;
+    if (u.state === 'work') u.state = 'walk';
   }
 }
 

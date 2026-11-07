@@ -7,10 +7,11 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { BUILDINGS, CONFIG, CROPS, DIRS, HEX, cropOf, hexToWorld, isHero, openRifts, resourceDir, tileAt } from '../sim/index.ts';
 import type { Building, BuildingKind, Crop, SimEvent, UnitKind, World } from '../sim/index.ts';
-import type { Art, CharKey, StaticKey, StaticModel } from './assets.ts';
+import type { Art, CharKey, StaticKey, StaticModel, StaticPart } from './assets.ts';
 import { CharView } from './chars.ts';
 import { buildGround, paintVillage } from './ground.ts';
 import { planVillage } from './village.ts';
+import type { Home } from './village.ts';
 import { SEASON_U, SeasonLook, Weather, leafy, snowy, weatherOf } from './season.ts';
 import type { QualityLook } from './quality.ts';
 import type { FxLayer } from './fx.ts';
@@ -153,6 +154,19 @@ function idlePose(kind: UnitKind, id: number, t: number): Pose {
   const phase = (t + id * 3.7) % 18;
   if (kind === 'soldado' || kind === 'cavaleiro' || kind === 'barbaro' || kind === 'cavaleiroNegro') return phase < 4 ? 'pushups' : 'idle';
   return phase < 2.5 ? 'wave' : 'idle';
+}
+
+/** Plantação: ângulo das fileiras, apontando para o celeiro vizinho. */
+function farmAngle(w: World, b: Building): number {
+  const p = hexToWorld(b.q, b.r);
+  for (const [dq, dr] of DIRS) {
+    const n = tileAt(w, b.q + dq, b.r + dr);
+    const nb = n && n.b >= 0 ? w.buildings.get(n.b) : undefined;
+    if (nb?.kind !== 'celeiro') continue;
+    const c = hexToWorld(nb.q, nb.r);
+    return Math.atan2(c.z - p.z, c.x - p.x);
+  }
+  return 0;
 }
 
 /** Pose de luta por tipo (os heróis usam as de duas mãos). */
@@ -301,6 +315,16 @@ export class World3D {
   private art: Art;
   private sets = new Map<StaticKey, Instanced>();
   private ver = -1;
+  /**
+   * Prédios de mudança (desmontando ou remontando): o que desenhar e onde, montado no syncStatic.
+   * O desenho em si vai a cada quadro (o prédio baixa ou sobe dentro do andaime).
+   */
+  private movers = new Map<number, { parts: StaticPart[]; x: number; z: number; rot: number; scale: number }>();
+  private moverMeshes = new Map<number, THREE.Group>();
+  private moverDust = new Map<number, number>();
+  /** Muralha de mudança: o pedaço é refeito no syncStatic, então ele roda de tempos em tempos. */
+  private wallsMoving = false;
+  private wallSync = 0;
   private chars = new Map<number, CharView>();
   private flights: Flight[] = [];
   private bars: Bars;
@@ -584,9 +608,26 @@ export class World3D {
     const village = planVillage(w);
     for (const v of village.pieces) this.place(v.key, v.x, 0, v.z, v.rot, v.scale, v.id);
     paintVillage(village.yards, village.trails);
+    this.movers.clear();
+    this.wallsMoving = false;
     for (const b of w.buildings.values()) {
       const p = hexToWorld(b.q, b.r);
       const home = village.homes.get(b.id);
+      // Mudança: andaime aqui e bandeira no lugar guardado; o prédio vai a cada quadro (syncDynamic).
+      if (b.moveTo || (b.moved && b.built < 1)) {
+        if (b.moveTo) {
+          const d = hexToWorld(b.moveTo.q, b.moveTo.r);
+          this.place('bandeira', d.x, 0, d.z, 0, 1.8);
+        }
+        if (b.kind === 'muralha' || b.kind === 'portao') {
+          this.wallsMoving = true;
+          this.wallPiece(w, b, p.x, p.z);
+          continue;
+        }
+        this.place('obra', p.x, 0, p.z, 0, 0.85, b.id);
+        this.movers.set(b.id, this.moverLook(w, b, home));
+        continue;
+      }
       if (home) {
         this.place(home.model, home.x, 0, home.z, home.rot, home.scale, b.id);
         continue;
@@ -610,16 +651,7 @@ export class World3D {
       }
       if (b.kind === 'fazenda') {
         // Plantação no hexágono, com as fileiras apontando para o celeiro vizinho.
-        let ang = 0;
-        for (const [dq, dr] of DIRS) {
-          const n = tileAt(w, b.q + dq, b.r + dr);
-          const nb = n && n.b >= 0 ? w.buildings.get(n.b) : undefined;
-          if (nb?.kind !== 'celeiro') continue;
-          const c = hexToWorld(nb.q, nb.r);
-          ang = Math.atan2(c.z - p.z, c.x - p.x);
-          break;
-        }
-        this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -ang);
+        this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -farmAngle(w, b));
         this.tmp.compose(this.p.set(p.x, 0, p.z), this.q, this.s.setScalar(1));
         this.farms.get(cropOf(w, b))!.push(this.tmp, b.id);
         continue;
@@ -653,6 +685,59 @@ export class World3D {
     for (const f of this.farms.values()) f.end();
     this.pitch.end();
     this.spikes.end();
+  }
+
+  /** O que desenhar de um prédio de mudança: o modelo principal, sem os enfeites em volta. */
+  private moverLook(w: World, b: Building, home: Home | undefined): { parts: StaticPart[]; x: number; z: number; rot: number; scale: number } {
+    const p = hexToWorld(b.q, b.r);
+    const fromSet = (set: Instanced): StaticPart[] => set.meshes.map((m) => ({ geometry: m.geometry, material: m.material as THREE.Material }));
+    if (home) return { parts: this.art.statics[home.model].parts, x: home.x, z: home.z, rot: home.rot, scale: home.scale };
+    if (b.kind === 'piche' || b.kind === 'estacas') return { parts: fromSet(b.kind === 'piche' ? this.pitch : this.spikes), x: p.x, z: p.z, rot: b.id * 0.7, scale: 1 };
+    if (b.kind === 'fazenda') return { parts: fromSet(this.farms.get(cropOf(w, b))!), x: p.x, z: p.z, rot: -farmAngle(w, b), scale: 1 };
+    const rot = ((b.id * 7) % 6) * (Math.PI / 3);
+    if (b.kind === 'celeiro') return { parts: this.art.statics.moinho.parts, x: p.x, z: p.z, rot, scale: 1 };
+    if (b.kind === 'pedreira') return { parts: this.art.statics.pedreira.parts, x: p.x, z: p.z, rot, scale: 1.4 };
+    return { parts: this.art.statics[HOME[b.kind]].parts, x: p.x, z: p.z, rot, scale: b.kind === 'torre' ? TOWER_SCALE : 1 };
+  }
+
+  /**
+   * Mudança a cada quadro: o prédio baixa dentro do andaime enquanto é desmontado e sobe enquanto
+   * é montado no lugar novo, com poeirinha em volta.
+   */
+  private syncMovers(w: World, dt: number): void {
+    if (this.wallsMoving && this.time - this.wallSync > 0.25) {
+      this.wallSync = this.time;
+      this.ver = -1;
+    }
+    for (const [id, look] of this.movers) {
+      const b = w.buildings.get(id);
+      if (!b) continue;
+      let g = this.moverMeshes.get(id);
+      if (!g) {
+        g = new THREE.Group();
+        for (const part of look.parts) {
+          const m = new THREE.Mesh(part.geometry, part.material);
+          m.castShadow = true;
+          g.add(m);
+        }
+        this.scene.add(g);
+        this.moverMeshes.set(id, g);
+      }
+      g.position.set(look.x, 0, look.z);
+      g.rotation.y = look.rot;
+      g.scale.set(look.scale, look.scale * Math.max(0.03, Math.min(1, b.built)), look.scale);
+      const left = (this.moverDust.get(id) ?? 0) - dt;
+      if (left <= 0 && dt > 0 && this.fx) {
+        this.fx.play('poof', look.x + (Math.random() - 0.5) * 1.3, 0.1, look.z + (Math.random() - 0.5) * 1.3, { scale: 0.45, flip: Math.random() < 0.5 });
+        this.moverDust.set(id, 0.45 + Math.random() * 0.4);
+      } else this.moverDust.set(id, left);
+    }
+    for (const [id, g] of this.moverMeshes) {
+      if (this.movers.has(id)) continue;
+      this.scene.remove(g);
+      this.moverMeshes.delete(id);
+      this.moverDust.delete(id);
+    }
   }
 
   /**
@@ -778,6 +863,7 @@ export class World3D {
     const fx = this.fx;
     this.stepFall(fxDt);
     this.stepParty(fxDt);
+    this.syncMovers(w, dt);
     // Na festa, a gente comemora mesmo com o jogo parado esperando o relatório.
     const animDt = this.partying ? fxDt : dt;
     const flip = (dx: number, dz: number) => dx * Math.cos(this.camYaw) - dz * Math.sin(this.camYaw) < 0;
@@ -798,6 +884,11 @@ export class World3D {
       } else if (!fx) continue;
       else if (e.type === 'hit') fx.play(e.fx, e.x, 0, e.z, { flip: flip(e.dx, e.dz), scale: e.fx === 'faisca' ? 0.6 : 1 });
       else if (e.type === 'death' && e.monster) fx.play('poof', e.x, 0, e.z, { flip: Math.random() < 0.5 });
+      else if (e.type === 'packed') {
+        // Acabou de desmontar: nuvem de poeira onde ele estava.
+        const p = hexToWorld(e.q, e.r);
+        fx.play('poof', p.x, 0.1, p.z, { scale: 1.2 });
+      }
       else if (e.type === 'monsterFx') fx.play(e.fx, e.x, 0, e.z);
       else if (e.type === 'special') {
         fx.play(e.fx, e.x, 0, e.z, { scale: SPECIAL_SCALE[e.fx] });
@@ -858,12 +949,16 @@ export class World3D {
         pose = 'repair';
       } else if (u.state === 'work') {
         const b = w.buildings.get(u.job);
-        pose = b?.kind === 'fazenda' ? 'dig' : b?.kind === 'serraria' ? 'chop' : b ? 'pick' : 'idle';
+        // Prédio de mudança: quem trabalha nele desmonta e monta a marretadas.
+        if (b && (b.moveTo || (b.moved && b.built < 1))) pose = 'repair';
+        else pose = b?.kind === 'fazenda' ? 'dig' : b?.kind === 'serraria' ? 'chop' : b ? 'pick' : 'idle';
       }
       if (u.kind === 'trabalhador' && u.state !== 'dead') {
-        // A ferramenta do trabalho vai na mão desde que ele sai para o serviço.
-        const jk = w.buildings.get(u.job)?.kind;
-        v.setTool(jk === 'fazenda' ? 'pa' : jk === 'serraria' ? 'machadoLenha' : jk === 'pedreira' || jk === 'mina' ? 'picareta' : null);
+        // A ferramenta do trabalho vai na mão desde que ele sai para o serviço (marreta na mudança).
+        const jb = w.buildings.get(u.job);
+        const jk = jb?.kind;
+        if (jb && (jb.moveTo || (jb.moved && jb.built < 1))) v.setTool('marreta');
+        else v.setTool(jk === 'fazenda' ? 'pa' : jk === 'serraria' ? 'machadoLenha' : jk === 'pedreira' || jk === 'mina' ? 'picareta' : null);
       }
       v.root.visible = true;
       v.root.position.set(x, y, z);
@@ -999,7 +1094,8 @@ export class World3D {
     for (const b of w.buildings.values()) {
       const p = hexToWorld(b.q, b.r);
       const top = this.topOf(b) + 0.35;
-      if (b.built < 1) this.bars.add(p.x, top, p.z, 1, b.built, '#e9b949');
+      // Obra em dourado; desmontando para a mudança, em laranja (a barra vai esvaziando).
+      if (b.built < 1) this.bars.add(p.x, top, p.z, 1, b.built, b.moveTo ? '#e0803a' : '#e9b949');
       else if (b.hp < b.maxHp) this.bars.add(p.x, top, p.z, 1.2, b.hp / b.maxHp, b.kind === 'castelo' ? '#c8483a' : '#8cc56a');
     }
     for (const u of w.units.values()) {

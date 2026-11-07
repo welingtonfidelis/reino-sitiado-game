@@ -66,6 +66,11 @@ export function loadWorld(json: string): World | null {
     t.b = b!;
     t.ruin = ruin === 1;
   });
+  // Salvo de antes da mudança em duas etapas: prédio sem mudança.
+  for (const b of d.buildings) {
+    b.moveTo ??= null;
+    b.moved ??= false;
+  }
   w.buildings = new Map(d.buildings.map((b) => [b.id, b]));
   w.units = new Map(d.units.map((u) => [u.id, u]));
   w.monsters = new Map(d.monsters.map((m) => [m.id, m]));

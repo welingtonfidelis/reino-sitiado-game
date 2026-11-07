@@ -180,6 +180,11 @@ export const CONFIG = {
   tower: { range: 10 },
   recruitQueue: 3,
   refund: 0.5,
+  /**
+   * Mudar um prédio de lugar: desmonta no lugar (75% do tempo da obra, no mínimo 3 s) e depois
+   * monta no outro (o tempo da obra inteira). Enquanto isso ele não funciona.
+   */
+  move: { pack: 0.75, packMin: 3 },
   repairShare: 0.5,
   waves: {
     first: 120,

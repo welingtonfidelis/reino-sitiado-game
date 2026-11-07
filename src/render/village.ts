@@ -192,7 +192,8 @@ export function planVillage(w: World): VillagePlan {
   const pieces: Piece[] = [];
   const yards: { x: number; z: number }[] = [];
   const trails: { x: number; z: number }[][] = [];
-  const linked = [...w.buildings.values()].filter((b) => LINKED.has(b.kind) && b.built >= 1);
+  // De mudança também conta: a rua e o quintal acompanham o prédio (aqui ou no lugar novo).
+  const linked = [...w.buildings.values()].filter((b) => LINKED.has(b.kind) && (b.built >= 1 || !!b.moveTo || b.moved));
   const houses = linked.filter((b) => b.kind === 'casa');
   if (!linked.length) return { homes, turns, pieces, yards, trails };
   const c = castle(w);
