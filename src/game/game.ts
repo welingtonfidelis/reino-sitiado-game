@@ -54,6 +54,12 @@ export class Game {
   /** Hexágono escolhido para construir/mover (no toque, o segundo toque confirma). */
   pending: { q: number; r: number } | null = null;
   toasts: Toast[] = [];
+  /** Diário de avisos (o mais novo primeiro). No celular os avisos só aparecem aqui. */
+  log: { id: number; text: string; tone: Tone; wave: number }[] = [];
+  /** Avisos que chegaram desde a última vez que o diário foi aberto. */
+  unread = 0;
+  /** Velocidade para onde a pausa volta (o botão de ritmo alterna 1×, 2× e 3×). */
+  resumeSpeed = 1;
   /** Eventos do último quadro (a tela usa para flechas). */
   frame: SimEvent[] = [];
   /** Abre o relatório a cada onda? Desligado, só abre quando há bênção para escolher. */
@@ -83,7 +89,10 @@ export class Game {
     this.boxMode = false;
     this.pending = null;
     this.toasts = [];
+    this.log = [];
+    this.unread = 0;
     this.speed = 1;
+    this.resumeSpeed = 1;
     this.started = true;
     this.emit();
   }
@@ -98,7 +107,17 @@ export class Game {
   }
 
   toast(text: string, tone: Tone): void {
-    this.toasts = [...this.toasts.slice(-3), { id: ++this.toastId, text, tone, age: 0 }];
+    const id = ++this.toastId;
+    this.toasts = [...this.toasts.slice(-3), { id, text, tone, age: 0 }];
+    this.log = [{ id, text, tone, wave: this.world.wave }, ...this.log].slice(0, 40);
+    this.unread++;
+    this.emit();
+  }
+
+  /** Abriu o diário: nada mais por ler. */
+  markRead(): void {
+    if (!this.unread) return;
+    this.unread = 0;
     this.emit();
   }
 
@@ -204,7 +223,19 @@ export class Game {
 
   setSpeed(s: number): void {
     this.speed = s;
+    if (s > 0) this.resumeSpeed = s;
     this.emit();
+  }
+
+  /** Pausa ou volta na velocidade de antes. */
+  togglePause(): void {
+    this.setSpeed(this.speed > 0 ? 0 : this.resumeSpeed);
+  }
+
+  /** Alterna 1×, 2× e 3× (e tira da pausa). */
+  cycleSpeed(): void {
+    const base = this.speed || this.resumeSpeed;
+    this.setSpeed((base % 3) + 1);
   }
 
   startBuild(b: BuildingKind): void {

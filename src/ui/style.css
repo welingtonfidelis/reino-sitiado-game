@@ -35,108 +35,18 @@ body {
 }
 #ui button,
 #ui .panel,
-#ui .tray,
 #ui .placebar,
 #ui .overlay,
 #ui .toast {
   pointer-events: auto;
 }
 
-/* HUD enxuto */
-.res-pill {
-  position: absolute;
-  left: max(10px, env(safe-area-inset-left));
-  top: max(10px, env(safe-area-inset-top));
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  align-items: center;
-  max-width: calc(100vw - 20px);
-  padding: 6px 14px;
-  background: var(--overlay);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  font-size: 0.9rem;
-  font-variant-numeric: tabular-nums;
-  pointer-events: auto;
-}
-.res-pill .hud-item.low {
-  color: var(--bad);
-}
-.top-right {
-  position: absolute;
-  right: max(10px, env(safe-area-inset-right));
-  top: max(10px, env(safe-area-inset-top));
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-}
-.top-right .row {
-  margin: 0;
-  gap: 6px;
-  justify-content: flex-end;
-}
-.wave-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
-  padding: 0.4rem 0.9rem;
-}
-.wave-pill.attack {
-  border-color: var(--bad);
-}
-.speed,
-.hud-mute {
-  background: var(--overlay);
-}
-.castle-hp {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-.castle-hp .bar {
-  width: 150px;
-}
-
-.build-btn {
-  border-color: var(--gold);
-}
-
 .toasts {
   position: absolute;
   left: max(10px, env(safe-area-inset-left));
-  bottom: max(70px, calc(env(safe-area-inset-bottom) + 60px));
+  bottom: max(104px, calc(env(safe-area-inset-bottom) + 96px));
   width: min(21rem, calc(100vw - 20px));
-}
-
-/* Bandeja de construir */
-.tray {
-  position: absolute;
-  left: 50%;
-  bottom: max(70px, calc(env(safe-area-inset-bottom) + 64px));
-  transform: translateX(-50%);
-  width: min(40rem, calc(100vw - 20px));
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-panel);
-  box-shadow: var(--shadow-panel);
-  padding: 0.6rem 0.8rem 0.8rem;
-}
-.tray .choices {
-  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
-  margin-top: 0.6rem;
-}
-.tray .choice:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.tray .choice small {
-  color: var(--bad);
-  font-size: 0.78rem;
+  pointer-events: none;
 }
 
 .placebar {
@@ -165,23 +75,6 @@ body {
 }
 .placebar .btn {
   margin: 0;
-}
-
-@media (max-width: 720px) {
-  .res-pill {
-    font-size: 0.8rem;
-    gap: 2px 10px;
-    padding: 5px 10px;
-    max-width: calc(100vw - 20px);
-  }
-  /* No celular a onda e a velocidade descem para baixo da pílula de recursos. */
-  .top-right {
-    top: calc(max(10px, env(safe-area-inset-top)) + 64px);
-  }
-  .wave-pill {
-    font-size: 0.82rem;
-    padding: 0.35rem 0.7rem;
-  }
 }
 
 /* Telas por cima (começo e fim) */
@@ -226,19 +119,6 @@ body {
   pointer-events: none;
   z-index: 5;
 }
-.bottom-row {
-  position: absolute;
-  left: 50%;
-  bottom: max(14px, env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  display: flex;
-  gap: 8px;
-}
-.bottom-row .nav-btn.on {
-  border-color: var(--gold);
-  background: var(--active);
-}
-
 /* Relatório de fim de onda */
 .overlay .report-card.report {
   width: min(760px, 100%);
@@ -263,32 +143,6 @@ body {
   }
 }
 
-/* Barra do chefe (Etapa 6) */
-.boss-bar {
-  position: absolute;
-  left: 50%;
-  top: max(58px, calc(env(safe-area-inset-top) + 48px));
-  transform: translateX(-50%);
-  width: min(420px, calc(100vw - 20px));
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: center;
-  font-family: var(--font-serif);
-  color: var(--bad);
-  font-size: 1.05rem;
-  text-shadow: 0 1px 2px #000;
-}
-.boss-bar .bar {
-  width: 100%;
-  height: 1rem;
-}
-@media (max-width: 720px) {
-  .boss-bar {
-    top: calc(max(10px, env(safe-area-inset-top)) + 110px);
-  }
-}
-
 .report-pref {
   display: flex;
   gap: 8px;
@@ -309,22 +163,6 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-}
-.rscrim {
-  position: absolute;
-  background: rgba(12, 10, 8, 0.32);
-  pointer-events: none;
-}
-.rtrack {
-  position: absolute;
-  box-sizing: border-box;
-  border-radius: 50%;
-  border: 1px dashed rgba(233, 185, 73, 0.35);
-  pointer-events: none;
-}
-.rtrack.fan {
-  border-bottom: 0;
-  border-radius: 999px 999px 0 0;
 }
 .rbtn {
   position: absolute;
@@ -377,6 +215,12 @@ body {
   color: var(--muted);
   cursor: help;
 }
+.rbtn.off .ico {
+  opacity: 0.45;
+}
+.rbtn.off .rbtn-label {
+  color: var(--muted);
+}
 .rbtn.off.focus {
   border-color: var(--bad);
 }
@@ -405,15 +249,14 @@ body {
 .rbtn-label {
   position: absolute;
   left: 50%;
-  top: calc(100% + 4px);
+  top: calc(100% + 3px);
   transform: translateX(-50%);
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   line-height: 16px;
-  padding: 0 7px;
-  border-radius: 8px;
-  background: rgba(20, 17, 14, 0.88);
-  color: var(--text);
+  color: #fff3d8;
+  text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.8);
   pointer-events: none;
 }
 .rbtn-badge {
@@ -526,4 +369,524 @@ body {
 }
 .rbars .n {
   color: var(--status-text);
+}
+
+/* HUD da etapa 12: topo em pilha, ⋯ e botões flutuantes. Três formatos: celular em pé
+   (largura até 599), celular deitado (altura até 499) e o resto (computador e tablet). */
+.hud-stack {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.hud-top {
+  width: 100%;
+  display: grid;
+  gap: 6px;
+  align-items: center;
+  grid-template-columns: minmax(150px, 200px) auto minmax(0, 1fr) 44px 44px 44px;
+  grid-template-areas: 'castle wave res pause speed more';
+}
+.hud-top > * {
+  pointer-events: auto;
+}
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 12px;
+  background: var(--overlay);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+button.chip {
+  cursor: pointer;
+}
+.chip .ico {
+  width: 18px;
+  height: 18px;
+}
+.castle-chip {
+  grid-area: castle;
+}
+.castle-chip .ico {
+  color: var(--heading);
+}
+.castle-chip.low {
+  border-color: var(--bad);
+}
+.castle-chip strong {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.castle-info {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chip-bar {
+  flex: 1 1 0;
+  min-width: 24px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--track);
+  overflow: hidden;
+}
+.chip-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--hp);
+}
+.wave-chip {
+  grid-area: wave;
+}
+.wave-chip.attack {
+  border-color: var(--bad);
+}
+.wave-chip .ico {
+  color: var(--bad);
+}
+.wave-lines {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+.wave-lines strong {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 190px;
+}
+.wave-lines span {
+  font-size: 11px;
+  color: var(--warn);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 190px;
+}
+.res-strip {
+  grid-area: res;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 44px;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0 14px;
+  overflow: hidden;
+  background: var(--overlay);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+.res-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.res-item .ico {
+  width: 15px;
+  height: 15px;
+}
+.res-item.gold {
+  color: var(--gold);
+  font-weight: 600;
+}
+.res-item.low {
+  color: var(--bad);
+}
+.res-label {
+  display: none;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.round {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  background: var(--overlay);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.round .ico {
+  width: 18px;
+  height: 18px;
+}
+.round.pause {
+  grid-area: pause;
+}
+.round.pause.on {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--on-gold);
+}
+.round.speed {
+  grid-area: speed;
+}
+.round.speed.fast {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.round.more {
+  grid-area: more;
+}
+.round .dot {
+  position: absolute;
+  right: -2px;
+  top: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--bad);
+  box-shadow: 0 0 0 2px rgba(20, 17, 14, 0.9);
+}
+.boss-card {
+  width: min(380px, 100%);
+  box-sizing: border-box;
+  padding: 6px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: rgba(42, 14, 12, 0.92);
+  border: 1px solid var(--bad);
+  border-radius: 12px;
+}
+.boss-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.boss-card strong {
+  font-family: var(--font-serif);
+  font-weight: normal;
+  font-size: 15px;
+  color: #f0b0a8;
+}
+.boss-card small {
+  font-size: 11px;
+  color: var(--chronicle-bad);
+}
+.boss-card .rbar {
+  height: 8px;
+}
+/* Celular em pé: duas linhas (castelo, onda, pausa e ritmo; recursos e ⋯) e o chefe embaixo. */
+@media (max-width: 599px) {
+  .hud-stack {
+    align-items: stretch;
+  }
+  .hud-top {
+    grid-template-columns: minmax(0, 1fr) auto 44px 44px;
+    grid-template-rows: 44px 32px;
+    grid-template-areas: 'castle wave pause speed' 'res res res res';
+  }
+  /* Castelo: número em cima e a barra embaixo, ocupando o chip todo. */
+  .castle-chip {
+    padding: 0 12px 0 10px;
+  }
+  .castle-info {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .castle-info strong {
+    font-size: 13px;
+    line-height: 1;
+  }
+  .chip-bar {
+    flex: none;
+    height: 6px;
+  }
+  /* Recursos numa faixa só, com o ⋯ dentro dela, no fim. */
+  .res-strip {
+    height: 32px;
+    gap: 3px;
+    padding: 0 40px 0 9px;
+    justify-content: space-between;
+    border-radius: 16px;
+    font-size: 11.5px;
+  }
+  .res-item {
+    gap: 2px;
+  }
+  .res-item .ico {
+    width: 12px;
+    height: 12px;
+  }
+  .round.more {
+    grid-area: res;
+    justify-self: end;
+    width: 32px;
+    height: 26px;
+    margin-right: 3px;
+    border-radius: 13px;
+    background: var(--panel-2);
+  }
+  .wave-lines strong,
+  .wave-lines span {
+    max-width: 120px;
+  }
+  .boss-card {
+    width: auto;
+  }
+}
+/* Celular deitado: uma linha só, mais baixa. */
+@media (min-width: 600px) and (max-height: 499px) {
+  .hud-top {
+    grid-template-columns: 140px auto minmax(0, 1fr) 40px 40px 40px;
+  }
+  .chip,
+  .res-strip {
+    height: 40px;
+  }
+  .res-strip {
+    gap: 8px;
+    padding: 0 10px;
+    justify-content: space-between;
+    font-size: 0.8rem;
+  }
+  .res-item {
+    gap: 3px;
+  }
+  .res-item .ico {
+    width: 13px;
+    height: 13px;
+  }
+  .round {
+    width: 40px;
+    height: 40px;
+  }
+}
+@media (min-width: 1200px) and (min-height: 500px) {
+  .res-label {
+    display: inline;
+  }
+}
+
+/* O ⋯: som, relatório e diário de avisos. */
+.more-backdrop {
+  position: fixed;
+  inset: 0;
+  pointer-events: auto;
+}
+.more-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 6px;
+  width: min(320px, calc(100vw - 16px));
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: auto;
+}
+.more-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+.more-row input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--gold);
+}
+.more-menu h3 {
+  margin: 8px 0 0;
+  font-family: var(--font-serif);
+  font-weight: normal;
+  font-size: 1rem;
+  color: var(--heading);
+}
+.diary {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+.diary li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+  line-height: 1.35;
+}
+.diary li.empty {
+  display: block;
+  color: var(--muted);
+}
+.diary .tone {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.diary li.bad .tone {
+  background: var(--bad);
+}
+.diary li.good .tone {
+  background: var(--good);
+}
+.diary li.warn .tone,
+.diary li.gold .tone {
+  background: var(--warn);
+}
+.diary small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* Botões flutuantes de baixo: Construir no meio, Selecionar à esquerda. */
+.fab {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.fab .ico {
+  width: 24px;
+  height: 24px;
+}
+.fab-build {
+  width: 60px;
+  height: 60px;
+  left: calc(50% - 30px);
+  bottom: max(16px, calc(env(safe-area-inset-bottom) + 6px));
+  background: var(--primary);
+  border: 2px solid var(--gold);
+  color: var(--primary-text);
+}
+.fab-build.open {
+  background: var(--panel);
+  border: 1.5px solid var(--line);
+  color: var(--text);
+}
+.fab-select {
+  width: 52px;
+  height: 52px;
+  left: max(14px, env(safe-area-inset-left));
+  bottom: max(20px, calc(env(safe-area-inset-bottom) + 10px));
+  background: var(--panel-2);
+  border: 1.5px solid var(--line);
+  color: var(--text);
+}
+.fab-badge {
+  position: absolute;
+  right: -5px;
+  top: -5px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  background: var(--gold);
+  color: var(--on-gold);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+.fab-label {
+  display: none;
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 3px);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff3d8;
+  text-shadow: 0 0 3px #000, 0 1px 2px #000;
+  pointer-events: none;
+}
+/* Computador e tablet: rótulo embaixo dos botões. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .fab-label {
+    display: block;
+  }
+  .fab-build {
+    bottom: 34px;
+  }
+  .fab-select {
+    bottom: 38px;
+  }
+}
+.fan-backdrop {
+  position: fixed;
+  inset: 0;
+  pointer-events: auto;
+}
+.rcosts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--status-text);
+  font-variant-numeric: tabular-nums;
+}
+.rcosts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.rcosts .ico {
+  width: 13px;
+  height: 13px;
+}
+.rcard-crumb {
+  font-size: 11px;
+  color: var(--muted);
 }

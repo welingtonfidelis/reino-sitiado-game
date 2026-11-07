@@ -11,6 +11,8 @@ import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
 import {
   BLESSINGS,
   BUILDINGS,
+  BUILD_MENU,
+  RES_ORDER,
   CONFIG,
   UNITS,
   castleCap,
@@ -20,6 +22,8 @@ import {
   hexToWorld,
   housing,
   igniteProblem,
+  levelProblem,
+  missing,
   moveProblem,
   recruitProblem,
   repairCost,
@@ -29,7 +33,7 @@ import {
   upgradeProblem,
   workers,
 } from '../sim/index.ts';
-import type { Building, ForgeLine } from '../sim/index.ts';
+import type { Building, BuildingKind, Category, Cost, ForgeLine } from '../sim/index.ts';
 import type { Game } from '../game/game.ts';
 import type { IsoCamera } from '../render/camera.ts';
 import { Icon, costText } from './common.tsx';
@@ -259,16 +263,47 @@ function Bar({ label, frac, color, text }: { label: string; frac: number; color:
 }
 
 /** Onde termina o HUD de cima (recursos, onda, velocidade, vida do castelo, chefe). */
-function hudBottom(): number {
+export function hudBottom(): number {
   let m = 0;
-  for (const sel of ['.res-pill', '.top-right', '.boss-bar']) {
+  for (const sel of ['.hud-stack']) {
     const e = document.querySelector(sel);
     if (e) m = Math.max(m, e.getBoundingClientRect().bottom);
   }
   return m + 8;
 }
 
-const clamp = (v: number, lo: number, hi: number) => (lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v)));
+type Press = { current: { id: string; long: boolean; timer: number } | null };
+
+/**
+ * Toques dos botões dos anéis: um toque executa; segurar (ou passar o mouse) só põe o botão em
+ * foco, e o cartão mostra o que ele faz.
+ */
+export function pressProps(id: string, setFocus: (id: string | null) => void, press: Press, activate: () => void) {
+  return {
+    onPointerEnter: (e: PointerEvent) => e.pointerType === 'mouse' && setFocus(id),
+    onPointerLeave: (e: PointerEvent) => e.pointerType === 'mouse' && setFocus(null),
+    onFocus: () => setFocus(id),
+    onPointerDown: (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') return;
+      const timer = window.setTimeout(() => {
+        if (press.current) press.current.long = true;
+        setFocus(id);
+      }, 380);
+      press.current = { id, long: false, timer };
+    },
+    onPointerUp: () => press.current && clearTimeout(press.current.timer),
+    onPointerCancel: () => press.current && clearTimeout(press.current.timer),
+    onContextMenu: (e: Event) => e.preventDefault(),
+    onClick: () => {
+      const long = press.current?.long && press.current.id === id;
+      press.current = null;
+      if (long) return;
+      activate();
+    },
+  };
+}
+
+export const clamp = (v: number, lo: number, hi: number) => (lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v)));
 
 export function RadialMenu({ game, cam, b, touch }: { game: Game; cam: IsoCamera; b: Building; touch: boolean }) {
   // Redesenha a cada quadro enquanto aberto: o anel acompanha o prédio ao arrastar e dar zoom.
@@ -351,36 +386,10 @@ export function RadialMenu({ game, cam, b, touch }: { game: Game; cam: IsoCamera
     a.run();
     game.emit();
   };
-  const handlers = (a: Act) => ({
-    onPointerEnter: (e: PointerEvent) => e.pointerType === 'mouse' && setFocus(a.id),
-    onPointerLeave: (e: PointerEvent) => e.pointerType === 'mouse' && setFocus(null),
-    onFocus: () => setFocus(a.id),
-    onPointerDown: (e: PointerEvent) => {
-      if (e.pointerType === 'mouse') return;
-      // Segurar o botão mostra a explicação sem executar.
-      const timer = window.setTimeout(() => {
-        if (press.current) press.current.long = true;
-        setFocus(a.id);
-      }, 380);
-      press.current = { id: a.id, long: false, timer };
-    },
-    onPointerUp: () => press.current && clearTimeout(press.current.timer),
-    onPointerCancel: () => press.current && clearTimeout(press.current.timer),
-    onContextMenu: (e: Event) => e.preventDefault(),
-    onClick: () => {
-      const long = press.current?.long && press.current.id === a.id;
-      press.current = null;
-      if (long) return;
-      activate(a);
-    },
-  });
+  const handlers = (a: Act) => pressProps(a.id, setFocus, press, () => activate(a));
 
-  const trackR = R;
-  const scrimR = R + half + 14;
   return (
     <div class="radial" aria-label={`Ações: ${def.name}`}>
-      <div class="rscrim" style={{ left: `${cx - scrimR}px`, top: `${cy - scrimR}px`, width: `${scrimR * 2}px`, height: `${fan ? scrimR : scrimR * 2}px`, borderRadius: fan ? `${scrimR}px ${scrimR}px 0 0` : '50%' }} />
-      <div class={`rtrack${fan ? ' fan' : ''}`} style={{ left: `${cx - trackR}px`, top: `${cy - trackR}px`, width: `${trackR * 2}px`, height: `${fan ? trackR : trackR * 2}px` }} />
       {acts.map((a) => {
         const ang = ((angles[a.slot] ?? -90) * Math.PI) / 180;
         const x = cx + R * Math.cos(ang);
@@ -454,6 +463,195 @@ export function RadialMenu({ game, cam, b, touch }: { game: Game; cam: IsoCamera
           noteFor(game, b) && <p class="rcard-sub">{noteFor(game, b)}</p>
         )}
         {shown && !focus && noteFor(game, b) ? <p class="rcard-sub">{noteFor(game, b)}</p> : null}
+      </section>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ leque do Construir
+
+const CAT_ORDER: Category[] = ['economia', 'moradia', 'defesa', 'militar'];
+const CAT_NAME: Record<Category, string> = { economia: 'Economia', moradia: 'Moradia', defesa: 'Defesa', militar: 'Militar' };
+const CAT_ICON: Record<Category, string> = { economia: 'comida', moradia: 'casa', defesa: 'escudo', militar: 'espadas' };
+const BUILD_ICON: Record<BuildingKind, string> = {
+  castelo: 'castelo',
+  casa: 'casa',
+  fazenda: 'comida',
+  serraria: 'machado',
+  pedreira: 'pedra',
+  mina: 'ferro',
+  muralha: 'muralha',
+  portao: 'portao',
+  torre: 'torre',
+  catapulta: 'catapulta',
+  piche: 'fogo',
+  estacas: 'estacas',
+  quartel: 'espadas',
+  campo: 'arco',
+  oficina: 'martelo',
+  capela: 'capela',
+  forja: 'bigorna',
+  torreMago: 'estrela',
+  estabulo: 'ferradura',
+};
+/** Rótulo curto embaixo do botão (o nome inteiro vai no cartão). */
+const SHORT: Partial<Record<BuildingKind, string>> = { torre: 'Torre', campo: 'Campo', piche: 'Piche', torreMago: 'Mago' };
+
+interface FanEntry {
+  id: string;
+  icon: string;
+  label: string;
+  title: string;
+  costs?: Cost;
+  text: string;
+  why: string | null;
+  badge?: string;
+  run: () => void;
+}
+
+function Costs({ c }: { c: Cost }) {
+  return (
+    <div class="rcosts">
+      {RES_ORDER.filter((r) => (c[r] ?? 0) > 0).map((r) => (
+        <span>
+          <Icon name={r} />
+          {c[r]}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Construir em leque (etapa 12): o martelo embaixo abre as categorias em meia-lua; tocar numa
+ * categoria troca o leque pelas opções dela. O martelo vira X (fecha) nas categorias e seta
+ * (volta) dentro de uma categoria; quem cuida disso é o botão, no App. Categoria com uma opção
+ * só (a moradia, que só tem a casa) já coloca direto.
+ */
+export function BuildFan({ game, touch, cat, setCat, close }: { game: Game; touch: boolean; cat: Category | null; setCat: (c: Category | null) => void; close: () => void }) {
+  const [focus, setFocus] = useState<string | null>(null);
+  const press = useRef<{ id: string; long: boolean; timer: number } | null>(null);
+  useEffect(() => setFocus(null), [cat]);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (cat) setCat(null);
+      else close();
+    };
+    addEventListener('keydown', key);
+    return () => removeEventListener('keydown', key);
+  }, [cat]);
+
+  const w = game.world;
+  const item = (k: BuildingKind): FanEntry => {
+    const def = BUILDINGS[k];
+    const cost = game.costOf(k);
+    return {
+      id: k,
+      icon: BUILD_ICON[k],
+      label: SHORT[k] ?? def.name,
+      title: def.name,
+      costs: cost,
+      text: def.blurb,
+      why: levelProblem(w, k) ?? missing(w, cost),
+      run: () => {
+        game.startBuild(k);
+        close();
+      },
+    };
+  };
+  const entries: FanEntry[] = cat
+    ? BUILD_MENU.filter((k) => BUILDINGS[k].category === cat).map(item)
+    : CAT_ORDER.map((c) => {
+        const ks = BUILD_MENU.filter((k) => BUILDINGS[k].category === c);
+        if (ks.length === 1) return item(ks[0]!);
+        return {
+          id: c,
+          icon: CAT_ICON[c],
+          label: CAT_NAME[c],
+          title: CAT_NAME[c],
+          text: `${ks.map((k) => BUILDINGS[k].name).join(', ')}.`,
+          why: null,
+          badge: String(ks.length),
+          run: () => setCat(c),
+        };
+      });
+
+  // Centro: o botão Construir (lido da tela, para valer em pé, deitado e no computador).
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const fab = document.querySelector('.fab-build')?.getBoundingClientRect();
+  const cx = fab ? fab.left + fab.width / 2 : vw / 2;
+  const cy = fab ? fab.top + fab.height / 2 : vh - 46;
+  const size = vw < 380 ? 48 : 52;
+  const half = size / 2;
+  const n = entries.length;
+  const R = Math.min(n <= 4 ? 118 : n <= 6 ? 140 : 154, vw / 2 - 40);
+  const [a0, a1] = cat ? [-170, -10] : [-165, -15];
+
+  const shown = entries.find((e) => e.id === focus) ?? null;
+  const cardW = Math.min(300, vw - 16);
+  const fanTop = cy - R - half - 8;
+  const card = useRef<HTMLElement>(null);
+  const cardH = card.current?.offsetHeight ?? 130;
+  // O cartão vai acima do leque; se encostaria no HUD (celular deitado), vai para o lado.
+  const sideLeft = cx + R + half + 18;
+  const side = fanTop - 10 - cardH < hudBottom() && vw - sideLeft - 8 >= 200;
+  const cardStyle = side
+    ? { left: `${sideLeft}px`, bottom: `${vh - cy + 4}px`, width: `${Math.min(cardW, vw - sideLeft - 8)}px` }
+    : { left: `${clamp(cx - cardW / 2, 8, vw - cardW - 8)}px`, bottom: `${vh - fanTop + 10}px`, width: `${cardW}px` };
+
+  const activate = (e: FanEntry) => {
+    if (e.why) {
+      setFocus(e.id);
+      return;
+    }
+    e.run();
+  };
+  return (
+    <div class="radial" aria-label={cat ? `Construir: ${CAT_NAME[cat]}` : 'Construir'}>
+      {entries.map((e, i) => {
+        const ang = ((a0 + ((a1 - a0) * i) / Math.max(1, n - 1)) * Math.PI) / 180;
+        const x = cx + R * Math.cos(ang);
+        const y = cy + R * Math.sin(ang);
+        const cls = ['rbtn', e.why ? 'off' : '', focus === e.id ? 'focus' : ''].filter(Boolean).join(' ');
+        return (
+          <button
+            key={e.id}
+            class={cls}
+            style={{ left: `${x - half}px`, top: `${y - half}px`, width: `${size}px`, height: `${size}px` }}
+            aria-label={e.why ? `${e.title}: ${e.why}` : e.title}
+            aria-disabled={e.why ? 'true' : undefined}
+            {...pressProps(e.id, setFocus, press, () => activate(e))}
+          >
+            <Icon name={e.icon} />
+            {e.badge ? <span class="rbtn-badge">{e.badge}</span> : null}
+            <span class="rbtn-label">{e.label}</span>
+          </button>
+        );
+      })}
+      <section ref={card} class="rcard" style={cardStyle} aria-live="polite">
+        <header>
+          <strong>{shown ? shown.title : cat ? CAT_NAME[cat] : 'Construir'}</strong>
+          {shown && cat ? <span class="rcard-crumb">{CAT_NAME[cat]}</span> : null}
+        </header>
+        {shown?.costs ? <Costs c={shown.costs} /> : null}
+        <p class="rcard-sub">{shown ? shown.text : cat ? 'Escolha o que erguer.' : 'Escolha uma categoria.'}</p>
+        {shown?.why ? (
+          <p class="rcard-hint bad">
+            <strong class="why">{shown.why}.</strong>
+          </p>
+        ) : (
+          <p class="rcard-hint">
+            {shown
+              ? shown.costs
+                ? `${touch ? 'Toque' : 'Clique'} para colocar no mapa.`
+                : `${touch ? 'Toque' : 'Clique'} para ver as ${shown.badge} opções.`
+              : touch
+                ? 'Segure um botão para ler sem escolher.'
+                : 'Passe o mouse num botão para ler.'}
+          </p>
+        )}
       </section>
     </div>
   );

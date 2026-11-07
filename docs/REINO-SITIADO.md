@@ -4,7 +4,7 @@ Tower defense sem fim em 2.5D isométrico. O jogador ergue um reino em volta do 
 
 Nome provisório. Proposta visual (canvas, design system Vigília): https://claude.ai/artifact/E2kdbKNuRkqvb9bmsePrsy
 
-Repositório: https://github.com/welingtonfidelis/reino-sitiado-game (criado pelo usuário em 2026-11-06). As etapas 1 a 11 estão na `main`; cada etapa tem o seu commit ("Etapa N: …" no `git log`). Commit e push só quando o usuário pedir.
+Repositório: https://github.com/welingtonfidelis/reino-sitiado-game (criado pelo usuário em 2026-11-06). As etapas 1 a 12 estão na `main`; cada etapa tem o seu commit ("Etapa N: …" no `git log`). Commit e push só quando o usuário pedir.
 
 ## 1. Decisões
 
@@ -15,7 +15,7 @@ Repositório: https://github.com/welingtonfidelis/reino-sitiado-game (criado pel
 | Tecnologia | Web: Vite, TypeScript, Three.js e Preact | Mesma base do Outpost 7. Abre no iPhone pela rede, sem instalar. |
 | Câmera | Ortográfica, ângulo fixo (yaw 30°, pitch 47°) | É o "2.5D": profundidade dos modelos sem perspectiva. |
 | Escopo da v1 | Fatia enxuta (seção 3) | Jogável cedo; o resto da proposta entra por etapas. |
-| HUD | Enxuto: pílula de recursos, onda e velocidade, um botão Construir | Pedido do usuário. |
+| HUD | Enxuto: pílula de recursos, onda e velocidade, um botão Construir. Refeito na etapa 12 (seção 15): topo em pilha, ⋯ e botões flutuantes | Pedido do usuário. |
 | Recrutar | Só pelo menu do prédio (tocar no quartel) | Pedido do usuário: nada de botão de recrutar na tela. |
 | Trabalhadores | Chegam sozinhos; nunca são comprados | Pedido do usuário, com limite para não facilitar (seção 4). |
 | Visual da interface | Tokens e componentes do Vigília (`src/ui/vigilia*.css`) | Escolha do usuário para a proposta. |
@@ -250,7 +250,7 @@ Regra do usuário: usar os efeitos do pixelfx sempre que der (https://patch-gg.g
 - **Sons** (`src/audio/sound.ts`): feitos na hora com Web Audio, sem arquivos.
   - flecha, golpe, morte de monstro, prédio pronto, corneta da onda, fim de onda, feitiço, cura, novo nível e prédio destruído.
   - Cada som tem um intervalo mínimo, para não virar chiado.
-  - Botão de som no HUD, ao lado da velocidade; liga no primeiro toque (exigência do iPhone).
+  - Botão de som no HUD, ao lado da velocidade (desde a etapa 12, dentro do ⋯); liga no primeiro toque (exigência do iPhone).
 - **Robô de equilíbrio:** `npm run balance [sementes] [onda máxima]` (`tools/balance.ts`; `VERBOSE=1` mostra o estado a cada onda). Joga partidas inteiras sem tela.
   - "Nada": só o castelo atira.
   - "Robô": ordem simples de construção, recruta, conserta e pega a primeira bênção.
@@ -349,6 +349,7 @@ Pedido do usuário em 2026-11-06: ferramentas na mão dos trabalhadores e um map
 
 Pedido do usuário em 2026-11-06, depois do esboço "Menu circular de prédio" no canvas de design. Vale no computador e no celular. Substitui o painel quadrado.
 
+- **Sem fundo escuro** (etapa 12): os botões flutuam sobre o mapa, e os rótulos são letra clara com contorno.
 - **Anel:** tocar no prédio abre os botões num anel em volta dele, e o anel acompanha o prédio ao arrastar e dar zoom. Tocar fora (ou Esc) fecha.
   - Se o prédio sai da tela, o anel some e volta quando ele reaparece; a seleção continua.
 - **Casas fixas:** cada ação tem o seu lugar, para a mão decorar. Prédio sem a ação deixa a casa vazia.
@@ -374,7 +375,36 @@ Pedido do usuário em 2026-11-06, depois do esboço "Menu circular de prédio" n
 - **Borda de baixo:** com o prédio colado nela, o anel vira leque aberto para cima, na mesma ordem em volta e com raio maior. Perto das laterais, o anel encosta para dentro da tela.
 - **Código:** `src/ui/Radial.tsx` (o anel e o cartão); ícones e texto de custo em `src/ui/common.tsx`; estilos `.radial`, `.rbtn` e `.rcard` em `src/ui/style.css`.
 
-## 15. Arquitetura
+## 15. HUD novo e Construir em leque (Etapa 12)
+
+Pedido do usuário em 2026-11-06, depois das pranchetas "HUD hoje no celular" e "HUD proposto" (versão 3) no canvas de design. A responsividade no celular estava ruim: peças soltas por cima do mapa se encavalavam.
+
+- **Topo em pilha** (`.hud-stack`): um bloco só, nada fica por cima de nada.
+
+| Formato | Quando | Como fica |
+| --- | --- | --- |
+| Celular em pé | largura até 599 px | duas linhas: castelo, onda, pausa e ritmo; recursos com o ⋯ no fim. O chefe embaixo, na largura toda |
+| Celular deitado | altura até 499 px | uma linha só (40 px): castelo, onda, recursos, pausa, ritmo e ⋯. O chefe no meio, embaixo |
+| Computador e tablet | o resto | uma linha só (44 px); a partir de 1200 px, cada recurso ganha o nome |
+
+- **Castelo:** ícone, barra e o número da vida; borda vermelha abaixo de 35%. Tocar leva a câmera até o castelo e abre o anel dele. Em pé, o número fica em cima e a barra embaixo.
+- **Onda:** número e monstros vivos; embaixo, o modificador. No calmo, "em 1:24 · chamar", e tocar chama a onda.
+- **Ritmo:** pausar (vira ▶ dourado quando pausado) e um botão que alterna 1×, 2× e 3× e tira da pausa.
+- **Recursos:** uma faixa, números curtos a partir de 1.000 (1,2k, 12k). O cristal só aparece com estoque ou com uma mina no veio de cristal. As tropas saíram dali e viraram o número no Selecionar.
+- **⋯:** som, relatório a cada onda vencida e o diário de avisos (os 40 últimos, o mais novo primeiro, com a onda).
+- **Avisos:** no celular (largura até 599 ou altura até 499) não aparecem na tela; vão para o diário, e o ⋯ ganha um ponto vermelho. No computador continuam embaixo à esquerda, e também vão para o diário.
+- **Botões flutuantes embaixo, sem fundo:** o martelo dourado no meio (Construir, 60 px) e o Selecionar à esquerda (52 px, com o número de tropas; só aparece com tropas). No computador ganham rótulo embaixo.
+- **Construir em leque:**
+  - o martelo abre uma meia-lua com Economia (4), Casa, Defesa (6) e Militar (7). Moradia só tem a casa, então "Casa" coloca direto;
+  - tocar numa categoria troca o leque pelas opções dela, com raio maior quando são muitas;
+  - o martelo vira X (fecha) nas categorias e seta (volta) dentro de uma; tocar fora ou Esc também;
+  - o Selecionar some enquanto o leque está aberto;
+  - o cartão mostra nome, custo em ícones e para que serve; opção bloqueada (falta recurso, nível do castelo, forja) fica apagada e o toque mostra o motivo;
+  - um toque vai para o mapa colocar; segurar (ou passar o mouse) só mostra o cartão;
+  - deitado, o cartão vai para o lado do leque quando em cima encostaria no HUD.
+- **Código:** `Hud` e `MoreMenu` em `src/ui/App.tsx`; `BuildFan` em `src/ui/Radial.tsx` (com os toques compartilhados com o menu do prédio, `pressProps`); diário e ritmo em `src/game/game.ts` (`log`, `unread`, `togglePause`, `cycleSpeed`); estilos no fim de `src/ui/style.css`.
+
+## 16. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
@@ -391,9 +421,9 @@ Pedido do usuário em 2026-11-06, depois do esboço "Menu circular de prédio" n
   - `camera.ts`: câmera isométrica com arrastar, pinça, roda e toque.
 - **Muralha:** cada trecho desenha meio muro até cada vizinho que também é muralha e um poste nas curvas e pontas. O portão segue a linha dos dois vizinhos opostos.
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
-- `src/ui/App.tsx`: HUD, bandeja Construir, avisos e telas de começo e fim. O menu do prédio fica em `src/ui/Radial.tsx` (seção 14).
+- `src/ui/App.tsx`: HUD, ⋯, botões flutuantes, avisos e telas de começo e fim. O menu do prédio e o leque do Construir ficam em `src/ui/Radial.tsx` (seções 14 e 15).
 
-## 16. Etapas
+## 17. Etapas
 
 | Etapa | O que | Situação |
 | --- | --- | --- |
@@ -408,8 +438,9 @@ Pedido do usuário em 2026-11-06, depois do esboço "Menu circular de prédio" n
 | 9 | Catapulta, fosso de piche, estacas e um modificador de onda a cada 5 ondas (seção 12) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 10 | Ferramentas na mão dos trabalhadores, mapa de raio 16 e correção do alvo do morcego (seção 13) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 11 | Menu circular do prédio no lugar do painel quadrado, no computador e no celular (seção 14) | Pronta em 2026-11-06. Vista no navegador do Mac, em tamanho de computador e de celular; falta jogar no iPhone. |
+| 12 | HUD novo: topo em pilha, ritmo em dois botões, ⋯ com diário, avisos fora da tela no celular, botões flutuantes e Construir em leque (seção 15) | Pronta em 2026-11-06. Vista no navegador do Mac em 1024×768, 375×812, 844×390 e 360×640; falta jogar no iPhone. |
 
-## 17. Arte e licenças
+## 18. Arte e licenças
 
 Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art` (lista em `tools/art-manifest.ts`). Detalhes em `LICENSES.md`.
 

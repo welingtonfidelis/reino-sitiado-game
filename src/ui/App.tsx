@@ -4,12 +4,12 @@
  * avisos e as telas de começo e fim.
  */
 import { useEffect, useReducer, useState } from 'preact/hooks';
-import { BUILDINGS, BUILD_MENU, CONFIG, RES_ORDER, castle, castleCap, housing, troops, workers, missing, waveSize, MONSTERS, BLESSINGS, repairAllCost, levelProblem, modsForWave, waveSizeWithMods, WAVE_MODS } from '../sim/index.ts';
+import { BUILDINGS, CONFIG, RES_ORDER, castle, castleCap, housing, troops, workers, missing, waveSize, MONSTERS, BLESSINGS, repairAllCost, modsForWave, waveSizeWithMods, WAVE_MODS, tileAt, hexToWorld } from '../sim/index.ts';
 import type { BlessingId, Category, MonsterKind, Res, UnitKind } from '../sim/index.ts';
 import { Game } from '../game/game.ts';
 import type { IsoCamera } from '../render/camera.ts';
-import { Icon, RES_LABEL, costText } from './common.tsx';
-import { RadialMenu } from './Radial.tsx';
+import { Icon, RES_LABEL, costText, short } from './common.tsx';
+import { BuildFan, RadialMenu } from './Radial.tsx';
 
 
 function clock(s: number): string {
@@ -17,12 +17,6 @@ function clock(s: number): string {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 }
 
-const CATS: [Category, string][] = [
-  ['economia', 'Economia'],
-  ['moradia', 'Moradia'],
-  ['defesa', 'Defesa'],
-  ['militar', 'Militar'],
-];
 
 function useGame(game: Game): void {
   const [, bump] = useReducer((n: number) => n + 1, 0);
@@ -37,124 +31,157 @@ function useGame(game: Game): void {
   }, [game]);
 }
 
-function Hud({ game }: { game: Game }) {
+/** Celular (em pé ou deitado): sem avisos na tela, só no diário do ⋯. */
+const SMALL = '(max-width: 599px), (max-height: 499px)';
+
+/**
+ * Topo em pilha (etapa 12): castelo, onda, recursos, pausa, ritmo e ⋯ num bloco só, com o
+ * chefe embaixo. O CSS arruma em duas linhas no celular em pé e numa linha só nos outros.
+ */
+function Hud({ game, cam, small }: { game: Game; cam: IsoCamera; small: boolean }) {
+  const [more, setMore] = useState(false);
   const w = game.world;
   const pop = workers(w);
   const room = Math.min(housing(w), castleCap(w));
-  const army = troops(w);
   const c = castle(w);
   const calm = w.waveState === 'calm';
   const left = calm ? 0 : [...w.monsters.values()].filter((m) => m.state !== 'dead').length + w.spawnQueue.length;
+  const boss = [...w.monsters.values()].find((m) => m.state !== 'dead' && MONSTERS[m.kind].boss);
+  const nextMods = modsForWave(w.seed, w.wave + 1).map((k) => WAVE_MODS[k].name);
+  const nowMods = w.waveMods.map((k) => WAVE_MODS[k].name);
+  // Cristal só aparece quando já conta: com estoque ou com uma mina no veio de cristal.
+  const crystal = w.res.cristal >= 1 || [...w.buildings.values()].some((b) => b.kind === 'mina' && tileAt(w, b.q, b.r)?.terrain === 'crystal');
+  const speed = game.speed || game.resumeSpeed;
+  const hpFrac = c ? c.hp / c.maxHp : 0;
+  const goCastle = () => {
+    if (!c) return;
+    const p = hexToWorld(c.q, c.r);
+    cam.target.set(p.x, 0, p.z + 1);
+    cam.apply();
+    game.selected = c.id;
+    game.emit();
+  };
   return (
-    <>
-      <div class="res-pill hud-bar">
-        {RES_ORDER.map((r) => (
-          <span class={`hud-item${r === 'ouro' ? ' gold' : ''}${r === 'comida' && w.hungry ? ' low' : ''}`} title={RES_LABEL[r]}>
-            <Icon name={r} /> {Math.floor(w.res[r])}
-          </span>
-        ))}
-        <span class="hud-item" title={`Trabalhadores ${pop} · vagas nas casas ${housing(w)} · teto do castelo ${castleCap(w)}`}>
-          <Icon name="casa" /> {pop}/{room}
-        </span>
-        {army > 0 ? (
-          <span class="hud-item" title="Tropas (sem teto)">
-            <Icon name="espadas" /> {army}
-          </span>
-        ) : null}
-      </div>
-      {(() => {
-        const boss = [...w.monsters.values()].find((m) => m.state !== 'dead' && MONSTERS[m.kind].boss);
-        if (!boss) return null;
-        return (
-          <div class="boss-bar">
-            <span>{MONSTERS[boss.kind].name}</span>
-            <div class="bar bar-enemy">
-              <div class="fill" style={{ width: `${(100 * boss.hp) / boss.maxHp}%` }} />
-              <span class="bar-text">{MONSTERS[boss.kind].immuneArrows ? 'Flechas não ferem' : 'Magia não fere'}</span>
-            </div>
-          </div>
-        );
-      })()}
-      <div class="top-right">
-        <div class="row">
-          {calm ? (
-            <button class="prompt wave-pill" title="Chamar a onda agora rende ouro pelo tempo que sobrou" onClick={() => game.callWave()}>
-              <Icon name="caveira" style="color: var(--bad)" /> Onda {w.wave + 1}
-              {modsForWave(w.seed, w.wave + 1).length ? <span style="color: var(--warn)"> ({modsForWave(w.seed, w.wave + 1).map((k) => WAVE_MODS[k].name).join(', ')})</span> : null} em{' '}
-              <span style="color: var(--warn); font-variant-numeric: tabular-nums">{clock(w.waveTimer)}</span>
-            </button>
-          ) : (
-            <span class="prompt wave-pill attack">
-              <Icon name="caveira" style="color: var(--bad)" /> Onda {w.wave}
-              {w.waveMods.length ? <span style="color: var(--warn)"> · {w.waveMods.map((k) => WAVE_MODS[k].name).join(' · ')}</span> : null} · {left} monstros
+    <div class="hud-stack">
+      <div class="hud-top">
+        <button class={`chip castle-chip${hpFrac < 0.35 ? ' low' : ''}`} aria-label={`Castelo: ${Math.ceil(c?.hp ?? 0)} de ${c?.maxHp ?? 0} de vida. Toque para ir até ele.`} onClick={goCastle}>
+          <Icon name="castelo" />
+          <span class="castle-info">
+            <span class="chip-bar">
+              <span style={{ width: `${hpFrac * 100}%` }} />
             </span>
-          )}
-          <button class="hud-mute" aria-label={game.sound ? 'Desligar o som' : 'Ligar o som'} style="margin-left: 0" onClick={() => game.setSound(!game.sound)}>
-            <Icon name={game.sound ? 'som' : 'mudo'} />
-          </button>
-          <span class="speed">
-            <button class={`spd${game.speed === 0 ? ' active' : ''}`} aria-label="Pausar" onClick={() => game.setSpeed(0)}>
-              <Icon name="pausa" />
-            </button>
-            {[1, 2, 3].map((s) => (
-              <button class={`spd${game.speed === s ? ' active' : ''}`} onClick={() => game.setSpeed(s)}>
-                {s}×
-              </button>
-            ))}
+            <strong>{Math.ceil(c?.hp ?? 0)}</strong>
           </span>
-        </div>
-        {c && (
-          <div class="castle-hp">
-            Castelo{' '}
-            <div class="bar slim bar-hp">
-              <div class="fill" style={{ width: `${(100 * c.hp) / c.maxHp}%` }} />
-            </div>
+        </button>
+        {calm ? (
+          <button class="chip wave-chip" title="Chamar a onda agora rende ouro pelo tempo que sobrou" onClick={() => game.callWave()}>
+            <Icon name="caveira" />
+            <span class="wave-lines">
+              <strong>
+                Onda {w.wave + 1}
+                {nextMods.length ? ` · ${nextMods.join(', ')}` : ''}
+              </strong>
+              <span>em {clock(w.waveTimer)} · chamar</span>
+            </span>
+          </button>
+        ) : (
+          <div class="chip wave-chip attack" role="status">
+            <Icon name="caveira" />
+            <span class="wave-lines">
+              <strong>
+                Onda {w.wave} · {left}
+              </strong>
+              <span>{nowMods.length ? nowMods.join(' · ') : 'monstros'}</span>
+            </span>
           </div>
         )}
+        <div class="res-strip">
+          {RES_ORDER.filter((r) => r !== 'cristal' || crystal).map((r) => (
+            <span class={`res-item${r === 'ouro' ? ' gold' : ''}${r === 'comida' && w.hungry ? ' low' : ''}`} title={`${RES_LABEL[r]}: ${Math.floor(w.res[r])}`}>
+              <Icon name={r} />
+              {short(w.res[r])}
+              <span class="res-label">{RES_LABEL[r]}</span>
+            </span>
+          ))}
+          <span class="res-item" title={`Trabalhadores ${pop} · vagas nas casas ${housing(w)} · teto do castelo ${castleCap(w)}`}>
+            <Icon name="casa" />
+            {pop}/{room}
+            <span class="res-label">moradores</span>
+          </span>
+        </div>
+        <button class={`round pause${game.speed === 0 ? ' on' : ''}`} aria-label={game.speed === 0 ? 'Continuar' : 'Pausar'} onClick={() => game.togglePause()}>
+          <Icon name={game.speed === 0 ? 'play' : 'pausa'} />
+        </button>
+        <button class={`round speed${speed > 1 ? ' fast' : ''}`} aria-label={`Velocidade ${speed}×; toque para ${(speed % 3) + 1}×`} onClick={() => game.cycleSpeed()}>
+          {speed}×
+        </button>
+        <button
+          class="round more"
+          aria-label={game.unread && small ? `Mais opções: ${game.unread} avisos novos` : 'Mais opções'}
+          aria-expanded={more}
+          onClick={() => {
+            setMore(!more);
+            game.markRead();
+          }}
+        >
+          <Icon name="mais" />
+          {small && game.unread ? <span class="dot" /> : null}
+        </button>
       </div>
-    </>
+      {boss ? (
+        <div class="boss-card" role="status">
+          <header>
+            <strong>{MONSTERS[boss.kind].name}</strong>
+            <small>{MONSTERS[boss.kind].immuneArrows ? 'Flechas não ferem' : 'Magia não fere'}</small>
+          </header>
+          <div class="rbar">
+            <div style={{ width: `${(100 * boss.hp) / boss.maxHp}%`, background: 'var(--bad)' }} />
+          </div>
+        </div>
+      ) : null}
+      {more ? <MoreMenu game={game} onClose={() => setMore(false)} /> : null}
+    </div>
   );
 }
 
-function Tray({ game, onClose }: { game: Game; onClose: () => void }) {
-  const [cat, setCat] = useState<Category>('economia');
-  const w = game.world;
+/** O ⋯: som, relatório a cada onda e o diário de avisos. */
+function MoreMenu({ game, onClose }: { game: Game; onClose: () => void }) {
+  useEffect(() => {
+    game.markRead();
+  }, [game.log.length]);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    addEventListener('keydown', key);
+    return () => removeEventListener('keydown', key);
+  }, []);
   return (
-    <section class="tray" aria-label="Construir">
-      <div style="display: flex; align-items: center; gap: 8px">
-        <nav class="tabs" style="flex: 1; border: 0; padding: 0">
-          {CATS.map(([k, label]) => (
-            <button class={`tab${cat === k ? ' active' : ''}`} onClick={() => setCat(k)}>
-              {label}
-            </button>
-          ))}
-        </nav>
-        <button class="icon-btn" aria-label="Fechar" onClick={onClose}>
-          ×
+    <>
+      <div class="more-backdrop" onPointerDown={onClose} />
+      <section class="panel more-menu" aria-label="Opções">
+        <button class="more-row" onClick={() => game.setSound(!game.sound)}>
+          <Icon name={game.sound ? 'som' : 'mudo'} />
+          {game.sound ? 'Som ligado' : 'Som desligado'}
         </button>
-      </div>
-      <div class="choices">
-        {BUILD_MENU.filter((k) => BUILDINGS[k].category === cat).map((k) => {
-          const cost = game.costOf(k);
-          const why = levelProblem(w, k) ?? missing(w, cost);
-          return (
-            <button
-              class="choice"
-              disabled={!!why}
-              title={BUILDINGS[k].blurb}
-              onClick={() => {
-                game.startBuild(k);
-                onClose();
-              }}
-            >
-              {BUILDINGS[k].name}
-              <span>{costText(cost)}</span>
-              {why ? <small>{why}</small> : <span>{BUILDINGS[k].blurb}</span>}
-            </button>
-          );
-        })}
-      </div>
-    </section>
+        <label class="more-row">
+          <input type="checkbox" checked={game.autoReport} onChange={(e) => game.setAutoReport((e.target as HTMLInputElement).checked)} />
+          Relatório a cada onda vencida
+        </label>
+        <h3>Diário de avisos</h3>
+        <ol class="diary">
+          {game.log.length ? (
+            game.log.map((l) => (
+              <li key={l.id} class={l.tone}>
+                <span class="tone" aria-hidden="true" />
+                <span>{l.text}</span>
+                <small>{l.wave ? `onda ${l.wave}` : 'início'}</small>
+              </li>
+            ))
+          ) : (
+            <li class="empty">Nenhum aviso ainda.</li>
+          )}
+        </ol>
+      </section>
+    </>
   );
 }
 
@@ -416,30 +443,49 @@ function Lost({ game }: { game: Game }) {
 
 export function App({ game, cam, touch }: { game: Game; cam: IsoCamera; touch: boolean }) {
   useGame(game);
-  const [tray, setTray] = useState(false);
+  const [fan, setFan] = useState(false);
+  const [cat, setCat] = useState<Category | null>(null);
   const w = game.world;
   const sel = game.selected >= 0 ? w.buildings.get(game.selected) : undefined;
+  const small = window.matchMedia(SMALL).matches;
+  const free = game.mode.kind === 'none' && !sel && game.units.length === 0 && !game.boxMode;
+  const army = troops(w);
+  const closeFan = () => {
+    setFan(false);
+    setCat(null);
+  };
   return (
     <>
-      <Hud game={game} />
-      <div class="toasts">
-        {game.toasts.map((t) => (
-          <div key={t.id} class={`toast ${t.tone === 'info' ? '' : t.tone}`}>
-            {t.text}
-          </div>
-        ))}
-      </div>
-      {game.mode.kind === 'none' && !sel && game.units.length === 0 && !game.boxMode ? (
-        <div class="bottom-row">
-          <button class="nav-btn build-btn" onClick={() => setTray(!tray)}>
-            <Icon name="martelo" /> Construir
-          </button>
-          {troops(w) > 0 ? (
-            <button class="nav-btn" onClick={() => (setTray(false), game.setBoxMode(true))}>
-              <Icon name="caixa" /> Selecionar
+      <Hud game={game} cam={cam} small={small} />
+      {small ? null : (
+        <div class="toasts">
+          {game.toasts.map((t) => (
+            <div key={t.id} class={`toast ${t.tone === 'info' ? '' : t.tone}`}>
+              {t.text}
+            </div>
+          ))}
+        </div>
+      )}
+      {free && fan ? <div class="fan-backdrop" onPointerDown={closeFan} /> : null}
+      {free && fan ? <BuildFan game={game} touch={touch} cat={cat} setCat={setCat} close={closeFan} /> : null}
+      {free ? (
+        <>
+          {army > 0 && !fan ? (
+            <button class="fab fab-select" aria-label={`Selecionar tropas (${army})`} onClick={() => game.setBoxMode(true)}>
+              <Icon name="caixa" />
+              <span class="fab-badge">{army}</span>
+              <span class="fab-label">Selecionar</span>
             </button>
           ) : null}
-        </div>
+          <button
+            class={`fab fab-build${fan ? ' open' : ''}`}
+            aria-label={fan ? (cat ? 'Voltar às categorias' : 'Fechar Construir') : 'Construir'}
+            onClick={() => (fan ? (cat ? setCat(null) : closeFan()) : setFan(true))}
+          >
+            <Icon name={fan ? (cat ? 'voltar' : 'fechar') : 'martelo'} />
+            {fan ? null : <span class="fab-label">Construir</span>}
+          </button>
+        </>
       ) : null}
       {game.boxMode ? (
         <div class="placebar">
@@ -450,7 +496,6 @@ export function App({ game, cam, touch }: { game: Game; cam: IsoCamera; touch: b
         </div>
       ) : null}
       {game.units.length > 0 && game.mode.kind === 'none' ? <SelectionBar game={game} touch={touch} /> : null}
-      {tray && game.mode.kind === 'none' && !sel && game.units.length === 0 ? <Tray game={game} onClose={() => setTray(false)} /> : null}
       <PlaceBar game={game} touch={touch} />
       {sel && game.mode.kind === 'none' ? <RadialMenu key={sel.id} game={game} cam={cam} b={sel} touch={touch} /> : null}
       {w.report && !w.lost ? <Report key={w.report.wave} game={game} /> : null}

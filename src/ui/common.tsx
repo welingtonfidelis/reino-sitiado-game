@@ -23,6 +23,20 @@ export const ICONS: Record<string, string> = {
   som: 'M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11',
   mudo: 'M4 9v6h4l5 4V5L8 9zM16 9l5 6M21 9l-5 6',
   caixa: 'M4 4h4M4 4v4M20 4h-4M20 4v4M4 20h4M4 20v-4M20 20h-4M20 20v-4',
+  // HUD da etapa 12 e ícones das construções no leque do Construir.
+  castelo: 'M4 21V9h3V6h3v3h4V6h3v3h3v12zM10 21v-4h4v4',
+  play: 'M8 5l11 7-11 7z',
+  mais: 'M5 12h.01M12 12h.01M19 12h.01',
+  muralha: 'M3 20V9h3V6h3v3h2V6h2v3h2V6h3v3h3v11zM3 14.5h18M9 9v5.5M15 9v5.5M12 14.5V20',
+  portao: 'M4 21V9a8 8 0 0 1 16 0v12M12 3v18M4 13h16',
+  torre: 'M7 21V9L5 5h14l-2 4v12zM10 21v-4h4v4M10 12h.01M14 12h.01',
+  catapulta: 'M3 19h18M6 19l4-8 9-6M18.5 3a1.8 1.8 0 1 0 .01 0M10 11l3 8',
+  estacas: 'M4 20l3-13 3 13M10 20l3-13 3 13M16 20l2-9 2 9',
+  machado: 'M14 4l6 6-3 3-6-6zM12 9L4 20M15.5 5.5c-2 0-4 1.5-4.5 3.5',
+  arco: 'M6 3c7 3 7 15 0 18M6 3v18M6 12h14M17 9l3 3-3 3',
+  capela: 'M12 2v5M10 4h4M5 21V11l7-4 7 4v10zM10 21v-5h4v5',
+  ferradura: 'M7 4v8a5 5 0 0 0 10 0V4M5 4h4M15 4h4M8 9h.01M16 9h.01M8 13h.01M16 13h.01',
+  estrela: 'M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z',
   // Menu circular do prédio.
   recrutar: 'M9 4.5a3 3 0 1 0 0.01 0M3.5 20c0-3.3 2.4-5.5 5.5-5.5s5.5 2.2 5.5 5.5M18.5 8v6M15.5 11h6',
   recolher: 'M4 21V9l8-5 8 5v12M10 21v-5h4v5',
@@ -41,6 +55,14 @@ export function Icon({ name, style }: { name: string; style?: string }) {
       <path d={ICONS[name]} />
     </svg>
   );
+}
+
+/** Número curto para a faixa de recursos: 719, 1,2k, 12k. */
+export function short(n: number): string {
+  const v = Math.floor(n);
+  if (v < 1000) return String(v);
+  if (v < 10000) return `${(v / 1000).toFixed(1).replace('.0', '').replace('.', ',')}k`;
+  return `${Math.floor(v / 1000)}k`;
 }
 
 export const RES_LABEL: Record<Res, string> = { comida: 'comida', madeira: 'madeira', pedra: 'pedra', ferro: 'ferro', cristal: 'cristal', ouro: 'ouro' };
