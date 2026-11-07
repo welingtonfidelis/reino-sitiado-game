@@ -569,9 +569,11 @@ export class World3D {
   }
 
   /** Gente, monstros, flechas e barras: a cada quadro. */
-  syncDynamic(w: World, events: SimEvent[], dt: number): void {
+  /** dt: tempo do mundo (zero na pausa e na derrota); fxDt: tempo dos efeitos e da queda do castelo. */
+  syncDynamic(w: World, events: SimEvent[], dt: number, fxDt = dt): void {
     this.time += dt;
     const fx = this.fx;
+    this.stepFall(fxDt);
     const flip = (dx: number, dz: number) => dx * Math.cos(this.camYaw) - dz * Math.sin(this.camYaw) < 0;
     const castleAt = () => {
       for (const b of w.buildings.values()) if (b.kind === 'castelo') return hexToWorld(b.q, b.r);
@@ -593,7 +595,8 @@ export class World3D {
       else if (e.type === 'monsterFx') fx.play(e.fx, e.x, 0, e.z);
       else if (e.type === 'destroyed') {
         const p = hexToWorld(e.q, e.r);
-        fx.play('explosao', p.x, 0, p.z, { scale: e.kind === 'muralha' || e.kind === 'portao' ? 0.6 : 1 });
+        if (e.kind === 'castelo') this.startFall(p.x, p.z);
+        else fx.play('explosao', p.x, 0, p.z, { scale: e.kind === 'muralha' || e.kind === 'portao' ? 0.6 : 1 });
       } else if (e.type === 'waveEnd') {
         const p = castleAt();
         if (p) fx.play('moedas', p.x, 4.3, p.z);
@@ -822,7 +825,7 @@ export class World3D {
         const p = hexToWorld(t.q, t.r);
         this.portals.push(fx.play('portal', p.x, 0, p.z, { loop: true }));
       }
-      fx.update(dt, this.pxPerMeter);
+      fx.update(fxDt, this.pxPerMeter);
     }
     // Fendas: só brilham as abertas.
     const open = openRifts(Math.max(1, w.wave + (w.waveState === 'calm' ? 1 : 0)));
@@ -848,7 +851,74 @@ export class World3D {
   }
 
   /** Partida nova: para os laços (fogo e portais) e os efeitos em andamento. */
+  // ------------------------------------------------------------ queda do castelo (Etapa 13)
+
+  private fall: { g: THREE.Group; x: number; z: number; t: number; puff: number; boom: number; done: boolean } | null = null;
+
+  /**
+   * O castelo cai quando a partida se perde: uma cópia dele treme com poeira, afunda inclinando
+   * no chão (os escombros já estão no ladrilho) com explosões de terra, e some num estouro final.
+   * Dura uns 3 s; o diálogo de derrota espera (FALL_TIME no Game).
+   */
+  private startFall(x: number, z: number): void {
+    this.endFall();
+    const g = new THREE.Group();
+    for (const part of this.art.statics.castelo.parts) {
+      const m = new THREE.Mesh(part.geometry, part.material);
+      m.castShadow = true;
+      g.add(m);
+    }
+    const flag = new THREE.Group();
+    for (const part of this.art.statics.bandeira.parts) flag.add(new THREE.Mesh(part.geometry, part.material));
+    flag.position.y = 4.0;
+    flag.scale.setScalar(1.2);
+    g.add(flag);
+    g.position.set(x, 0, z);
+    this.scene.add(g);
+    this.fall = { g, x, z, t: 0, puff: 0, boom: 0.5, done: false };
+  }
+
+  private stepFall(dt: number): void {
+    const f = this.fall;
+    if (!f || f.done) return;
+    f.t += dt;
+    const t = f.t;
+    const fx = this.fx;
+    // Tremor forte no começo, mais leve enquanto afunda.
+    const shake = t < 2.6 ? Math.min(1, t / 0.25) * (t < 0.8 ? 0.08 : 0.04) : 0;
+    const k = Math.min(1, Math.max(0, (t - 0.6) / 2.0));
+    const sink = k * k * (3 - 2 * k);
+    f.g.position.set(f.x + Math.sin(t * 47) * shake, -sink * 4.8, f.z + Math.cos(t * 39) * shake);
+    f.g.rotation.set(sink * 0.18, 0, sink * 0.3);
+    if (fx) {
+      f.puff -= dt;
+      if (f.puff <= 0 && t < 2.8) {
+        f.puff = 0.12;
+        const a = Math.random() * Math.PI * 2;
+        const r = 0.7 + Math.random() * 0.9;
+        fx.play('poof', f.x + Math.cos(a) * r, 0, f.z + Math.sin(a) * r, { scale: 0.8 + Math.random() * 0.6, flip: Math.random() < 0.5 });
+      }
+      f.boom -= dt;
+      if (f.boom <= 0 && t > 0.5 && t < 2.6) {
+        f.boom = 0.38;
+        fx.play('explosao', f.x + (Math.random() - 0.5) * 1.8, 0, f.z + (Math.random() - 0.5) * 1.8, { scale: 0.7 + Math.random() * 0.5 });
+      }
+    }
+    if (t > 2.7) {
+      f.done = true;
+      this.scene.remove(f.g);
+      fx?.play('explosao', f.x, 0, f.z, { scale: 1.5 });
+      fx?.play('poof', f.x, 0, f.z, { scale: 1.8 });
+    }
+  }
+
+  private endFall(): void {
+    if (this.fall) this.scene.remove(this.fall.g);
+    this.fall = null;
+  }
+
   resetFx(): void {
+    this.endFall();
     if (!this.fx) return;
     for (const i of this.burning.values()) this.fx.stop('fogo', i);
     for (const i of this.portals) this.fx.stop('portal', i);

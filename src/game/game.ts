@@ -31,6 +31,7 @@ import {
   upgradeCastle,
   garrison,
   callArchers,
+  hexToWorld,
 } from '../sim/index.ts';
 import type { BlessingId, BuildingKind, ForgeLine, SimEvent, World } from '../sim/index.ts';
 
@@ -42,6 +43,9 @@ export interface Toast {
   tone: Tone;
   age: number;
 }
+
+/** Quanto dura a queda do castelo antes do diálogo de derrota (s). */
+export const FALL_TIME = 3.4;
 
 export class Game {
   world: World;
@@ -62,6 +66,10 @@ export class Game {
   unread = 0;
   /** Velocidade para onde a pausa volta (o botão de ritmo alterna 1×, 2× e 3×). */
   resumeSpeed = 1;
+  /** Segundos desde que o castelo caiu (-1: de pé). O diálogo de derrota espera a queda acabar. */
+  fallT = -1;
+  /** Onde o castelo estava quando caiu (a câmera vai até lá). */
+  fallAt: { x: number; z: number } | null = null;
   /** Eventos do último quadro (a tela usa para flechas). */
   frame: SimEvent[] = [];
   /** Abre o relatório a cada onda? Desligado, só abre quando há bênção para escolher. */
@@ -95,6 +103,8 @@ export class Game {
     this.unread = 0;
     this.speed = 1;
     this.resumeSpeed = 1;
+    this.fallT = -1;
+    this.fallAt = null;
     this.started = true;
     this.emit();
   }
@@ -129,6 +139,11 @@ export class Game {
     if (this.toasts.some((t) => t.age > 6)) {
       this.toasts = this.toasts.filter((t) => t.age <= 6);
       this.emit();
+    }
+    if (this.fallT >= 0) {
+      const before = this.fallT;
+      this.fallT += Math.min(dt, 0.1);
+      if (before < FALL_TIME && this.fallT >= FALL_TIME) this.emit();
     }
     if (!this.started || this.speed === 0 || this.world.lost) return;
     this.acc += Math.min(dt, 0.1) * this.speed;
@@ -167,6 +182,17 @@ export class Game {
         this.emit();
       }
       else if (e.type === 'destroyed' && e.id === this.selected) this.selected = -1;
+      if (e.type === 'destroyed' && e.kind === 'castelo') {
+        // Começa a queda do castelo (Etapa 13): o diálogo de derrota espera FALL_TIME.
+        this.fallT = 0;
+        this.fallAt = hexToWorld(e.q, e.r);
+        // A simulação para na derrota: atualiza já, para o castelo sair do desenho e os escombros entrarem.
+        refresh(this.world);
+        this.selected = -1;
+        this.mode = { kind: 'none' };
+        this.units = [];
+        this.boxMode = false;
+      }
       if (e.type === 'waveEnd') this.save();
       if (e.type === 'lost') clearSave();
     }

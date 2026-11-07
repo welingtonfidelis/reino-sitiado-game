@@ -417,7 +417,21 @@ Pedido do usuário em 2026-11-06, depois das pranchetas "HUD hoje no celular" e 
   - deitado, o cartão vai para o lado do leque quando em cima encostaria no HUD.
 - **Código:** `Hud` e `MoreMenu` em `src/ui/App.tsx`; `BuildFan` em `src/ui/Radial.tsx` (com os toques compartilhados com o menu do prédio, `pressProps`); diário e ritmo em `src/game/game.ts` (`log`, `unread`, `togglePause`, `cycleSpeed`); estilos no fim de `src/ui/style.css`.
 
-## 16. Arquitetura
+## 16. Queda do castelo (Etapa 13)
+
+Pedido do usuário em 2026-11-07 ("enfeites"). Antes, o castelo sumia e o diálogo "O castelo caiu" aparecia no mesmo instante; para uma criança, não ficava claro o que tinha acontecido.
+
+- **Uns 3 s antes do diálogo** (`FALL_TIME` = 3,4 s em `src/game/game.ts`):
+  - a câmera vai até o castelo e aproxima até a vista de 18 m;
+  - o castelo treme forte por 0,8 s, com nuvens de poeira (pixelfx "poof") em volta da base;
+  - de 0,6 s a 2,6 s ele afunda 4,8 m inclinando, com explosões de terra a cada 0,4 s; os escombros já estão no ladrilho, então ele some dentro deles;
+  - aos 2,7 s, um estouro final de terra e poeira;
+  - um estrondo grave e comprido (som "queda", feito na hora).
+- O mundo congela na derrota (personagens parados), mas a queda e a poeira andam em tempo real (`fxDt` em `syncDynamic`).
+- A simulação para no instante da derrota; o jogo chama `refresh` na hora, para o castelo sair do desenho e os escombros entrarem (antes ele continuaria desenhado).
+- Código: `startFall`/`stepFall` em `src/render/world3d.ts` (uma cópia do modelo do castelo e da bandeira); `fallT`/`fallAt` no `Game`; a câmera no laço de `src/main.tsx`.
+
+## 17. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
@@ -436,7 +450,7 @@ Pedido do usuário em 2026-11-06, depois das pranchetas "HUD hoje no celular" e 
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
 - `src/ui/App.tsx`: HUD, ⋯, botões flutuantes, avisos e telas de começo e fim. O menu do prédio e o leque do Construir ficam em `src/ui/Radial.tsx` (seções 14 e 15).
 
-## 17. Etapas
+## 18. Etapas
 
 | Etapa | O que | Situação |
 | --- | --- | --- |
@@ -452,8 +466,9 @@ Pedido do usuário em 2026-11-06, depois das pranchetas "HUD hoje no celular" e 
 | 10 | Ferramentas na mão dos trabalhadores, mapa de raio 16 e correção do alvo do morcego (seção 13) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 11 | Menu circular do prédio no lugar do painel quadrado, no computador e no celular (seção 14) | Pronta em 2026-11-06. Vista no navegador do Mac, em tamanho de computador e de celular; falta jogar no iPhone. |
 | 12 | HUD novo: topo em pilha, ritmo em dois botões, ⋯ com diário, avisos fora da tela no celular, botões flutuantes e Construir em leque (seção 15) | Pronta em 2026-11-06. Vista no navegador do Mac em 1024×768, 375×812, 844×390 e 360×640; falta jogar no iPhone. |
+| 13 | Queda do castelo antes do diálogo de derrota (seção 16) | Pronta em 2026-11-07. Vista no navegador do Mac (tremor, meio da queda e fim); falta jogar no iPhone e ouvir o estrondo. |
 
-## 18. Arte e licenças
+## 19. Arte e licenças
 
 Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art` (lista em `tools/art-manifest.ts`). Detalhes em `LICENSES.md`.
 

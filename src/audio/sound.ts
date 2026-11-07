@@ -3,9 +3,9 @@
  * mínimo, para cem flechas por segundo não virarem um chiado. O áudio só liga depois do
  * primeiro toque (exigência do iPhone).
  */
-export type Sfx = 'arco' | 'golpe' | 'morte' | 'pronto' | 'onda' | 'vitoria' | 'castelo' | 'magia' | 'cura' | 'nivel';
+export type Sfx = 'arco' | 'golpe' | 'morte' | 'pronto' | 'onda' | 'vitoria' | 'castelo' | 'magia' | 'cura' | 'nivel' | 'queda';
 
-const GAP: Record<Sfx, number> = { arco: 0.07, golpe: 0.09, morte: 0.08, pronto: 0.2, onda: 1, vitoria: 1, castelo: 0.4, magia: 0.12, cura: 0.3, nivel: 1 };
+const GAP: Record<Sfx, number> = { arco: 0.07, golpe: 0.09, morte: 0.08, pronto: 0.2, onda: 1, vitoria: 1, castelo: 0.4, magia: 0.12, cura: 0.3, nivel: 1, queda: 3 };
 
 export class Sound {
   private ctx: AudioContext | null = null;
@@ -62,6 +62,8 @@ export class Sound {
     const t = c.currentTime;
     const s = c.createBufferSource();
     s.buffer = this.noiseBuf;
+    // A amostra tem 1 s: em laço, os sons longos (o castelo desabando) não acabam no meio.
+    s.loop = true;
     const fl = c.createBiquadFilter();
     fl.type = filter;
     fl.frequency.setValueAtTime(f0, t);
@@ -111,6 +113,12 @@ export class Sound {
         break;
       case 'cura':
         this.tone('sine', 700, 1050, 0.3, 0.07);
+        break;
+      case 'queda':
+        // O castelo desabando: estrondo grave e comprido, com um segundo tombo no meio.
+        this.noise(2.2, 0.45, 'lowpass', 900, 60);
+        this.tone('sine', 70, 28, 1.8, 0.45);
+        this.tone('sine', 55, 25, 1.2, 0.35, 1.1);
         break;
       case 'nivel':
         [392, 523, 659, 784].forEach((f, i) => this.tone('triangle', f, f, 0.3, 0.12, i * 0.1));

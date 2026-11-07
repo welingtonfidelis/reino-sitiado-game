@@ -4,7 +4,7 @@ import './ui/style.css';
 import * as THREE from 'three';
 import { render } from 'preact';
 import { CONFIG, hexToWorld, worldToHex } from './sim/index.ts';
-import { Game } from './game/game.ts';
+import { FALL_TIME, Game } from './game/game.ts';
 import { loadArt } from './render/assets.ts';
 import { IsoCamera } from './render/camera.ts';
 import { World3D } from './render/world3d.ts';
@@ -136,6 +136,14 @@ function frame(now: number): void {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   game.update(dt);
+  // Queda do castelo (Etapa 13): a câmera vai até ele e aproxima um pouco.
+  if (game.fallAt && game.fallT >= 0 && game.fallT < 1.8) {
+    const k = 1 - Math.exp(-dt * 3.5);
+    cam.target.x += (game.fallAt.x - cam.target.x) * k;
+    cam.target.z += (game.fallAt.z + 1 - cam.target.z) * k;
+    cam.view += (Math.min(cam.view, 18) - cam.view) * k;
+    cam.apply();
+  }
   const w = game.world;
   if (w !== seenWorld) {
     seenWorld = w;
@@ -159,10 +167,13 @@ function frame(now: number): void {
     else if (e.type === 'waveStart') sound.play('onda');
     else if (e.type === 'waveEnd') sound.play('vitoria');
     else if (e.type === 'upgrade') sound.play('nivel');
-    else if (e.type === 'destroyed') sound.play('castelo');
+    else if (e.type === 'destroyed') sound.play(e.kind === 'castelo' ? 'queda' : 'castelo');
   }
   view.syncStatic(w);
-  view.syncDynamic(w, game.frame, game.started && game.speed > 0 && !w.lost ? dt * game.speed : 0);
+  const worldDt = game.started && game.speed > 0 && !w.lost ? dt * game.speed : 0;
+  // Na derrota o mundo congela, mas a queda do castelo e a poeira dela andam em tempo real.
+  const fxDt = w.lost && game.fallT >= 0 && game.fallT < FALL_TIME + 1.5 ? Math.min(dt, 0.1) : worldDt;
+  view.syncDynamic(w, game.frame, worldDt, fxDt);
   // Fantasma ao construir/mover, contorno no prédio selecionado.
   const m = game.mode;
   view.showGrid(m.kind === 'build' || m.kind === 'move');

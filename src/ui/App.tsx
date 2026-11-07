@@ -6,7 +6,7 @@
 import { useEffect, useReducer, useState } from 'preact/hooks';
 import { BUILDINGS, CONFIG, RES_ORDER, castle, castleCap, housing, troops, workers, missing, waveSize, MONSTERS, BLESSINGS, repairAllCost, modsForWave, waveSizeWithMods, WAVE_MODS, tileAt, hexToWorld } from '../sim/index.ts';
 import type { BlessingId, Category, MonsterKind, Res, UnitKind } from '../sim/index.ts';
-import { Game } from '../game/game.ts';
+import { FALL_TIME, Game } from '../game/game.ts';
 import type { IsoCamera } from '../render/camera.ts';
 import { Icon, RES_LABEL, costText, short } from './common.tsx';
 import { BuildFan, RadialMenu } from './Radial.tsx';
@@ -546,7 +546,7 @@ export function App({ game, cam, touch }: { game: Game; cam: IsoCamera; touch: b
   const w = game.world;
   const sel = game.selected >= 0 ? w.buildings.get(game.selected) : undefined;
   const small = window.matchMedia(SMALL).matches;
-  const free = game.mode.kind === 'none' && !sel && game.units.length === 0 && !game.boxMode;
+  const free = game.mode.kind === 'none' && !sel && game.units.length === 0 && !game.boxMode && !w.lost;
   const army = troops(w);
   const closeFan = () => {
     setFan(false);
@@ -598,7 +598,7 @@ export function App({ game, cam, touch }: { game: Game; cam: IsoCamera; touch: b
       {sel && game.mode.kind === 'none' ? <RadialMenu key={sel.id} game={game} cam={cam} b={sel} touch={touch} /> : null}
       {w.report && !w.lost ? <Report key={w.report.wave} game={game} /> : null}
       {!game.started ? <Intro game={game} /> : null}
-      {w.lost ? <Lost game={game} /> : null}
+      {w.lost && (game.fallT < 0 || game.fallT >= FALL_TIME) ? <Lost game={game} /> : null}
     </>
   );
 }
