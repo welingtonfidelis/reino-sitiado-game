@@ -83,7 +83,11 @@ function bot(w: World): void {
   // Economia.
   let pop = 0;
   for (const u of w.units.values()) if (u.state !== 'dead') pop++;
-  if (count(w, 'fazenda') < Math.ceil(pop / 16) + 1 && put(w, 'fazenda', 2, 7)) return;
+  if (count(w, 'fazenda') < Math.ceil(pop / 16) + 1) {
+    // Plantação só ao lado de um celeiro: sem vaga em volta dos que existem, ergue outro.
+    if (put(w, 'fazenda', 1, 8)) return;
+    if (put(w, 'celeiro', 2, 6)) return;
+  }
   if (housing(w) - wk <= 1 && housing(w) < castleCap(w) && put(w, 'casa', 1, 5)) return;
   if (count(w, 'serraria') < (wave >= 3 ? 3 : 2) && put(w, 'serraria', 2, 9)) return;
   if (count(w, 'pedreira') < (wave >= 6 ? 2 : 1) && put(w, 'pedreira', 2, 9)) return;

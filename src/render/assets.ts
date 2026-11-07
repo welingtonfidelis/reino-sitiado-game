@@ -49,6 +49,9 @@ export const STATIC_MODELS = {
   pedraC: 'medieval/rock_single_C.gltf',
   minerio: 'resource/Iron_Nuggets.gltf',
   bandeira: 'medieval/flag_blue.gltf',
+  feno: 'medieval/haybale.gltf',
+  saco: 'medieval/sack.gltf',
+  carrinho: 'medieval/wheelbarrow.gltf',
   flecha: 'medieval/projectile_arrow.gltf',
 } as const;
 export type StaticKey = keyof typeof STATIC_MODELS;

@@ -32,7 +32,7 @@ import {
   waveSize,
   workers,
 } from '../src/sim/index.ts';
-import { MONSTERS, UNITS, buyHero, heroCost, heroOf, heroProblem } from '../src/sim/index.ts';
+import { CROPS, DIRS, MONSTERS, UNITS, buyHero, cropOf, heroCost, heroOf, heroProblem } from '../src/sim/index.ts';
 import type { Monster, MonsterKind, World } from '../src/sim/index.ts';
 
 function run(w: World, seconds: number, stop?: (w: World) => boolean): void {
@@ -174,7 +174,9 @@ describe('tropas sem teto, ponto de encontro e ordens (Etapa 2)', () => {
     recruit(w, q.id);
     run(w, 30);
     const s = [...w.units.values()].find((u) => u.kind === 'soldado')!;
-    expect(Math.hypot(s.x - target.x, s.z - target.z)).toBeLessThan(0.6);
+    // Fica no lugar dele na roda em volta do ponto (a roda tem até ~1 m de raio).
+    expect(Math.hypot(s.postX - target.x, s.postZ - target.z)).toBeLessThan(1.1);
+    expect(Math.hypot(s.x - s.postX, s.z - s.postZ)).toBeLessThan(0.4);
   });
 
   it('mudar o ponto de encontro não chama quem já saiu', () => {
@@ -789,5 +791,39 @@ describe('heróis (Etapa 14)', () => {
     expect(h2.level).toBe(3);
     expect(h2.xp).toBe(1200);
     expect(h2.downT).toBe(10);
+  });
+});
+
+describe('fazenda em teste: celeiro e plantações em volta', () => {
+  it('o reino começa com o celeiro e uma plantação encostada nele', () => {
+    const w = createWorld(80);
+    const barn = [...w.buildings.values()].find((b) => b.kind === 'celeiro')!;
+    const farm = [...w.buildings.values()].find((b) => b.kind === 'fazenda')!;
+    expect(barn).toBeDefined();
+    expect(hexDist(barn.q, barn.r, farm.q, farm.r)).toBe(1);
+    // Nenhum hexágono em volta do celeiro inicial encosta no castelo.
+    for (const [dq, dr] of DIRS) expect(hexDist(barn.q + dq, barn.r + dr, 0, 0)).toBeGreaterThanOrEqual(2);
+  });
+
+  it('a plantação só vai num hexágono ao lado de um celeiro', () => {
+    const w = createWorld(81);
+    const barn = [...w.buildings.values()].find((b) => b.kind === 'celeiro')!;
+    const far = freeGrass(w, 30, 3, 6).find((p) => hexDist(p.q, p.r, barn.q, barn.r) > 1)!;
+    expect(placeProblem(w, 'fazenda', far.q, far.r)).toContain('celeiro');
+    const near = w.list.find((t) => hexDist(t.q, t.r, barn.q, barn.r) === 1 && t.b < 0 && t.terrain === 'grass')!;
+    expect(placeProblem(w, 'fazenda', near.q, near.r)).toBeNull();
+  });
+
+  it('cada celeiro dá as plantas em ordem: milho, tomate, trigo...', () => {
+    const w = createWorld(82);
+    w.res.madeira = 1000;
+    const barn = [...w.buildings.values()].find((b) => b.kind === 'celeiro')!;
+    for (const [dq, dr] of DIRS) {
+      const t = w.list.find((x) => x.q === barn.q + dq && x.r === barn.r + dr);
+      if (t && t.b < 0 && t.terrain === 'grass') addBuilding(w, 'fazenda', t.q, t.r, 1);
+    }
+    const farms = [...w.buildings.values()].filter((b) => b.kind === 'fazenda').sort((a, b) => a.id - b.id);
+    expect(farms.length).toBeGreaterThanOrEqual(3);
+    expect(farms.map((f) => cropOf(w, f))).toEqual(CROPS.slice(0, farms.length));
   });
 });

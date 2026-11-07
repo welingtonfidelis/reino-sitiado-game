@@ -45,6 +45,7 @@ export const ICONS: Record<string, string> = {
   novo: 'M4 12a8 8 0 1 0 2.3-5.7M4 4v5h5',
   check: 'M5 12l5 5 9-10',
   folha: 'M5 19c0-8 6-14 15-14-1 9-7 15-15 14zM5 19l8-8',
+  moinho: 'M12 21V12M9 21h6M12 12L8 4M12 12l8-3M12 12l4 8M12 12l-8 3',
   // Menu circular do prédio.
   recrutar: 'M9 4.5a3 3 0 1 0 0.01 0M3.5 20c0-3.3 2.4-5.5 5.5-5.5s5.5 2.2 5.5 5.5M18.5 8v6M15.5 11h6',
   recolher: 'M4 21V9l8-5 8 5v12M10 21v-5h4v5',

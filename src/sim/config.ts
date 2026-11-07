@@ -10,6 +10,7 @@ export type BuildingKind =
   | 'castelo'
   | 'casa'
   | 'fazenda'
+  | 'celeiro'
   | 'serraria'
   | 'pedreira'
   | 'mina'
@@ -35,7 +36,7 @@ export const HERO_KINDS: HeroKind[] = ['barbaro', 'atiradora', 'druida', 'cavale
 export const isHero = (k: UnitKind): k is HeroKind => (HERO_KINDS as UnitKind[]).includes(k);
 export type MonsterKind = 'esqueleto' | 'lobisomem' | 'orc' | 'bruto' | 'morcego' | 'bruxa' | 'troll' | 'necromante' | 'golem' | 'golemOssos';
 /** Onde o prédio pode ficar: chão livre, vizinho da floresta, vizinho da rocha, em cima do veio, em cima de muralha. */
-export type Site = 'grass' | 'nearForest' | 'nearRock' | 'ore' | 'wall';
+export type Site = 'grass' | 'nearForest' | 'nearRock' | 'ore' | 'wall' | 'nearBarn';
 
 export interface BuildingDef {
   name: string;
@@ -66,7 +67,10 @@ export interface BuildingDef {
 export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
   castelo: { name: 'Castelo', category: null, blurb: 'O coração do reino. Se cair, a partida acaba.', cost: {}, hp: 1500, build: 0, site: 'grass', housing: 4, breakCost: 1 },
   casa: { name: 'Casa', category: 'moradia', blurb: '+4 vagas. Os trabalhadores chegam sozinhos.', cost: { madeira: 30 }, hp: 150, build: 6, site: 'grass', housing: 4, breakCost: 6 },
-  fazenda: { name: 'Fazenda', category: 'economia', blurb: 'Comida. 2 trabalhadores.', cost: { madeira: 20 }, hp: 120, build: 6, site: 'grass', workers: 2, produces: 'comida', rate: 10, breakCost: 3 },
+  // Fazenda em teste (2026-11-07): o celeiro fica num hexágono e as plantações vão nos hexágonos
+  // em volta dele. A plantação é a antiga fazenda (mesmo preço e produção), só que ao lado de um celeiro.
+  celeiro: { name: 'Celeiro', category: 'economia', blurb: 'Centro da fazenda: as plantações vão nos hexágonos em volta dele.', cost: { madeira: 30 }, hp: 250, build: 6, site: 'grass', breakCost: 6 },
+  fazenda: { name: 'Plantação', category: 'economia', blurb: 'Comida. 2 trabalhadores. Ao lado de um celeiro.', cost: { madeira: 20 }, hp: 120, build: 6, site: 'nearBarn', workers: 2, produces: 'comida', rate: 10, breakCost: 3 },
   serraria: { name: 'Serraria', category: 'economia', blurb: 'Madeira. Precisa de floresta ao lado.', cost: { madeira: 25, pedra: 10 }, hp: 200, build: 8, site: 'nearForest', workers: 2, produces: 'madeira', rate: 16, breakCost: 6 },
   pedreira: { name: 'Pedreira', category: 'economia', blurb: 'Pedra. Precisa de rocha ao lado.', cost: { madeira: 40 }, hp: 200, build: 8, site: 'nearRock', workers: 2, produces: 'pedra', rate: 10, breakCost: 6 },
   mina: { name: 'Mina', category: 'economia', blurb: 'Ferro. Só em cima de um veio de minério.', cost: { madeira: 50, pedra: 20 }, hp: 220, build: 10, site: 'ore', workers: 2, produces: 'ferro', rate: 8, breakCost: 6 },
@@ -86,7 +90,7 @@ export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
 };
 
 /** O que aparece no menu Construir, em ordem. O portão vira de uma muralha. */
-export const BUILD_MENU: BuildingKind[] = ['casa', 'fazenda', 'serraria', 'pedreira', 'mina', 'muralha', 'portao', 'torre', 'catapulta', 'piche', 'estacas', 'quartel', 'campo', 'oficina', 'capela', 'forja', 'torreMago', 'estabulo'];
+export const BUILD_MENU: BuildingKind[] = ['casa', 'celeiro', 'fazenda', 'serraria', 'pedreira', 'mina', 'muralha', 'portao', 'torre', 'catapulta', 'piche', 'estacas', 'quartel', 'campo', 'oficina', 'capela', 'forja', 'torreMago', 'estabulo'];
 
 export interface UnitDef {
   name: string;

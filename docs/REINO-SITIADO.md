@@ -455,7 +455,19 @@ Pedido do usuário em 2026-11-07: para o jogo não ficar repetitivo quando sobra
 - **Robô (6 sementes):** com heróis, 22,5 ondas em média; sem heróis (`HEROIS=0 npm run balance`), 22,3. Eles chegam no fim e ajudam sem tirar o desafio; o ouro deixa de se acumular.
 - **Código:** `HERO_KINDS`, `HERO_INFO` e `CONFIG.heroes` em `src/sim/config.ts`; comportamento, golpes, nível e desmaio em `src/sim/step.ts` (`heroStep`, `heroSpecial`, `knockDown`); compra em `src/sim/commands.ts` (`buyHero`, `heroCost`, `heroProblem`); submenu em `src/ui/Radial.tsx` (`heroActs`).
 
-## 18. Arquitetura
+## 18. Fazenda com celeiro (Etapa 15)
+
+Pedido do usuário: um celeiro no centro, num hexágono, e as plantações em volta dele, cada uma no seu hexágono, pelo mesmo preço; só uma mudança visual. Aprovado pelo usuário em 2026-11-07.
+
+- **Celeiro** (novo, Economia): 30 de madeira. É o moinho do pack medieval no centro do hexágono, com fardos de feno, sacos e o carrinho de mão em volta. Não produz nada; é o centro da fazenda.
+- **Plantação** (a antiga fazenda, mesmo preço e produção: 20 de madeira, 2 trabalhadores, comida): só vai num hexágono ao lado de um celeiro ("A plantação vai ao lado de um celeiro"). É um canteiro de terra do tamanho do hexágono inteiro, então as plantações vizinhas se encostam sem grama no meio (pedido do usuário), com fileiras de trigo apontando para o celeiro; o moinho pequeno no canto saiu.
+- **Uma planta por plantação** (ideia do usuário): em volta de cada celeiro, na ordem em que são construídas, as plantações recebem milho, tomate, trigo, alface, cenoura e abóbora (seis, uma por hexágono vizinho). Só muda o desenho e o nome no cartão ("Plantação de milho"); a comida é a mesma. Plantação sem celeiro (jogos salvos antigos) pega uma planta pelo número dela. `cropOf` em `src/sim/world.ts`; modelos em `cropModel` (`world3d.ts`).
+- **Começo do jogo:** celeiro em (-3, 1), a 3 hexágonos do castelo, e uma plantação encostada nele, em (-3, 2). Assim nenhuma plantação em volta do celeiro encosta no castelo (pedido do usuário); os dois ladrilhos viram grama na criação do mapa.
+- **Jogos salvos antigos:** as fazendas de antes continuam de pé e produzindo; a regra só vale para construir ou mover.
+- **Robô:** quando não há vaga em volta dos celeiros, ergue outro. Com 12 mapas, 22,4 ondas em média, contra 21,3 antes; a diferença é ruído, a dificuldade não muda.
+- Código: `site: 'nearBarn'` em `src/sim/config.ts` e `placeProblem`; desenho em `world3d.ts` (`farmModel` e o celeiro no `syncStatic`).
+
+## 19. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
@@ -474,7 +486,7 @@ Pedido do usuário em 2026-11-07: para o jogo não ficar repetitivo quando sobra
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
 - `src/ui/App.tsx`: HUD, ⋯, botões flutuantes, avisos e telas de começo e fim. O menu do prédio e o leque do Construir ficam em `src/ui/Radial.tsx` (seções 14 e 15).
 
-## 19. Etapas
+## 20. Etapas
 
 | Etapa | O que | Situação |
 | --- | --- | --- |
@@ -492,8 +504,9 @@ Pedido do usuário em 2026-11-07: para o jogo não ficar repetitivo quando sobra
 | 12 | HUD novo: topo em pilha, ritmo em dois botões, ⋯ com diário, avisos fora da tela no celular, botões flutuantes e Construir em leque (seção 15) | Pronta em 2026-11-06. Vista no navegador do Mac em 1024×768, 375×812, 844×390 e 360×640; falta jogar no iPhone. |
 | 13 | Queda do castelo antes do diálogo de derrota (seção 16) | Pronta em 2026-11-07. Vista no navegador do Mac (tremor, meio da queda e fim); falta jogar no iPhone e ouvir o estrondo. |
 | 14 | Heróis: Bárbaro, Atiradora, Druida e Cavaleiro Negro, comprados no castelo (seção 17) | Pronta em 2026-11-07. Vista no navegador do Mac (compra, giro, os quatro modelos, submenu); falta jogar no iPhone. |
+| 15 | Fazenda com celeiro: plantações hexagonais em volta, uma planta por plantação (seção 18) | Pronta em 2026-11-07. Vista no navegador do Mac; falta jogar no iPhone. |
 
-## 20. Arte e licenças
+## 21. Arte e licenças
 
 Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art` (lista em `tools/art-manifest.ts`). Detalhes em `LICENSES.md`.
 

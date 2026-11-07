@@ -5,8 +5,8 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BUILDINGS, CONFIG, DIRS, HEX, hexToWorld, isHero, openRifts, tileAt } from '../sim/index.ts';
-import type { Building, BuildingKind, SimEvent, UnitKind, World } from '../sim/index.ts';
+import { BUILDINGS, CONFIG, CROPS, DIRS, HEX, cropOf, hexToWorld, isHero, openRifts, tileAt } from '../sim/index.ts';
+import type { Building, BuildingKind, Crop, SimEvent, UnitKind, World } from '../sim/index.ts';
 import type { Art, CharKey, StaticKey, StaticModel } from './assets.ts';
 import { CharView } from './chars.ts';
 import { buildGround } from './ground.ts';
@@ -120,6 +120,7 @@ interface Flight {
 const HOME: Record<BuildingKind, StaticKey> = {
   castelo: 'castelo',
   casa: 'casaA',
+  celeiro: 'moinho',
   fazenda: 'fazenda',
   serraria: 'serraria',
   pedreira: 'pedreira',
@@ -169,19 +170,85 @@ function spikesModel(): StaticModel {
   return { parts: [{ geometry, material: new THREE.MeshLambertMaterial({ color: '#8a6238', flatShading: true }) }], box: new THREE.Box3(new THREE.Vector3(-0.7, 0, -0.7), new THREE.Vector3(0.7, 0.6, 0.7)) };
 }
 
-/** Plantação sem base hexagonal (Etapa 8): canteiro de terra com fileiras de trigo. */
-function farmModel(): StaticModel {
-  const plot = new THREE.BoxGeometry(1.5, 0.06, 1.2).translate(0, 0.03, 0);
-  const rows: THREE.BufferGeometry[] = [];
-  for (let k = 0; k < 5; k++) rows.push(new THREE.BoxGeometry(1.3, 0.16, 0.13).translate(0, 0.12, -0.44 + k * 0.22));
-  const crop = mergeGeometries(rows)!;
-  return {
-    parts: [
-      { geometry: plot, material: new THREE.MeshLambertMaterial({ color: '#7a5a3a' }) },
-      { geometry: crop, material: new THREE.MeshLambertMaterial({ color: '#c9a646' }) },
-    ],
-    box: new THREE.Box3(new THREE.Vector3(-0.75, 0, -0.6), new THREE.Vector3(0.75, 0.2, 0.6)),
-  };
+/**
+ * Plantações em hexágono (fazenda em teste, 2026-11-07): canteiro de terra do tamanho do ladrilho
+ * e uma planta por plantação (milho, tomate, trigo, alface, cenoura, abóbora), em fileiras ao longo
+ * de x; quem desenha gira a plantação para as fileiras apontarem para o celeiro.
+ */
+const FIELD_R = HEX * 0.998;
+const lambert = (color: string) => new THREE.MeshLambertMaterial({ color, flatShading: true });
+const soil = lambert('#7a5a3a');
+
+/** Junta peças (indexadas ou não) numa geometria só. */
+function merge(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  return mergeGeometries(list.map((g) => (g.index ? g.toNonIndexed() : g)))!;
+}
+
+/** Pontos em fileiras (ao longo de x) dentro do hexágono, com folga da borda. */
+function fieldPoints(dx: number, dz: number, margin: number): [number, number][] {
+  const R = FIELD_R - margin;
+  const out: [number, number][] = [];
+  for (let z = -R; z <= R + 1e-6; z += dz) {
+    const half = (Math.sqrt(3) / 2) * R * Math.min(1, (R - Math.abs(z)) / (R / 2));
+    const n = Math.floor((2 * half) / dx);
+    for (let i = 0; i <= n; i++) out.push([-half + (2 * half - n * dx) / 2 + i * dx, z]);
+  }
+  return out;
+}
+
+function cropModel(crop: Crop): StaticModel {
+  const plot = new THREE.CylinderGeometry(FIELD_R, FIELD_R, 0.06, 6).translate(0, 0.03, 0);
+  const parts: { geometry: THREE.BufferGeometry; material: THREE.Material }[] = [{ geometry: plot, material: soil }];
+  const add = (color: string, list: THREE.BufferGeometry[]) => list.length && parts.push({ geometry: merge(list), material: lambert(color) });
+  const green: THREE.BufferGeometry[] = [];
+  const fruit: THREE.BufferGeometry[] = [];
+  if (crop === 'trigo') {
+    for (let k = -5; k <= 5; k++) {
+      const z = k * 0.2;
+      const half = (Math.sqrt(3) / 2) * FIELD_R * Math.min(1, (FIELD_R - Math.abs(z)) / (FIELD_R / 2)) - 0.07;
+      if (half > 0.08) fruit.push(new THREE.BoxGeometry(half * 2, 0.16, 0.11).translate(0, 0.12, z));
+    }
+    add('#c9a646', fruit);
+  } else if (crop === 'milho') {
+    for (const [x, z] of fieldPoints(0.2, 0.3, 0.12)) {
+      green.push(new THREE.BoxGeometry(0.045, 0.46, 0.045).translate(x, 0.29, z));
+      green.push(new THREE.BoxGeometry(0.16, 0.025, 0.04).rotateZ(0.5).translate(x + 0.05, 0.22, z));
+      fruit.push(new THREE.BoxGeometry(0.07, 0.13, 0.07).translate(x + 0.035, 0.34, z));
+    }
+    add('#5f9a3a', green);
+    add('#f2c94c', fruit);
+  } else if (crop === 'tomate') {
+    for (const [x, z] of fieldPoints(0.3, 0.32, 0.14)) {
+      green.push(new THREE.IcosahedronGeometry(0.12, 0).scale(1, 0.85, 1).translate(x, 0.15, z));
+      for (const [ox, oy, oz] of [[0.07, 0.2, 0.04], [-0.06, 0.17, 0.07], [0.01, 0.24, -0.07]] as const) fruit.push(new THREE.SphereGeometry(0.038, 6, 4).translate(x + ox, oy, z + oz));
+    }
+    add('#4f8a34', green);
+    add('#d9452e', fruit);
+  } else if (crop === 'alface') {
+    for (const [x, z] of fieldPoints(0.24, 0.26, 0.12)) green.push(new THREE.IcosahedronGeometry(0.1, 0).scale(1, 0.75, 1).translate(x, 0.12, z));
+    add('#8fd06a', green);
+  } else if (crop === 'cenoura') {
+    for (const [x, z] of fieldPoints(0.18, 0.24, 0.12)) {
+      green.push(new THREE.ConeGeometry(0.05, 0.16, 4).translate(x, 0.17, z));
+      fruit.push(new THREE.CylinderGeometry(0.04, 0.03, 0.05, 6).translate(x, 0.085, z));
+    }
+    add('#5fa83e', green);
+    add('#f08a2a', fruit);
+  } else {
+    // Abóbora: ramas finas ao longo das fileiras e abóboras espaçadas.
+    for (let k = -2; k <= 2; k++) {
+      const z = k * 0.42;
+      const half = (Math.sqrt(3) / 2) * FIELD_R * Math.min(1, (FIELD_R - Math.abs(z)) / (FIELD_R / 2)) - 0.1;
+      if (half > 0.1) green.push(new THREE.BoxGeometry(half * 2, 0.03, 0.05).translate(0, 0.075, z));
+    }
+    for (const [x, z] of fieldPoints(0.42, 0.42, 0.18)) {
+      fruit.push(new THREE.SphereGeometry(0.13, 8, 6).scale(1, 0.7, 1).translate(x, 0.14, z));
+      green.push(new THREE.BoxGeometry(0.03, 0.07, 0.03).translate(x, 0.25, z));
+    }
+    add('#4f8a34', green);
+    add('#e8892e', fruit);
+  }
+  return { parts, box: new THREE.Box3(new THREE.Vector3(-FIELD_R, 0, -FIELD_R), new THREE.Vector3(FIELD_R, 0.5, FIELD_R)) };
 }
 
 /** Cristais de um veio azul (não há modelo de cristal no KayKit local): prismas de seis faces. */
@@ -245,7 +312,8 @@ export class World3D {
   private ground: THREE.Mesh | null = null;
   private grid: THREE.LineSegments | null = null;
   private water: THREE.Mesh | null = null;
-  private farms!: Instanced;
+  /** Uma leva de plantações por planta (fazenda em teste). */
+  private farms = new Map<Crop, Instanced>();
   private pitch!: Instanced;
   private spikes!: Instanced;
   private rocksInFlight: Flight[] = [];
@@ -258,9 +326,10 @@ export class World3D {
     this.art = art;
     const big = (k: StaticKey, cap: number, cast = true, receive = false) => this.sets.set(k, new Instanced(scene, art.statics[k], cap, cast, receive));
     for (const k of ['arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina'] as StaticKey[]) big(k, 400);
+    for (const k of ['feno', 'saco', 'carrinho'] as StaticKey[]) big(k, 120);
     for (const k of ['castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina'] as StaticKey[]) big(k, 200);
     this.crystals = new Instanced(scene, crystalModel(), 200, true, false);
-    this.farms = new Instanced(scene, farmModel(), 120, true, true);
+    for (const c of CROPS) this.farms.set(c, new Instanced(scene, cropModel(c), 60, true, true));
     this.pitch = new Instanced(scene, pitchModel(), 120, false, true);
     this.spikes = new Instanced(scene, spikesModel(), 160, true, false);
     big('catapulta', 100);
@@ -409,12 +478,12 @@ export class World3D {
   syncStatic(w: World): void {
     if (w.ver === this.ver) return;
     this.ver = w.ver;
-    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'catapulta'];
+    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'feno', 'saco', 'carrinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'catapulta'];
     for (const k of keys) this.sets.get(k)!.begin();
     this.crystals.begin();
     this.pitch.begin();
     this.spikes.begin();
-    this.farms.begin();
+    for (const f of this.farms.values()) f.begin();
     const sixth = Math.PI / 3;
     for (const t of w.list) {
       const p = hexToWorld(t.q, t.r);
@@ -462,12 +531,28 @@ export class World3D {
         continue;
       }
       if (b.kind === 'fazenda') {
-        // Plantação própria, girada livre (Etapa 8), com o moinho num canto.
-        const r2 = (b.id * 0.9) % Math.PI;
-        this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r2);
+        // Plantação no hexágono, com as fileiras apontando para o celeiro vizinho.
+        let ang = 0;
+        for (const [dq, dr] of DIRS) {
+          const n = tileAt(w, b.q + dq, b.r + dr);
+          const nb = n && n.b >= 0 ? w.buildings.get(n.b) : undefined;
+          if (nb?.kind !== 'celeiro') continue;
+          const c = hexToWorld(nb.q, nb.r);
+          ang = Math.atan2(c.z - p.z, c.x - p.x);
+          break;
+        }
+        this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -ang);
         this.tmp.compose(this.p.set(p.x, 0, p.z), this.q, this.s.setScalar(1));
-        this.farms.push(this.tmp, b.id);
-        this.place('moinho', p.x + Math.cos(r2) * 0.8, 0, p.z - Math.sin(r2) * 0.8, r2, 0.8, b.id);
+        this.farms.get(cropOf(w, b))!.push(this.tmp, b.id);
+        continue;
+      }
+      if (b.kind === 'celeiro') {
+        // Celeiro: o moinho no centro do hexágono, com feno, sacos e o carrinho em volta.
+        this.place('moinho', p.x, 0, p.z, rot, 1, b.id);
+        this.place('feno', p.x + 0.55, 0, p.z + 0.5, 0.4, 0.9, b.id);
+        this.place('feno', p.x + 0.78, 0, p.z + 0.05, 1.3, 0.8, b.id);
+        this.place('saco', p.x - 0.62, 0, p.z + 0.45, 0.8, 0.9, b.id);
+        this.place('carrinho', p.x - 0.7, 0, p.z - 0.25, 2.2, 0.8, b.id);
         continue;
       }
       this.place(key, p.x, 0, p.z, rot, 1, b.id);
@@ -483,7 +568,7 @@ export class World3D {
       this.crystals.push(this.tmp);
     }
     this.crystals.end();
-    this.farms.end();
+    for (const f of this.farms.values()) f.end();
     this.pitch.end();
     this.spikes.end();
   }
@@ -555,7 +640,7 @@ export class World3D {
   pickBuilding(ray: THREE.Raycaster): number {
     let best = -1;
     let bd = Infinity;
-    for (const set of [this.farms, this.pitch, this.spikes])
+    for (const set of [...this.farms.values(), this.pitch, this.spikes])
     for (const m of set.meshes)
       for (const h of ray.intersectObject(m, false)) {
         const id = h.instanceId !== undefined ? (set.ids[h.instanceId] ?? -1) : -1;

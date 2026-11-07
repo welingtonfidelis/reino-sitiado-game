@@ -22,6 +22,8 @@ import {
   hexToWorld,
   housing,
   igniteProblem,
+  CROP_NAME,
+  cropOf,
   HERO_INFO,
   HERO_KINDS,
   heroCost,
@@ -517,7 +519,7 @@ export function RadialMenu({ game, cam, b, touch }: { game: Game; cam: IsoCamera
         aria-live="polite"
       >
         <header>
-          <strong>{b.kind === 'castelo' ? `Castelo · nível ${b.level}` : def.name}</strong>
+          <strong>{b.kind === 'castelo' ? `Castelo · nível ${b.level}` : b.kind === 'fazenda' ? `Plantação de ${CROP_NAME[cropOf(w, b)]}` : def.name}</strong>
           <button class="rcard-x" aria-label="Fechar" onClick={close}>
             <Icon name="fechar" />
           </button>
@@ -554,6 +556,7 @@ const CAT_ICON: Record<Category, string> = { economia: 'comida', moradia: 'casa'
 const BUILD_ICON: Record<BuildingKind, string> = {
   castelo: 'castelo',
   casa: 'casa',
+  celeiro: 'moinho',
   fazenda: 'comida',
   serraria: 'machado',
   pedreira: 'pedra',
@@ -573,7 +576,7 @@ const BUILD_ICON: Record<BuildingKind, string> = {
   estabulo: 'ferradura',
 };
 /** Rótulo curto embaixo do botão (o nome inteiro vai no cartão). */
-const SHORT: Partial<Record<BuildingKind, string>> = { torre: 'Torre', campo: 'Campo', piche: 'Piche', torreMago: 'Mago' };
+const SHORT: Partial<Record<BuildingKind, string>> = { torre: 'Torre', campo: 'Campo', piche: 'Piche', torreMago: 'Mago', fazenda: 'Plantação' };
 
 interface FanEntry {
   id: string;

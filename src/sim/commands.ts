@@ -41,6 +41,7 @@ export function placeProblem(w: World, kind: BuildingKind, q: number, r: number,
   if (t.terrain !== 'grass') return t.terrain === 'ore' || t.terrain === 'crystal' ? 'Veio de minério: guarde para a mina' : 'Terreno ocupado';
   if (def.site === 'nearForest' && !ns.some((n) => n?.terrain === 'forest')) return 'Precisa de floresta ao lado';
   if (def.site === 'nearRock' && !ns.some((n) => n?.terrain === 'rock')) return 'Precisa de rocha ao lado';
+  if (def.site === 'nearBarn' && !ns.some((n) => n && n.b >= 0 && n.b !== ignore && w.buildings.get(n.b)?.kind === 'celeiro')) return 'A plantação vai ao lado de um celeiro';
   return null;
 }
 

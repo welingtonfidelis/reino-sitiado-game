@@ -201,6 +201,38 @@ export function neighbors(w: World, t: Tile): Tile[] {
   return out;
 }
 
+/**
+ * Fazenda em teste: a planta de cada plantação. Em volta de cada celeiro, as plantações recebem
+ * as plantas na ordem em que foram construídas (pedido do usuário): a 1ª milho, a 2ª tomate, e
+ * assim por diante. Só muda o desenho e o nome; a comida é a mesma.
+ */
+export const CROPS = ['milho', 'tomate', 'trigo', 'alface', 'cenoura', 'abobora'] as const;
+export type Crop = (typeof CROPS)[number];
+export const CROP_NAME: Record<Crop, string> = { milho: 'milho', tomate: 'tomate', trigo: 'trigo', alface: 'alface', cenoura: 'cenoura', abobora: 'abóbora' };
+
+/** O celeiro ao lado da plantação (o primeiro que achar em volta), se houver. */
+export function barnOf(w: World, b: Building): Building | null {
+  for (const [dq, dr] of DIRS) {
+    const t = tileAt(w, b.q + dq, b.r + dr);
+    const n = t && t.b >= 0 ? w.buildings.get(t.b) : undefined;
+    if (n?.kind === 'celeiro') return n;
+  }
+  return null;
+}
+
+export function cropOf(w: World, b: Building): Crop {
+  const barn = barnOf(w, b);
+  if (!barn) return CROPS[b.id % CROPS.length]!;
+  const mine: number[] = [];
+  for (const [dq, dr] of DIRS) {
+    const t = tileAt(w, barn.q + dq, barn.r + dr);
+    const n = t && t.b >= 0 ? w.buildings.get(t.b) : undefined;
+    if (n?.kind === 'fazenda' && barnOf(w, n)?.id === barn.id) mine.push(n.id);
+  }
+  mine.sort((a, c) => a - c);
+  return CROPS[Math.max(0, mine.indexOf(b.id)) % CROPS.length]!;
+}
+
 export function castle(w: World): Building | undefined {
   return w.buildings.get(CASTLE_ID);
 }
@@ -468,7 +500,11 @@ export function createWorld(seed = 1, R = CONFIG.mapRadius): World {
   c.hp = c.maxHp;
   addBuilding(w, 'casa', -1, 2, 1);
   addBuilding(w, 'casa', 1, 1, 1);
-  addBuilding(w, 'fazenda', -2, 1, 1);
+  // A fazenda começa com o celeiro e uma plantação encostada nele. O celeiro fica a 3 hexágonos
+  // do castelo: assim nenhuma plantação em volta dele encosta no castelo (pedido do usuário).
+  for (const [q, r] of [[-3, 1], [-3, 2]] as const) tileAt(w, q, r)!.terrain = 'grass';
+  addBuilding(w, 'celeiro', -3, 1, 1);
+  addBuilding(w, 'fazenda', -3, 2, 1);
   for (let k = 0; k < CONFIG.startWorkers; k++) {
     const p = castleDoor(w);
     addUnit(w, 'trabalhador', p.x, p.z);

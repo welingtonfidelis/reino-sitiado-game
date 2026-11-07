@@ -43,6 +43,10 @@ export const MEDIEVAL: [string, string][] = [
     'rock_single_E',
   ].map((n) => ['decoration/nature', n] as [string, string]),
   ['decoration/props', 'flag_blue'],
+  // Fazenda em teste: enfeites em volta do celeiro.
+  ['decoration/props', 'haybale'],
+  ['decoration/props', 'sack'],
+  ['decoration/props', 'wheelbarrow'],
   ['units/neutral', 'projectile_arrow'],
   ['buildings/neutral', 'projectile_catapult'],
 ];
