@@ -4,46 +4,13 @@
  * avisos e as telas de começo e fim.
  */
 import { useEffect, useReducer, useState } from 'preact/hooks';
-import { BUILDINGS, BUILD_MENU, CONFIG, RES_ORDER, UNITS, castle, castleCap, housing, hexToWorld, troops, workers, recruitProblem, repairCost, repairProblem, missing, moveProblem, demolishProblem, upgradeCost, upgradeProblem, waveSize, MONSTERS, BLESSINGS, repairAllCost, levelProblem, forgeCost, forgeProblem, igniteProblem, modsForWave, waveSizeWithMods, WAVE_MODS } from '../sim/index.ts';
-import type { BlessingId, Building, Category, Cost, ForgeLine, MonsterKind, Res, UnitKind } from '../sim/index.ts';
+import { BUILDINGS, BUILD_MENU, CONFIG, RES_ORDER, castle, castleCap, housing, troops, workers, missing, waveSize, MONSTERS, BLESSINGS, repairAllCost, levelProblem, modsForWave, waveSizeWithMods, WAVE_MODS } from '../sim/index.ts';
+import type { BlessingId, Category, MonsterKind, Res, UnitKind } from '../sim/index.ts';
 import { Game } from '../game/game.ts';
 import type { IsoCamera } from '../render/camera.ts';
+import { Icon, RES_LABEL, costText } from './common.tsx';
+import { RadialMenu } from './Radial.tsx';
 
-const ICONS: Record<string, string> = {
-  comida: 'M12 21V8M12 12c-2.5 0-4-1.5-4-4 2.5 0 4 1.5 4 4zM12 12c2.5 0 4-1.5 4-4-2.5 0-4 1.5-4 4zM12 16.5c-2.5 0-4-1.5-4-4 2.5 0 4 1.5 4 4zM12 16.5c2.5 0 4-1.5 4-4-2.5 0-4 1.5-4 4z',
-  madeira: 'M17 7a3 5 0 1 0 0.01 0zM17 7H7c-1.7 0-3 2.2-3 5s1.3 5 3 5h10',
-  pedra: 'M4 17l2.5-7L11 6l6 1.5 3 5.5-2 5H6zM11 6l1 5 6 2M12 11l-5.5-1',
-  ferro: 'M3 17l3-7h12l3 7zM6 10l1.5-3h9L18 10',
-  cristal: 'M12 3l6 6-6 12-6-12zM6 9h12M12 3v18',
-  ouro: 'M5 8a7 3 0 1 0 14 0a7 3 0 1 0-14 0M5 8v4c0 1.7 3.1 3 7 3s7-1.3 7-3V8M5 12v4c0 1.7 3.1 3 7 3s7-1.3 7-3v-4',
-  casa: 'M3.5 11.5L12 5l8.5 6.5M6 10.5V20h12v-9.5M10 20v-5h4v5',
-  caveira: 'M12 3c-4.4 0-8 3.1-8 7.5 0 2.6 1.2 4.3 3 5.3V19h10v-3.2c1.8-1 3-2.7 3-5.3C20 6.1 16.4 3 12 3zM9 11h.01M15 11h.01',
-  pausa: 'M9 6v12M15 6v12',
-  martelo: 'M14 6l4 4M11.5 8.5l-7 7a1.4 1.4 0 0 0 2 2l7-7M12 5l3-2 6 6-2 3z',
-  mover: 'M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3',
-  melhorar: 'M12 19V6M6 11l6-6 6 6',
-  lixo: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13',
-  espadas: 'M4 4l11 11M15 15l2 2M14 18l4-4M20 4L9 15M9 15l-2 2M10 18l-4-4',
-  bandeira: 'M5 21V4M5 4h11l-2 4 2 4H5',
-  som: 'M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11',
-  mudo: 'M4 9v6h4l5 4V5L8 9zM16 9l5 6M21 9l-5 6',
-  caixa: 'M4 4h4M4 4v4M20 4h-4M20 4v4M4 20h4M4 20v-4M20 20h-4M20 20v-4',
-};
-
-function Icon({ name, style }: { name: string; style?: string }) {
-  return (
-    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true" style={style}>
-      <path d={ICONS[name]} />
-    </svg>
-  );
-}
-
-const RES_LABEL: Record<Res, string> = { comida: 'comida', madeira: 'madeira', pedra: 'pedra', ferro: 'ferro', cristal: 'cristal', ouro: 'ouro' };
-
-export function costText(c: Cost): string {
-  const parts = RES_ORDER.filter((r) => (c[r] ?? 0) > 0).map((r) => `${c[r]} de ${RES_LABEL[r]}`);
-  return parts.length ? parts.join(' · ') : 'grátis';
-}
 
 function clock(s: number): string {
   const t = Math.max(0, Math.ceil(s));
@@ -227,212 +194,6 @@ function PlaceBar({ game, touch }: { game: Game; touch: boolean }) {
         {m.kind === 'build' && m.b === 'muralha' ? 'Pronto' : 'Cancelar'}
       </button>
     </div>
-  );
-}
-
-function ActionBtn({ icon, label, why, danger, onClick }: { icon: string; label: string; why: string | null; danger?: boolean; onClick: () => void }) {
-  return (
-    <button class={`btn small${danger ? ' danger' : ''}`} disabled={!!why} title={why ?? label} onClick={onClick}>
-      <Icon name={icon} />
-      {label}
-      {why ? <span class="why">{why}</span> : null}
-    </button>
-  );
-}
-
-function BuildingMenu({ game, cam, b }: { game: Game; cam: IsoCamera; b: Building }) {
-  const [confirmKill, setConfirmKill] = useState(false);
-  const w = game.world;
-  const def = BUILDINGS[b.kind];
-  const p = hexToWorld(b.q, b.r);
-  const s = cam.toScreen(p.x, 1, p.z);
-  const left = Math.min(window.innerWidth - 350, Math.max(10, s.x + 40));
-  // Nunca sai da tela: o menu do castelo é alto, e a janela pode ser baixa.
-  const top = Math.max(10, Math.min(window.innerHeight - 500, Math.max(60, s.y - 160)));
-  const recruits = def.recruits;
-  const rep = repairCost(w, b);
-  const isCastle = b.kind === 'castelo';
-  const up = isCastle ? upgradeCost(w) : null;
-  return (
-    <section class="panel bmenu" style={{ left: `${left}px`, top: `${top}px` }} aria-label={def.name}>
-      <header class="panel-head">
-        <div class="panel-title">
-          <h2>{def.name}</h2>
-          <p class="sub">{isCastle ? `Nível ${b.level} · ${def.blurb}` : def.blurb}</p>
-        </div>
-        <button class="icon-btn" aria-label="Fechar" onClick={() => ((game.selected = -1), game.emit())}>
-          ×
-        </button>
-      </header>
-      <div class="panel-body">
-        <div class="bars">
-          {b.built < 1 ? (
-            <>
-              <label>Obra</label>
-              <div class="bar bar-xp">
-                <div class="fill" style={{ width: `${b.built * 100}%` }} />
-                <span class="bar-text">{Math.floor(b.built * 100)}%</span>
-              </div>
-            </>
-          ) : null}
-          <label>Vida</label>
-          <div class="bar bar-hp">
-            <div class="fill" style={{ width: `${(100 * b.hp) / b.maxHp}%` }} />
-            <span class="bar-text">
-              {Math.ceil(b.hp)}/{b.maxHp}
-            </span>
-          </div>
-          {def.workers ? (
-            <>
-              <label>Trabalho</label>
-              <div class="bar bar-loyalty">
-                <div class="fill" style={{ width: `${(100 * b.workers.length) / def.workers}%` }} />
-                <span class="bar-text">
-                  {b.workers.length} de {def.workers} trabalhadores
-                </span>
-              </div>
-            </>
-          ) : null}
-          {recruits ? (
-            <>
-              <label>Fila</label>
-              <div class="bar bar-xp">
-                <div class="fill" style={{ width: `${b.queue ? (100 * b.queueT) / UNITS[recruits].train : 0}%` }} />
-                <span class="bar-text">
-                  {b.queue} de {CONFIG.recruitQueue}
-                </span>
-              </div>
-            </>
-          ) : null}
-          {b.kind === 'torre' ? (
-            <>
-              <label>Guarnição</label>
-              <div class="bar bar-loyalty">
-                <div class="fill" style={{ width: `${(100 * b.archers.length) / (def.slots ?? 2)}%` }} />
-                <span class="bar-text">
-                  {b.archers.length} de {def.slots} arqueiros
-                </span>
-              </div>
-            </>
-          ) : null}
-        </div>
-        {isCastle ? (
-          <p class="sub" style="margin-top: 0.5rem">
-            Trabalhadores {workers(w)} · vagas nas casas {housing(w)} · teto do castelo {castleCap(w)} · tropas {troops(w)}, sem teto.
-          </p>
-        ) : null}
-        {b.kind === 'torre' ? <p class="sub">Arqueiros treinados no campo de tiro sobem sozinhos.</p> : null}
-        {b.kind === 'forja' && b.built >= 1 ? <ForgePanel game={game} /> : null}
-        {b.kind === 'catapulta' ? <p class="sub">Atira sozinha a cada 4 s no monstro com mais vida entre 3 e 12 m. Não acerta quem voa.</p> : null}
-        {b.kind === 'estacas' ? <p class="sub">Golpes que ainda aguenta: {Math.max(0, Math.ceil(b.hp))} de {def.hp}. Ninguém para aqui: a horda passa por cima e se fere.</p> : null}
-        {b.kind === 'piche' ? (
-          <>
-            <p class="sub">
-              {b.burn > 0
-                ? `Queimando: mais ${Math.ceil(b.burn)} s de fogo em quem estiver em cima.`
-                : 'Quem passa anda pela metade. Com a bênção Flechas em brasa, a primeira flecha acende sozinha.'}
-            </p>
-            <button class="btn primary big" style="margin-top: 0.4rem" disabled={!!igniteProblem(w, b)} onClick={() => game.ignite(b.id)}>
-              Acender o piche ({costText(CONFIG.pitch.igniteCost)}){igniteProblem(w, b) ? <small> · {igniteProblem(w, b)}</small> : null}
-            </button>
-          </>
-        ) : null}
-        {recruits ? (
-          <>
-            <p class="sub" style="margin-top: 0.5rem">
-              Cada recruta é um trabalhador que sai da vila (a vaga dele volta a ser preenchida).
-              {b.rally ? ' Saem para o ponto de encontro.' : ''}
-            </p>
-            <button class="btn primary big" style="margin-top: 0.4rem" disabled={!!recruitProblem(w, b)} onClick={() => game.recruit(b.id)}>
-              Recrutar {UNITS[recruits].name.toLowerCase()} ({costText(UNITS[recruits].cost)})
-              {recruitProblem(w, b) ? <small> · {recruitProblem(w, b)}</small> : null}
-            </button>
-          </>
-        ) : null}
-        {isCastle && w.blessings.length ? (
-          <p class="sub">Bênçãos: {w.blessings.map((id) => BLESSINGS[id].name).join(', ')}.</p>
-        ) : null}
-        {isCastle ? (
-          <ShelterButton game={game} />
-        ) : null}
-        {isCastle ? (
-          <label class="report-pref">
-            <input type="checkbox" checked={game.autoReport} onChange={(e) => game.setAutoReport((e.target as HTMLInputElement).checked)} />
-            Relatório a cada onda vencida
-          </label>
-        ) : null}
-        {isCastle ? (
-          <button class="btn primary big" style="margin-top: 0.4rem" disabled={!!upgradeProblem(w)} onClick={() => game.upgrade()}>
-            {up ? `Melhorar castelo (${costText(up)})` : 'Castelo no nível máximo'}
-            {up && upgradeProblem(w) ? <small> · {upgradeProblem(w)}</small> : null}
-          </button>
-        ) : null}
-        <div class="actions" style={recruits ? 'grid-template-columns: repeat(4, minmax(0, 1fr))' : undefined}>
-          {recruits ? <ActionBtn icon="bandeira" label="Encontro" why={b.built < 1 ? 'Ainda em obra' : null} onClick={() => game.startRally(b.id)} /> : null}
-          <ActionBtn icon="mover" label="Mover" why={moveProblem(w, b)} onClick={() => game.startMove(b.id)} />
-          <ActionBtn icon="martelo" label={Object.keys(rep).length ? `Consertar` : 'Consertar'} why={repairProblem(w, b)} onClick={() => game.repair(b.id)} />
-          <ActionBtn
-            icon="lixo"
-            label={confirmKill ? 'Confirmar' : 'Destruir'}
-            why={demolishProblem(w, b)}
-            danger
-            onClick={() => {
-              if (!confirmKill) setConfirmKill(true);
-              else game.demolish(b.id);
-            }}
-          />
-        </div>
-        {Object.keys(rep).length && !repairProblem(w, b) ? <p class="sub">Consertar custa {costText(rep)}.</p> : null}
-      </div>
-    </section>
-  );
-}
-
-const FORGE: [ForgeLine, string, string][] = [
-  ['armas', 'Armas', '+20% de dano corpo a corpo e dos magos por nível'],
-  ['armaduras', 'Armaduras', '+20% de vida das tropas por nível, inclusive as de agora'],
-  ['flechas', 'Pontas de ferro', '+15% de dano das flechas por nível'],
-];
-
-function ForgePanel({ game }: { game: Game }) {
-  const w = game.world;
-  return (
-    <div class="choices" style="margin-top: 0.5rem">
-      {FORGE.map(([line, name, text]) => {
-        const cost = forgeCost(w, line);
-        const why = forgeProblem(w, line);
-        return (
-          <button class="choice" disabled={!!why} onClick={() => game.forge(line)}>
-            {name} · nível {w.forge[line]} de 3
-            <span>{text}</span>
-            <span>{cost ? costText(cost) : 'Nível máximo'}{why && cost ? ` · ${why}` : ''}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function ShelterButton({ game }: { game: Game }) {
-  const w = game.world;
-  let inside = 0;
-  let all = 0;
-  for (const u of w.units.values()) {
-    if (u.kind !== 'trabalhador' || u.state === 'dead') continue;
-    all++;
-    if (u.state === 'shelter') inside++;
-  }
-  return (
-    <>
-      <button class={`btn big${w.shelter ? '' : ' danger'}`} style="margin-top: 0.5rem" onClick={() => game.toggleShelter()}>
-        {w.shelter ? 'Liberar os trabalhadores' : 'Recolher os trabalhadores no castelo'}
-      </button>
-      <p class="sub">
-        {w.shelter
-          ? `${inside} de ${all} já estão lá dentro. Ninguém trabalha enquanto estiverem recolhidos.`
-          : 'Dentro do castelo a horda não os alcança, mas a produção para.'}
-      </p>
-    </>
   );
 }
 
@@ -691,7 +452,7 @@ export function App({ game, cam, touch }: { game: Game; cam: IsoCamera; touch: b
       {game.units.length > 0 && game.mode.kind === 'none' ? <SelectionBar game={game} touch={touch} /> : null}
       {tray && game.mode.kind === 'none' && !sel && game.units.length === 0 ? <Tray game={game} onClose={() => setTray(false)} /> : null}
       <PlaceBar game={game} touch={touch} />
-      {sel && game.mode.kind === 'none' ? <BuildingMenu key={sel.id} game={game} cam={cam} b={sel} /> : null}
+      {sel && game.mode.kind === 'none' ? <RadialMenu key={sel.id} game={game} cam={cam} b={sel} touch={touch} /> : null}
       {w.report && !w.lost ? <Report key={w.report.wave} game={game} /> : null}
       {!game.started ? <Intro game={game} /> : null}
       {w.lost ? <Lost game={game} /> : null}

@@ -4,7 +4,7 @@ Tower defense sem fim em 2.5D isométrico. O jogador ergue um reino em volta do 
 
 Nome provisório. Proposta visual (canvas, design system Vigília): https://claude.ai/artifact/E2kdbKNuRkqvb9bmsePrsy
 
-Repositório: https://github.com/welingtonfidelis/reino-sitiado-game (criado pelo usuário em 2026-11-06). As etapas 1 a 10 estão na `main`; cada etapa tem o seu commit ("Etapa N: …" no `git log`). Commit e push só quando o usuário pedir.
+Repositório: https://github.com/welingtonfidelis/reino-sitiado-game (criado pelo usuário em 2026-11-06). As etapas 1 a 11 estão na `main`; cada etapa tem o seu commit ("Etapa N: …" no `git log`). Commit e push só quando o usuário pedir.
 
 ## 1. Decisões
 
@@ -61,7 +61,7 @@ No console: `game`, `view`, `cam` e `snap('nome')` (salva `reports/snap-nome.png
   | Defesa | muralha; portão (em cima de uma muralha pronta); torre de arqueiros |
   | Militar | quartel; campo de tiro |
 
-- **Menu do prédio:**
+- **Menu do prédio** (desde a etapa 11 é um anel em volta do prédio; veja a seção 14):
   - vida, obra, trabalhadores, fila e guarnição;
   - recrutar (quartel e campo);
   - melhorar (castelo);
@@ -345,7 +345,36 @@ Pedido do usuário em 2026-11-06: ferramentas na mão dos trabalhadores e um map
   - sem fazer nada: onda 4.
   - O mapa maior dá alguns segundos a mais até a horda chegar.
 
-## 14. Arquitetura
+## 14. Menu circular do prédio (Etapa 11)
+
+Pedido do usuário em 2026-11-06, depois do esboço "Menu circular de prédio" no canvas de design. Vale no computador e no celular. Substitui o painel quadrado.
+
+- **Anel:** tocar no prédio abre os botões num anel em volta dele, e o anel acompanha o prédio ao arrastar e dar zoom. Tocar fora (ou Esc) fecha.
+  - Se o prédio sai da tela, o anel some e volta quando ele reaparece; a seleção continua.
+- **Casas fixas:** cada ação tem o seu lugar, para a mão decorar. Prédio sem a ação deixa a casa vazia.
+
+| Casa | Ação |
+| --- | --- |
+| Topo | a principal: Recrutar (prédios de tropa), Melhorar (castelo), Melhorias (forja), Acender (piche) |
+| Direita | Encontro (prédios de tropa), Recolher ou Liberar (castelo) |
+| Baixo à direita | Consertar |
+| Baixo à esquerda | Destruir (o castelo não tem) |
+| Esquerda | Mover; no castelo, que não se move, o liga-desliga do relatório |
+
+- **Cartão:** nome, vida, obra, trabalho, fila ou arqueiros, e o que o botão em foco faz e custa.
+  - Fica acima do anel, longe do dedo. Sem espaço entre o anel e o HUD, desce para baixo do anel.
+  - Sem botão em foco, mostra a ação principal; prédio sem ação principal mostra a nota dele (torre, catapulta, estacas, piche, castelo).
+- **Toques:**
+  - um toque executa;
+  - botão apagado não executa: o toque mostra o motivo no cartão;
+  - segurar o botão (ou passar o mouse) só mostra a explicação;
+  - Destruir pede dois toques: o primeiro vira uma pílula vermelha "Toque de novo para destruir" e apaga os outros botões; tocar fora ou Esc cancela.
+- **Recrutar:** a fila aparece no número dourado e o próximo recruta num aro em volta do botão.
+- **Forja:** Melhorias troca o anel pelas três linhas (armas, armaduras, pontas), com o nível no rótulo. O botão do meio volta.
+- **Borda de baixo:** com o prédio colado nela, o anel vira leque aberto para cima, na mesma ordem em volta e com raio maior. Perto das laterais, o anel encosta para dentro da tela.
+- **Código:** `src/ui/Radial.tsx` (o anel e o cartão); ícones e texto de custo em `src/ui/common.tsx`; estilos `.radial`, `.rbtn` e `.rcard` em `src/ui/style.css`.
+
+## 15. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
@@ -362,9 +391,9 @@ Pedido do usuário em 2026-11-06: ferramentas na mão dos trabalhadores e um map
   - `camera.ts`: câmera isométrica com arrastar, pinça, roda e toque.
 - **Muralha:** cada trecho desenha meio muro até cada vizinho que também é muralha e um poste nas curvas e pontas. O portão segue a linha dos dois vizinhos opostos.
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
-- `src/ui/App.tsx`: HUD, bandeja Construir, menu do prédio, avisos e telas de começo e fim.
+- `src/ui/App.tsx`: HUD, bandeja Construir, avisos e telas de começo e fim. O menu do prédio fica em `src/ui/Radial.tsx` (seção 14).
 
-## 15. Etapas
+## 16. Etapas
 
 | Etapa | O que | Situação |
 | --- | --- | --- |
@@ -378,8 +407,9 @@ Pedido do usuário em 2026-11-06: ferramentas na mão dos trabalhadores e um map
 | 8 | Texturas de grama e solo, lagos com água animada, plantação e rochas sem base hexagonal (seção 11) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 9 | Catapulta, fosso de piche, estacas e um modificador de onda a cada 5 ondas (seção 12) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 10 | Ferramentas na mão dos trabalhadores, mapa de raio 16 e correção do alvo do morcego (seção 13) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
+| 11 | Menu circular do prédio no lugar do painel quadrado, no computador e no celular (seção 14) | Pronta em 2026-11-06. Vista no navegador do Mac, em tamanho de computador e de celular; falta jogar no iPhone. |
 
-## 16. Arte e licenças
+## 17. Arte e licenças
 
 Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art` (lista em `tools/art-manifest.ts`). Detalhes em `LICENSES.md`.
 
