@@ -44,7 +44,7 @@ body {
 .toasts {
   position: absolute;
   left: max(10px, env(safe-area-inset-left));
-  bottom: max(104px, calc(env(safe-area-inset-bottom) + 96px));
+  bottom: max(16px, calc(env(safe-area-inset-bottom) + 8px));
   width: min(21rem, calc(100vw - 20px));
   pointer-events: none;
 }
@@ -783,7 +783,7 @@ button.chip {
   white-space: nowrap;
 }
 
-/* Botões flutuantes de baixo: Construir no meio, Selecionar à esquerda. */
+/* Botões flutuantes embaixo à direita: Construir no canto, Selecionar ao lado dele. */
 .fab {
   position: absolute;
   display: flex;
@@ -803,7 +803,7 @@ button.chip {
 .fab-build {
   width: 60px;
   height: 60px;
-  left: calc(50% - 30px);
+  right: max(14px, env(safe-area-inset-right));
   bottom: max(16px, calc(env(safe-area-inset-bottom) + 6px));
   background: var(--primary);
   border: 2px solid var(--gold);
@@ -817,10 +817,11 @@ button.chip {
 .fab-select {
   width: 52px;
   height: 52px;
-  left: max(14px, env(safe-area-inset-left));
-  bottom: max(20px, calc(env(safe-area-inset-bottom) + 10px));
+  /* 28 px de espaço até o Construir; mesma base que ele, para os rótulos ficarem na mesma linha. */
+  right: calc(max(14px, env(safe-area-inset-right)) + 88px);
+  bottom: max(16px, calc(env(safe-area-inset-bottom) + 6px));
   background: var(--panel-2);
-  border: 1.5px solid var(--line);
+  border: 2px solid var(--line);
   color: var(--text);
 }
 .fab-badge {
@@ -861,7 +862,7 @@ button.chip {
     bottom: 34px;
   }
   .fab-select {
-    bottom: 38px;
+    bottom: 34px;
   }
 }
 .fan-backdrop {

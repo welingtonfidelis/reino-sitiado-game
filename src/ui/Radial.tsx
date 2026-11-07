@@ -523,7 +523,8 @@ function Costs({ c }: { c: Cost }) {
 }
 
 /**
- * Construir em leque (etapa 12): o martelo embaixo abre as categorias em meia-lua; tocar numa
+ * Construir em leque (etapa 12): o martelo no canto de baixo à direita abre as categorias num
+ * quarto de círculo (duas fileiras quando são muitas opções); tocar numa
  * categoria troca o leque pelas opções dela. O martelo vira X (fecha) nas categorias e seta
  * (volta) dentro de uma categoria; quem cuida disso é o botão, no App. Categoria com uma opção
  * só (a moradia, que só tem a casa) já coloca direto.
@@ -586,20 +587,44 @@ export function BuildFan({ game, touch, cat, setCat, close }: { game: Game; touc
   const size = vw < 380 ? 48 : 52;
   const half = size / 2;
   const n = entries.length;
-  const R = Math.min(n <= 4 ? 118 : n <= 6 ? 140 : 154, vw / 2 - 40);
-  const [a0, a1] = cat ? [-170, -10] : [-165, -15];
+  // Martelo no canto da direita: o leque abre em um quarto de círculo, para a esquerda e para
+  // cima; com mais de 4 opções, duas fileiras (para os rótulos não se encostarem). Martelo no
+  // meio (se o CSS mudar): meia-lua para cima.
+  const corner = cx > vw * 0.66;
+  const spread = (k: number, a0: number, a1: number, r: number) =>
+    Array.from({ length: k }, (_, i) => ({ ang: a0 + ((a1 - a0) * i) / Math.max(1, k - 1), r }));
+  let slots: { ang: number; r: number }[];
+  if (corner) {
+    if (n <= 4) slots = spread(n, -180, -90, 130);
+    else {
+      const inner = Math.floor(n / 2);
+      slots = [...spread(inner, -180, -90, 112), ...spread(n - inner, -180, -90, 196)];
+    }
+  } else {
+    const R = Math.min(n <= 4 ? 118 : n <= 6 ? 140 : 154, vw / 2 - 40);
+    slots = cat ? spread(n, -170, -10, R) : spread(n, -165, -15, R);
+  }
+  const Rmax = Math.max(...slots.map((p) => p.r));
 
   const shown = entries.find((e) => e.id === focus) ?? null;
   const cardW = Math.min(300, vw - 16);
-  const fanTop = cy - R - half - 8;
+  const fanTop = cy - Rmax - half - 8;
   const card = useRef<HTMLElement>(null);
   const cardH = card.current?.offsetHeight ?? 130;
-  // O cartão vai acima do leque; se encostaria no HUD (celular deitado), vai para o lado.
-  const sideLeft = cx + R + half + 18;
-  const side = fanTop - 10 - cardH < hudBottom() && vw - sideLeft - 8 >= 200;
-  const cardStyle = side
-    ? { left: `${sideLeft}px`, bottom: `${vh - cy + 4}px`, width: `${Math.min(cardW, vw - sideLeft - 8)}px` }
-    : { left: `${clamp(cx - cardW / 2, 8, vw - cardW - 8)}px`, bottom: `${vh - fanTop + 10}px`, width: `${cardW}px` };
+  // O cartão vai acima do leque; se encostaria no HUD (celular deitado), vai para o lado livre.
+  const above = fanTop - 10 - cardH >= hudBottom();
+  const sideRight = cx - Rmax - half - 18;
+  const sideLeft = cx + Rmax + half + 18;
+  let cardStyle: Record<string, string>;
+  if (above || (corner ? sideRight < 208 : vw - sideLeft < 208)) {
+    const left = corner ? clamp(cx + half - cardW, 8, vw - cardW - 8) : clamp(cx - cardW / 2, 8, vw - cardW - 8);
+    cardStyle = { left: `${left}px`, bottom: `${vh - fanTop + 10}px`, width: `${cardW}px` };
+  } else if (corner) {
+    const wd = Math.min(cardW, sideRight - 8);
+    cardStyle = { left: `${sideRight - wd}px`, bottom: `${vh - cy + 4}px`, width: `${wd}px` };
+  } else {
+    cardStyle = { left: `${sideLeft}px`, bottom: `${vh - cy + 4}px`, width: `${Math.min(cardW, vw - sideLeft - 8)}px` };
+  }
 
   const activate = (e: FanEntry) => {
     if (e.why) {
@@ -611,9 +636,10 @@ export function BuildFan({ game, touch, cat, setCat, close }: { game: Game; touc
   return (
     <div class="radial" aria-label={cat ? `Construir: ${CAT_NAME[cat]}` : 'Construir'}>
       {entries.map((e, i) => {
-        const ang = ((a0 + ((a1 - a0) * i) / Math.max(1, n - 1)) * Math.PI) / 180;
-        const x = cx + R * Math.cos(ang);
-        const y = cy + R * Math.sin(ang);
+        const p = slots[i]!;
+        const ang = (p.ang * Math.PI) / 180;
+        const x = cx + p.r * Math.cos(ang);
+        const y = cy + p.r * Math.sin(ang);
         const cls = ['rbtn', e.why ? 'off' : '', focus === e.id ? 'focus' : ''].filter(Boolean).join(' ');
         return (
           <button

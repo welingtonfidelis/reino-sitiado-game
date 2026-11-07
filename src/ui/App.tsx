@@ -77,11 +77,9 @@ function Hud({ game, cam, small }: { game: Game; cam: IsoCamera; small: boolean 
           <button class="chip wave-chip" title="Chamar a onda agora rende ouro pelo tempo que sobrou" onClick={() => game.callWave()}>
             <Icon name="caveira" />
             <span class="wave-lines">
-              <strong>
-                Onda {w.wave + 1}
-                {nextMods.length ? ` · ${nextMods.join(', ')}` : ''}
-              </strong>
-              <span>em {clock(w.waveTimer)} · chamar</span>
+              <strong>Onda {w.wave + 1}</strong>
+              {/* Com modificador, ele vai na segunda linha com o tempo (na primeira, cortava no celular). */}
+              <span>{nextMods.length ? `${nextMods.join(', ')} · em ${clock(w.waveTimer)}` : `em ${clock(w.waveTimer)} · chamar`}</span>
             </span>
           </button>
         ) : (

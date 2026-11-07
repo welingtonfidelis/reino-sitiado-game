@@ -388,15 +388,15 @@ Pedido do usuário em 2026-11-06, depois das pranchetas "HUD hoje no celular" e 
 | Computador e tablet | o resto | uma linha só (44 px); a partir de 1200 px, cada recurso ganha o nome |
 
 - **Castelo:** ícone, barra e o número da vida; borda vermelha abaixo de 35%. Tocar leva a câmera até o castelo e abre o anel dele. Em pé, o número fica em cima e a barra embaixo.
-- **Onda:** número e monstros vivos; embaixo, o modificador. No calmo, "em 1:24 · chamar", e tocar chama a onda.
+- **Onda:** número e monstros vivos; embaixo, o modificador. No calmo, "em 1:24 · chamar" (ou "Blindados · em 1:24" quando a próxima tem modificador), e tocar chama a onda.
 - **Ritmo:** pausar (vira ▶ dourado quando pausado) e um botão que alterna 1×, 2× e 3× e tira da pausa.
 - **Recursos:** uma faixa, números curtos a partir de 1.000 (1,2k, 12k). O cristal só aparece com estoque ou com uma mina no veio de cristal. As tropas saíram dali e viraram o número no Selecionar.
 - **⋯:** som, relatório a cada onda vencida e o diário de avisos (os 40 últimos, o mais novo primeiro, com a onda).
 - **Avisos:** no celular (largura até 599 ou altura até 499) não aparecem na tela; vão para o diário, e o ⋯ ganha um ponto vermelho. No computador continuam embaixo à esquerda, e também vão para o diário.
-- **Botões flutuantes embaixo, sem fundo:** o martelo dourado no meio (Construir, 60 px) e o Selecionar à esquerda (52 px, com o número de tropas; só aparece com tropas). No computador ganham rótulo embaixo.
+- **Botões flutuantes embaixo à direita, sem fundo** (pedido do usuário, depois da primeira versão com o martelo no meio): o martelo dourado no canto (Construir, 60 px) e o Selecionar ao lado dele (52 px, com o número de tropas; só aparece com tropas), alinhados pela base e com 28 px entre eles. No computador ganham rótulo embaixo, e os avisos ficam no canto de baixo à esquerda.
 - **Construir em leque:**
-  - o martelo abre uma meia-lua com Economia (4), Casa, Defesa (6) e Militar (7). Moradia só tem a casa, então "Casa" coloca direto;
-  - tocar numa categoria troca o leque pelas opções dela, com raio maior quando são muitas;
+  - o martelo abre um quarto de círculo, para a esquerda e para cima, com Economia (4), Casa, Defesa (6) e Militar (7). Moradia só tem a casa, então "Casa" coloca direto;
+  - tocar numa categoria troca o leque pelas opções dela; com mais de 4, elas vão em duas fileiras (metade perto do martelo, metade mais longe), para os rótulos não se encostarem;
   - o martelo vira X (fecha) nas categorias e seta (volta) dentro de uma; tocar fora ou Esc também;
   - o Selecionar some enquanto o leque está aberto;
   - o cartão mostra nome, custo em ícones e para que serve; opção bloqueada (falta recurso, nível do castelo, forja) fica apagada e o toque mostra o motivo;
