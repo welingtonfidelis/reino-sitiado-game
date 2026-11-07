@@ -7,8 +7,9 @@
  * e as medidas em `src/render/fxSheets.ts` (gerado, não editar). Da pasta baixada bastam
  * `src/core/` e os arquivos de `EFFECTS` com o `_lib.js` da categoria de cada um.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { deflateSync } from 'node:zlib';
 
@@ -19,7 +20,7 @@ const core = await load('src/core/index.js');
 const commit = existsSync(join(src, 'COMMIT')) ? readFileSync(join(src, 'COMMIT'), 'utf8').trim() : 'desconhecido';
 
 /** Efeitos usados, com o ritmo da folha (os longos a 15 quadros por segundo, para pesar menos). */
-const EFFECTS: { key: string; file: string; fps: number; opts?: Record<string, unknown> }[] = [
+const EFFECTS: { key: string; file: string; fps: number; opts?: Record<string, unknown>; semCorpo?: boolean }[] = [
   { key: 'faisca', file: 'impacts/hit-spark', fps: 30 },
   { key: 'pancada', file: 'impacts/blunt-hit', fps: 30 },
   { key: 'espada', file: 'melee/sword-slash', fps: 30 },
@@ -33,7 +34,9 @@ const EFFECTS: { key: string; file: string; fps: number; opts?: Record<string, u
   { key: 'moedas', file: 'ui/coin-collect', fps: 15 },
   // Etapa 5: mago, clérigo e cavaleiro.
   { key: 'mana', file: 'arcane/mana-burst', fps: 20 },
-  { key: 'cura', file: 'holy/heal', fps: 20 },
+  // O "heal" pinta o corpo do boneco de demonstração (cinza, depois colorido); no jogo o curado
+  // é o personagem 3D, então a folha sai só com a luz: pétalas, aro, brilhos e corações.
+  { key: 'cura', file: 'holy/heal', fps: 20, semCorpo: true },
   { key: 'golpe', file: 'melee/heavy-cleave', fps: 20 },
   // Etapa 6: o morcego (sprite em laço), a alma do esqueleto levantado e a cura da bruxa.
   { key: 'morcego', file: 'critters/bat', fps: 15 },
@@ -76,11 +79,28 @@ function png(w: number, h: number, rgba: Uint8ClampedArray): Buffer {
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
 }
 
+/**
+ * Carrega uma cópia do efeito com `recolor` desligado (é a função que pinta os pixels do corpo do
+ * boneco). A cópia vai para uma pasta temporária, com os imports apontando para o pixelfx.
+ */
+const tmp = mkdtempSync(join(tmpdir(), 'reino-fx-'));
+async function loadSemCorpo(file: string) {
+  const path = join(src, `src/fx/${file}.js`);
+  let code = readFileSync(path, 'utf8');
+  code = code.replace(/from "(\.[^"]+)"/g, (_m, rel: string) => `from "${pathToFileURL(resolve(dirname(path), rel)).href}"`);
+  const calls = code.split('recolor(').length - 1;
+  if (calls !== 1) throw new Error(`${file}: esperava uma chamada de recolor, achei ${calls}`);
+  code = code.replace(/(\n\s*)recolor\(/, '$1semCorpo(') + '\nfunction semCorpo() {}\n';
+  const out = join(tmp, `${file.replace('/', '-')}.mjs`);
+  writeFileSync(out, code);
+  return import(pathToFileURL(out).href);
+}
+
 mkdirSync('public/assets/fx', { recursive: true });
 const lines: string[] = [];
 let pixels = 0;
 for (const e of EFFECTS) {
-  const mod = await load(`src/fx/${e.file}.js`);
+  const mod = e.semCorpo ? await loadSemCorpo(e.file) : await load(`src/fx/${e.file}.js`);
   const meta = mod.meta;
   const [W, H] = meta.size as [number, number];
   const [ox, oy] = meta.origin as [number, number];

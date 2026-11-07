@@ -127,6 +127,7 @@ Regra do usuário: usar os efeitos do pixelfx sempre que der (https://patch-gg.g
 - **Como entram:** com o OK do usuário, baixei só 33 arquivos do repositório (~300 KB, commit a841596) para uma pasta temporária, fora do projeto. Li o código antes de rodar: só imports locais, sem rede nem disco.
   - Desde a Etapa 5 os efeitos saem da cópia local que o usuário clonou em `../pixelfx` (mesmo commit), liberada para uso.
   - `tools/bake-fx.ts` (`node tools/bake-fx.ts ../pixelfx`) roda cada efeito no node e grava uma folha de quadros por efeito em `public/assets/fx/`, com as medidas em `src/render/fxSheets.ts` (gerado).
+  - A cura do clérigo ("holy/heal") pinta, no pixelfx, o corpo do boneco de demonstração que está sendo curado (cinza, depois colorido). No jogo esse corpo aparecia como um segundo personagem dentro do efeito (o usuário notou em 2026-11-06). A folha agora sai sem o corpo: a ferramenta carrega uma cópia do efeito com a função `recolor` desligada (opção `semCorpo`), e ficam só pétalas, aro de luz, brilhos e corações. Os outros efeitos com personagem só usam o contorno dele, sem desenhá-lo.
   - Os efeitos longos saem a 12–20 quadros por segundo para pesar menos. Ao todo são 6 Mpx, cerca de 23 MB na GPU; a explosão sozinha tem 9 MB.
 - **Na tela (`src/render/fx.ts`):** cada efeito é um quadrado virado para a câmera, preso pela origem do efeito (o chão onde ele acontece).
   - Por tipo de efeito: uma textura e uma malha instanciada. Nada é alocado por efeito tocado.

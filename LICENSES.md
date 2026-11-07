@@ -40,7 +40,7 @@ do pixelfx, https://github.com/patch-gg/pixelfx (commit a84159688af3ca37a4be05a0
 | nivel | ui/level-up (texto trocado para "NOVO NIVEL!") |
 | moedas | ui/coin-collect |
 | mana | arcane/mana-burst (impacto do feitiço do mago) |
-| cura | holy/heal (clérigo) |
+| cura | holy/heal (clérigo), sem o corpo do boneco de demonstração (a função `recolor` do efeito fica desligada ao gerar a folha) |
 | golpe | melee/heavy-cleave (cavaleiro) |
 | morcego | critters/bat (o morcego gigante voando) |
 | alma | spawn/soul-rise (esqueleto levantado pelo necromante) |
