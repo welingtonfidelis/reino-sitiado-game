@@ -116,6 +116,37 @@ describe('trabalhadores e moradia', () => {
     expect(population(w)).toBe(CONFIG.startWorkers);
   });
 
+  it('na serraria e na pedreira, trabalham virados para a floresta e a rocha', () => {
+    const w = createWorld(5);
+    calm(w);
+    for (const [kind, terrain] of [['serraria', 'forest'], ['pedreira', 'rock']] as const) {
+      const t = w.list.find((t) => t.terrain === 'grass' && t.b < 0 && hexDist(t.q, t.r, 0, 0) < 9 && DIRS.some(([dq, dr]) => w.list.find((n) => n.q === t.q + dq && n.r === t.r + dr)?.terrain === terrain))!;
+      addBuilding(w, kind, t.q, t.r, 1);
+      for (let i = 0; i < 2; i++) addUnit(w, 'trabalhador', 0, 1);
+    }
+    run(w, 60);
+    let n = 0;
+    for (const b of w.buildings.values()) {
+      if (b.kind !== 'serraria' && b.kind !== 'pedreira') continue;
+      const terrain = b.kind === 'serraria' ? 'forest' : 'rock';
+      for (const id of b.workers) {
+        const u = w.units.get(id)!;
+        expect(u.state).toBe('work');
+        // Um passo à frente cai num ladrilho do recurso.
+        const ahead = { x: u.x + Math.sin(u.facing) * 1.1, z: u.z + Math.cos(u.facing) * 1.1 };
+        const tile = w.list.find((t) => {
+          const c = hexToWorld(t.q, t.r);
+          return Math.hypot(c.x - ahead.x, c.z - ahead.z) < 1;
+        });
+        expect(tile?.terrain).toBe(terrain);
+        n++;
+      }
+      const [a, c] = b.workers.map((id) => w.units.get(id)!);
+      expect(Math.hypot(a!.x - c!.x, a!.z - c!.z)).toBeGreaterThan(0.5);
+    }
+    expect(n).toBe(4);
+  });
+
   it('cada casa nova custa 10% a mais', () => {
     const w = createWorld(8);
     const c0 = buildCost(w, 'casa').madeira!;

@@ -220,6 +220,22 @@ export function barnOf(w: World, b: Building): Building | null {
   return null;
 }
 
+/**
+ * De que lado fica o recurso que o prédio explora: a floresta da serraria, a rocha da pedreira
+ * (o primeiro vizinho que achar). Devolve a direção unitária no chão, ou null.
+ */
+export function resourceDir(w: World, b: Building): { x: number; z: number } | null {
+  const want = b.kind === 'serraria' ? 'forest' : b.kind === 'pedreira' ? 'rock' : null;
+  if (!want) return null;
+  for (const [dq, dr] of DIRS) {
+    if (tileAt(w, b.q + dq, b.r + dr)?.terrain !== want) continue;
+    const o = hexToWorld(dq, dr);
+    const d = Math.hypot(o.x, o.z);
+    return { x: o.x / d, z: o.z / d };
+  }
+  return null;
+}
+
 export function cropOf(w: World, b: Building): Crop {
   const barn = barnOf(w, b);
   if (!barn) return CROPS[b.id % CROPS.length]!;

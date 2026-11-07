@@ -484,6 +484,28 @@ Pedido do usuário em 2026-11-07, a partir de uma lista de ideias para o jogador
 - **Música ambiente** (`src/audio/music.ts`), feita na hora como os sons: na calmaria, um tema calmo em dó maior (dedilhado, acordes macios e baixo, 84 bpm); na onda, um tema de batalha em lá menor com tambores (116 bpm). São 16 compassos: 8 com a melodia inteira e 8 só com umas notas soltas. Troca suave entre os dois e silêncio na derrota. Liga e desliga no ⋯ ("Música", guardado no navegador); só toca com o som ligado. Fica bem abaixo dos efeitos.
 - **Álbum de figurinhas** (`src/game/album.ts`): 25 conquistas que ficam de uma partida para outra (no navegador, `reino.album`). Cada uma é uma figura grande com cor própria; quando ganha, aparece embaixo, no meio da tela, com "Figurinha nova!" e um arpejo, e o ⋯ ganha um ponto vermelho. O álbum abre pelo ⋯ ("Álbum de figurinhas 3/25"): as ganhas coloridas (as novas brilham), as que faltam em cinza com a dica embaixo, para quem lê junto. Exemplos: 4 casas, primeira torre, torre com 4 arqueiros, 6 plantações num celeiro, as 6 plantas, castelo nível 4, 20 tropas, 1000 de ouro, primeiro herói, os 4 heróis, herói nível 5, ondas 5, 10, 20 e 30, chefe vencido, onda sem caídos, primeiro inverno, 100 e 1000 monstros.
 
+### Ajustes depois da Etapa 16 (2026-11-07)
+
+Pedidos do usuário depois de jogar:
+
+- **Pedreira diferente da mina:** as duas usavam o mesmo modelo, só com outra cor. A mina continua sendo a entrada no morro. A pedreira virou um pátio a céu aberto (`quarry` em `world3d.ts`), com:
+  - barraca;
+  - blocos de pedra cortada empilhados e com cinta (Resource Bits);
+  - pedra cortada, lascas, carrinho e caixote.
+  
+  Tudo fica virado para a rocha vizinha, e a beira desse lado fica livre para os trabalhadores.
+- **Trabalhadores virados para o serviço:** antes cada um parava em volta do prédio e ficava virado para onde vinha andando (o lenhador cortava o ar). A regra agora é a `workSpot` em `step.ts`:
+  - na serraria e na pedreira, os dois ficam lado a lado na beira que dá para a floresta ou a rocha (`resourceDir` em `world.ts`) e batem nela;
+  - na mina e na fazenda, ficam em volta, virados para o meio;
+  - quem chega pega a primeira vaga livre (antes, quem chegava depois de alguém sair podia cair no mesmo lugar de outro);
+  - num salvo antigo, quem está fora do lugar anda até a beira certa.
+  
+  Tem teste.
+- **Torre aberta:** a torre dos arqueiros virou a torre de vigia de madeira do KayKit (`building_watchtower_blue`, 1,8× maior), aberta em cima.
+  - Os arqueiros aparecem na plataforma, um em cada canto.
+  - Atirando, viram para o monstro; sem monstro, olham para fora. Na festa, comemoram lá em cima.
+  - A flecha sai de 2,0 m de altura, a altura do arqueiro.
+
 ## 20. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.

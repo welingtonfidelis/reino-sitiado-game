@@ -6,7 +6,7 @@ copiados por `npm run art` conforme `tools/art-manifest.ts`.
 
 | Pack | Arquivos usados |
 | --- | --- |
-| KayKit Medieval Hexagon Pack 1.0.1 | hex_grass; castelo, casas A e B, quartel, campo de tiro, serraria, mina (azul e amarela), torre A, base de torre, moinho; plantação, andaime, ruína, muralha reta e com portão; árvores, montanhas, morro, pedras; bandeira; flecha; textura hexagons_medieval.png |
+| KayKit Medieval Hexagon Pack 1.0.1 | hex_grass; castelo, casas A e B, quartel, campo de tiro, serraria, mina, torre de vigia (a torre dos arqueiros), base de torre, moinho; plantação, andaime, ruína, muralha reta e com portão; árvores, montanhas, morro, pedras; bandeira; flecha; textura hexagons_medieval.png |
 | KayKit Adventurers 2.0 | Knight, Ranger; sword_1handed, shield_round_color, bow_withString e as texturas knight e ranger |
 | KayKit Skeletons 1.1 | Skeleton_Minion, Skeleton_Blade, skeleton_texture_A |
 | KayKit Mystery Monthly 4 | Werewolf_Wolf, OrcRaider, Orc_Axe; Paladin_with_Helmet, paladin_hammer, paladin_shield e a textura (o cavaleiro) |
@@ -19,7 +19,8 @@ copiados por `npm run art` conforme `tools/art-manifest.ts`.
 | KayKit Medieval Hexagon Pack (Etapa 5) | torre B, igreja, estábulo, ferreiro, oficina |
 | KayKit Medieval Hexagon Pack (Etapa 9) | torre com catapulta e a pedra da catapulta |
 | KayKit RPG Tools Bits 1.0 (Etapa 10) | axe, pickaxe, shovel, hammer e tools_bits_texture (ferramentas dos trabalhadores e martelo do engenheiro) |
-| KayKit Resource Bits 1.0 | Iron_Nuggets e a textura do pack |
+| KayKit Resource Bits 1.0 | Iron_Nuggets; Stone_Bricks_Stack_Large e Medium, Stone_Chunks_Large e Small (pedreira); textura do pack |
+| KayKit Medieval Hexagon Pack (pedreira) | barraca, resource_stone, crate_open |
 | KayKit Adventurers 2.0 (Etapa 14) | Barbarian, Rogue_Hooded, Druid; axe_2handed, crossbow_2handed, druid_staff e as texturas barbarian, rogue e druid |
 | KayKit Mystery Monthly 5 (Etapa 14) | BlackKnight, BlackKnight_Sword, BlackKnight_Shield e a textura |
 | KayKit Character Animations 1.1 | Rig_Medium (General, MovementBasic, CombatMelee, CombatRanged, Tools, Simulation) e Rig_Large (General, MovementBasic, CombatMelee). Da Simulation (Etapa 16): Cheering, Waving, Sit_Floor_Idle e Push_Ups |

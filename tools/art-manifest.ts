@@ -19,10 +19,9 @@ const TB = 'KayKit RPG Tools Bits 1.0/Assets/gltf';
 /** Modelos do pack medieval: [pasta dentro de gltf/, nome]. Todos vão para medieval/. */
 export const MEDIEVAL: [string, string][] = [
   ['tiles/base', 'hex_grass'],
-  ...['castle', 'home_A', 'home_B', 'barracks', 'archeryrange', 'lumbermill', 'mine', 'tower_A', 'tower_base', 'windmill', 'tower_B', 'church', 'stables', 'blacksmith', 'workshop', 'tower_catapult'].map(
+  ...['castle', 'home_A', 'home_B', 'barracks', 'archeryrange', 'lumbermill', 'mine', 'watchtower', 'tower_base', 'windmill', 'tower_B', 'church', 'stables', 'blacksmith', 'workshop', 'tower_catapult'].map(
     (n) => ['buildings/blue', `building_${n}_blue`] as [string, string],
   ),
-  ['buildings/yellow', 'building_mine_yellow'],
   ...['building_grain', 'building_scaffolding', 'building_destroyed', 'wall_straight', 'wall_straight_gate'].map(
     (n) => ['buildings/neutral', n] as [string, string],
   ),
@@ -47,6 +46,10 @@ export const MEDIEVAL: [string, string][] = [
   ['decoration/props', 'haybale'],
   ['decoration/props', 'sack'],
   ['decoration/props', 'wheelbarrow'],
+  // Pedreira a céu aberto (barraca, pedra cortada e caixote): não é mais a mina pintada de amarelo.
+  ['decoration/props', 'tent'],
+  ['decoration/props', 'resource_stone'],
+  ['decoration/props', 'crate_open'],
   ['units/neutral', 'projectile_arrow'],
   ['buildings/neutral', 'projectile_catapult'],
 ];
@@ -131,9 +134,11 @@ export const ART: [string, string][] = [
     [`${FN}/Rock_${n}_A_Color1.bin`, `forest/Rock_${n}_A_Color1.bin`],
   ] as [string, string][]),
   [`${FN}/forest_texture.png`, 'forest/forest_texture.png'],
-  // Minério da mina.
-  [`${RB}/Iron_Nuggets.gltf`, 'resource/Iron_Nuggets.gltf'],
-  [`${RB}/Iron_Nuggets.bin`, 'resource/Iron_Nuggets.bin'],
+  // Minério da mina; blocos e lascas de pedra da pedreira.
+  ...['Iron_Nuggets', 'Stone_Bricks_Stack_Large', 'Stone_Bricks_Stack_Medium', 'Stone_Chunks_Large', 'Stone_Chunks_Small'].flatMap((n) => [
+    [`${RB}/${n}.gltf`, `resource/${n}.gltf`],
+    [`${RB}/${n}.bin`, `resource/${n}.bin`],
+  ] as [string, string][]),
   [`${RB}/resource_bits_texture.png`, 'resource/resource_bits_texture.png'],
   // Animações (os personagens não trazem nenhuma).
   ...['General', 'MovementBasic', 'CombatMelee', 'CombatRanged', 'Tools', 'Simulation'].map(

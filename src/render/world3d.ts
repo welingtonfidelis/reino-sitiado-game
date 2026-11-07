@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BUILDINGS, CONFIG, CROPS, DIRS, HEX, cropOf, hexToWorld, isHero, openRifts, tileAt } from '../sim/index.ts';
+import { BUILDINGS, CONFIG, CROPS, DIRS, HEX, cropOf, hexToWorld, isHero, openRifts, resourceDir, tileAt } from '../sim/index.ts';
 import type { Building, BuildingKind, Crop, SimEvent, UnitKind, World } from '../sim/index.ts';
 import type { Art, CharKey, StaticKey, StaticModel } from './assets.ts';
 import { CharView } from './chars.ts';
@@ -158,7 +158,18 @@ const FIGHT_POSE: Partial<Record<UnitKind, Pose>> = { arqueiro: 'shoot', mago: '
 /** Tamanho dos golpes especiais na tela (o giro cobre o raio do golpe). */
 const SPECIAL_SCALE: Record<'giro' | 'chuva' | 'raizes' | 'pisao', number> = { giro: 1.4, chuva: 1.3, raizes: 0.9, pisao: 1.8 };
 
-const TOP: Partial<Record<BuildingKind, number>> = { catapulta: 1.6, piche: 0.3, estacas: 0.6, castelo: 4.1, torre: 2.2, quartel: 1.7, campo: 1.8, muralha: 1.2, portao: 1.4, torreMago: 2.4, capela: 1.9, estabulo: 1.3, forja: 1.4, oficina: 1.3 };
+/** Torre dos arqueiros: a torre de vigia aberta do KayKit, maior, com os arqueiros na plataforma. */
+const TOWER_SCALE = 1.8;
+/** Piso da plataforma e os quatro cantos (em medidas do modelo, antes da escala). */
+const PLATFORM_Y = 0.79;
+const PLATFORM: [number, number][] = [
+  [-0.17, -0.17],
+  [0.17, 0.17],
+  [-0.17, 0.17],
+  [0.17, -0.17],
+];
+
+const TOP: Partial<Record<BuildingKind, number>> = { catapulta: 1.6, piche: 0.3, estacas: 0.6, castelo: 4.1, torre: 2.6, quartel: 1.7, campo: 1.8, muralha: 1.2, portao: 1.4, torreMago: 2.4, capela: 1.9, estabulo: 1.3, forja: 1.4, oficina: 1.3 };
 
 /** Fosso de piche (Etapa 9): mancha escura e lustrosa no chão. */
 function pitchModel(): StaticModel {
@@ -343,7 +354,7 @@ export class World3D {
     this.art = art;
     const big = (k: StaticKey, cap: number, cast = true, receive = false) => this.sets.set(k, new Instanced(scene, art.statics[k], cap, cast, receive));
     for (const k of ['arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina'] as StaticKey[]) big(k, 400);
-    for (const k of ['feno', 'saco', 'carrinho'] as StaticKey[]) big(k, 120);
+    for (const k of ['feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote'] as StaticKey[]) big(k, 120);
     for (const k of ['castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina'] as StaticKey[]) big(k, 200);
     this.crystals = new Instanced(scene, crystalModel(), 200, true, false);
     for (const c of CROPS) this.farms.set(c, new Instanced(scene, cropModel(c), 60, true, true));
@@ -518,7 +529,7 @@ export class World3D {
   syncStatic(w: World): void {
     if (w.ver === this.ver) return;
     this.ver = w.ver;
-    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'feno', 'saco', 'carrinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'catapulta'];
+    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'catapulta'];
     for (const k of keys) this.sets.get(k)!.begin();
     this.crystals.begin();
     this.pitch.begin();
@@ -595,7 +606,11 @@ export class World3D {
         this.place('carrinho', p.x - 0.7, 0, p.z - 0.25, 2.2, 0.8, b.id);
         continue;
       }
-      this.place(key, p.x, 0, p.z, rot, 1, b.id);
+      if (b.kind === 'pedreira') {
+        this.quarry(w, b, p.x, p.z);
+        continue;
+      }
+      this.place(key, p.x, 0, p.z, rot, b.kind === 'torre' ? TOWER_SCALE : 1, b.id);
       if (b.kind === 'castelo') this.place('bandeira', p.x, 4.0, p.z, 0, 1.2, b.id);
       if (b.kind === 'mina') this.place('minerio', p.x + 0.6, 0, p.z + 0.5, 0, 0.35, b.id);
     }
@@ -611,6 +626,25 @@ export class World3D {
     for (const f of this.farms.values()) f.end();
     this.pitch.end();
     this.spikes.end();
+  }
+
+  /**
+   * Pedreira a céu aberto: barraca, blocos cortados, lascas e carrinho, com a beira que dá para a
+   * rocha livre para os trabalhadores (eles ficam ali, virados para o rochedo vizinho).
+   */
+  private quarry(w: World, b: Building, x: number, z: number): void {
+    const d = resourceDir(w, b) ?? { x: 1, z: 0 };
+    // u: rumo à rocha; v: de lado.
+    const put = (k: StaticKey, u: number, v: number, turn: number, scale: number) =>
+      this.place(k, x + d.x * u - d.z * v, 0, z + d.z * u + d.x * v, Math.atan2(d.x, d.z) + turn, scale, b.id);
+    put('pedreira', -0.5, 0.42, 0.5, 1.6);
+    put('blocos', -0.42, -0.42, 0.2, 0.34);
+    put('blocosB', 0.05, -0.62, 1.1, 0.3);
+    put('pedraCortada', 0.1, 0.05, 0.9, 1.5);
+    put('lascas', 0.55, 0, 0.4, 0.26);
+    put('lascasB', 0.95, 0, 2.1, 0.3);
+    put('carrinho', 0.35, 0.62, Math.PI / 2, 0.9);
+    put('caixote', -0.05, 0.75, 1.6, 1.1);
   }
 
   private wallPiece(w: World, b: Building, x: number, z: number): void {
@@ -762,20 +796,38 @@ export class World3D {
       seen.add(u.id);
       const kind: CharKey = u.kind === 'trabalhador' && u.id % 2 ? 'trabalhadorB' : u.kind;
       const v = this.charFor(u.id, kind);
-      const y = 0;
+      let x = u.x;
+      let y = 0;
+      let z = u.z;
+      let facing = u.facing;
       let pose: Pose = 'idle';
-      if (u.state === 'dead') pose = 'death';
-      else if (u.state === 'walk') pose = u.kind === 'cavaleiro' ? 'run' : 'walk';
-      else if ((this.spinUntil.get(u.id) ?? 0) > this.time) pose = 'spin';
-      else if (u.state === 'fight') pose = FIGHT_POSE[u.kind] ?? 'attack';
-      else if (this.partying && u.state !== 'tower' && u.state !== 'shelter') pose = 'cheer';
-      else if (u.state === 'idle') pose = idlePose(u.kind, u.id, this.realTime);
-      else if (u.state === 'tower' || u.state === 'shelter') {
-        // Dentro da torre (as flechas saem das janelas) ou recolhido no castelo: não aparece.
+      if (u.state === 'shelter') {
+        // Recolhido no castelo: não aparece.
         v.root.visible = false;
         v.update(animDt);
         continue;
-      } else if (u.state === 'work' && u.kind === 'engenheiro') {
+      }
+      if (u.state === 'tower') {
+        // Torre aberta: cada arqueiro num canto da plataforma; atirando, vira para o monstro,
+        // senão olha para fora.
+        const t = w.buildings.get(u.tower);
+        if (t) {
+          const c = hexToWorld(t.q, t.r);
+          const [ox, oz] = PLATFORM[Math.max(0, t.archers.indexOf(u.id)) % PLATFORM.length]!;
+          const rot = ((t.id * 7) % 6) * (Math.PI / 3);
+          x = c.x + (ox * Math.cos(rot) + oz * Math.sin(rot)) * TOWER_SCALE;
+          z = c.z + (-ox * Math.sin(rot) + oz * Math.cos(rot)) * TOWER_SCALE;
+          y = PLATFORM_Y * TOWER_SCALE;
+          if (u.cd <= 0) facing = Math.atan2(x - c.x, z - c.z);
+        }
+        pose = this.partying ? 'cheer' : u.cd > 0 ? 'shoot' : 'idle';
+      } else if (u.state === 'dead') pose = 'death';
+      else if (u.state === 'walk') pose = u.kind === 'cavaleiro' ? 'run' : 'walk';
+      else if ((this.spinUntil.get(u.id) ?? 0) > this.time) pose = 'spin';
+      else if (u.state === 'fight') pose = FIGHT_POSE[u.kind] ?? 'attack';
+      else if (this.partying) pose = 'cheer';
+      else if (u.state === 'idle') pose = idlePose(u.kind, u.id, this.realTime);
+      else if (u.state === 'work' && u.kind === 'engenheiro') {
         pose = 'repair';
       } else if (u.state === 'work') {
         const b = w.buildings.get(u.job);
@@ -787,8 +839,8 @@ export class World3D {
         v.setTool(jk === 'fazenda' ? 'pa' : jk === 'serraria' ? 'machadoLenha' : jk === 'pedreira' || jk === 'mina' ? 'picareta' : null);
       }
       v.root.visible = true;
-      v.root.position.set(u.x, y, u.z);
-      v.root.rotation.y = u.facing;
+      v.root.position.set(x, y, z);
+      v.root.rotation.y = facing;
       v.play(pose);
       v.update(animDt);
     }

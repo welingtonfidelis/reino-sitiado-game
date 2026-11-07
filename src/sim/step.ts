@@ -7,7 +7,7 @@ import type { HeroKind, MonsterKind, UnitKind } from './config.ts';
 import { hexDist, hexToWorld, worldToHex } from './hex.ts';
 import { allyPath, computeFlow, computeReach } from './path.ts';
 import { BLESSING_EVERY, BLESSING_IDS, emptyStats, epitaph } from './blessings.ts';
-import { addUnit, castle, castleCap, castleDoor, housing, population, tileAt, workers } from './world.ts';
+import { addUnit, castle, castleCap, castleDoor, housing, population, resourceDir, tileAt, workers } from './world.ts';
 import type { Building, Monster, Unit, WaveMod, World } from './world.ts';
 import { WAVE_MODS } from './world.ts';
 
@@ -166,6 +166,24 @@ function slotPoint(b: Building, slot: number): { x: number; z: number } {
   return { x: c.x + Math.cos(a) * rr, z: c.z + Math.sin(a) * rr };
 }
 
+/**
+ * Onde o trabalhador fica no serviço e para onde olha. Na serraria e na pedreira, lado a lado na
+ * beira que dá para a floresta ou a rocha, virados para ela (o machado bate na árvore, não no ar);
+ * na mina e na fazenda, em volta e virados para o meio.
+ */
+export function workSpot(w: World, b: Building, slot: number): { x: number; z: number; face: number } {
+  const c = center(b);
+  const d = resourceDir(w, b);
+  if (d) {
+    const side = slot % 2 ? -0.36 : 0.36;
+    const x = c.x + d.x * 0.82 - d.z * side;
+    const z = c.z + d.z * 0.82 + d.x * side;
+    return { x, z, face: Math.atan2(c.x + d.x * 2 - x, c.z + d.z * 2 - z) };
+  }
+  const p = slotPoint(b, slot);
+  return { x: p.x, z: p.z, face: Math.atan2(c.x - p.x, c.z - p.z) };
+}
+
 function setGoal(w: World, u: Unit, goal: number): boolean {
   if (u.goal === goal && u.path.length > 0) return true;
   const from = tileIndexAt(w, u.x, u.z);
@@ -227,7 +245,10 @@ function assignJobs(w: World): void {
     const b = nearestJob(w, u);
     if (!b) continue;
     u.job = b.id;
-    u.slot = b.workers.length;
+    // A primeira vaga livre: quem sai abre o lugar dele (antes dois podiam cair no mesmo).
+    const used = new Set(b.workers.map((id) => w.units.get(id)?.slot));
+    u.slot = 0;
+    while (used.has(u.slot)) u.slot++;
     b.workers.push(u.id);
     u.state = 'walk';
     u.path = [];
@@ -446,7 +467,15 @@ function unitsStep(w: World): void {
         idle(w, u);
         continue;
       }
-      if (u.state === 'work') continue;
+      const spot = workSpot(w, b, u.slot);
+      if (u.state === 'work') {
+        if (dist(u.x, u.z, spot.x, spot.z) < 0.15) {
+          u.facing = spot.face;
+          continue;
+        }
+        // Fora do lugar (salvo de antes desta regra): anda até a beira certa.
+        u.state = 'walk';
+      }
       const goal = w.grid.idx(b.q, b.r);
       if (!setGoal(w, u, goal)) {
         // Ficou sem caminho (muralha nova no meio): larga o emprego.
@@ -454,8 +483,10 @@ function unitsStep(w: World): void {
         u.job = -1;
         continue;
       }
-      const p = slotPoint(b, u.slot);
-      u.state = walk(w, u, p.x, p.z, def.speed) ? 'work' : 'walk';
+      if (walk(w, u, spot.x, spot.z, def.speed)) {
+        u.state = 'work';
+        u.facing = spot.face;
+      } else u.state = 'walk';
       continue;
     }
     if (u.kind === 'arqueiro') {
@@ -1275,7 +1306,7 @@ function defenses(w: World): void {
       const m = nearestMonster(w, p.x, p.z, CONFIG.tower.range * rk(w), false, 'arrow');
       if (!m) break;
       u.facing = Math.atan2(m.x - p.x, m.z - p.z);
-      shoot(w, p.x, 2.3, p.z, m, UNITS.arqueiro.dmg);
+      shoot(w, p.x, 2.0, p.z, m, UNITS.arqueiro.dmg);
       u.cd = UNITS.arqueiro.cd;
     }
   }
