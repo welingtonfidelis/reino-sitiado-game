@@ -49,7 +49,7 @@ No console: `game`, `view`, `cam` e `snap('nome')` (salva `reports/snap-nome.png
 
 ## 3. O que a v1 tem
 
-- **Mapa:** hexagonal de raio 13, sorteado pela semente. Tem florestas, rochas, veios de minério e três fendas na borda norte; a 1ª abre na onda 1, a 2ª na 10 e a 3ª na 20.
+- **Mapa:** hexagonal de raio 16 (era 13 até a etapa 9; veja a seção 13), sorteado pela semente. Tem florestas, rochas, veios de minério e três fendas na borda norte; a 1ª abre na onda 1, a 2ª na 10 e a 3ª na 20.
 - **Começo:** castelo, duas casas, uma fazenda e quatro trabalhadores.
 - **Economia:** comida, madeira, pedra, ferro e ouro. O ouro vem das ondas e de chamar a onda antes da hora.
 - **Prédios:**
@@ -225,7 +225,7 @@ Regra do usuário: usar os efeitos do pixelfx sempre que der (https://patch-gg.g
 
 | Monstro | Desde | Modelo | Como age |
 | --- | --- | --- | --- |
-| Morcego gigante | onda 8 (12% da onda) | sprite "bat" do pixelfx | voa a 1,8 m por cima das muralhas, direto para as casas (depois os outros prédios, o castelo por último); ataca gente que estiver fora; só flecha, magia e castelo o alcançam |
+| Morcego gigante | onda 8 (12% da onda) | sprite "bat" do pixelfx | voa a 1,8 m por cima das muralhas, direto para a casa mais perto dele; sem casa, o prédio mais perto do castelo; o castelo por último; nunca muralha, portão ou armadilha (Etapa 10); ataca gente que estiver fora; só flecha, magia e castelo o alcançam |
 | Bruxa | onda 9 (1, até 4) | Witch | lenta, cura 10 de vida nos monstros a até 3 m a cada 2,5 s (efeito "healing bloom"). É a xamã da proposta |
 | Troll | onda 12 | Monstrosity (rig grande) | 180 de vida, recupera 3% por segundo se não for queimado (magia ou flecha com a bênção Flechas em brasa) nos últimos 3 s |
 | Necromante | onda 16 | Necromancer, com cajado | levanta um esqueleto ao lado a cada 6 s, até 5 vivos (efeito "soul rise") |
@@ -314,7 +314,38 @@ Pedido do usuário: as defesas que faltavam da proposta e ondas mais variadas.
 - **Robô (6 sementes):** com os modificadores e sem usar as defesas novas, caiu para a média de 15,7. Usando catapultas e estacas, subiu para 19,5 (ondas 10 a 28). Sem fazer nada, o castelo cai na onda 4.
 - **Arte:** catapulta = torre com catapulta e pedra do pack medieval; piche e estacas são feitos no projeto; o impacto da pedra usa a explosão de terra do pixelfx, menor.
 
-## 13. Arquitetura
+## 13. Ferramentas, mapa maior e morcego (Etapa 10)
+
+Pedido do usuário em 2026-11-06: ferramentas na mão dos trabalhadores e um mapa um pouco maior.
+
+- **Ferramentas** (KayKit RPG Tools Bits): o trabalhador leva a ferramenta do serviço desde que sai para ele, e fica de mãos vazias sem serviço.
+
+| Serviço | Ferramenta | Animação |
+| --- | --- | --- |
+| Fazenda | pá | Digging |
+| Serraria | machado | Chopping |
+| Pedreira e mina | picareta | Pickaxing |
+| Engenheiro (conserto) | martelo (troca o do pack medieval, que ficava minúsculo) | Hammering |
+
+  - As ferramentas são 30% maiores que o modelo, para aparecer de longe por baixo do chapéu.
+  - A pá do pack vem com a lâmina do lado do cabo; ela é virada ao carregar, para a lâmina ir ao chão.
+  - `CharView.setTool` em `src/render/chars.ts`; a escolha fica em `syncDynamic` (`src/render/world3d.ts`).
+- **Mapa de raio 16** (era 13): cerca de 50% mais área (817 ladrilhos contra 547).
+  - Florestas e rochas crescem na proporção da área e vão até perto da borda; lagos também podem ficar mais longe.
+  - A câmera afasta mais (zoom máximo 54) e anda até perto da borda; a sombra cobre o mapa inteiro.
+  - O jogo salvo guarda o raio. Um salvo de antes (sem raio) continua no mapa de 13.
+  - `npm run balance` aceita `RAIO=13` para comparar com o mapa antigo.
+- **Defeito do morcego corrigido:** ele atacava o prédio mais perto de si.
+  - Uma mina junto das fendas virava alvo fora do alcance das torres; os engenheiros consertavam mais rápido que o morcego derrubava, e a onda nunca acabava.
+  - O robô "caía" quando acabava o tempo da partida, então os números das etapas 7 e 9 estavam distorcidos.
+  - Agora ele vai para as casas (a regra que a seção 9 já prometia). Há teste.
+- **Robô (6 sementes), depois da correção:**
+  - raio 16: ondas 15 a 27 (média 22,8);
+  - raio 13: ondas 15 a 26 (média 21,3);
+  - sem fazer nada: onda 4.
+  - O mapa maior dá alguns segundos a mais até a horda chegar.
+
+## 14. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
@@ -333,7 +364,7 @@ Pedido do usuário: as defesas que faltavam da proposta e ondas mais variadas.
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
 - `src/ui/App.tsx`: HUD, bandeja Construir, menu do prédio, avisos e telas de começo e fim.
 
-## 14. Etapas
+## 15. Etapas
 
 | Etapa | O que | Situação |
 | --- | --- | --- |
@@ -346,8 +377,9 @@ Pedido do usuário: as defesas que faltavam da proposta e ondas mais variadas.
 | 7 | Relatório opcional, salvar e continuar, sons e equilíbrio com robô de teste (seção 10) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone (e ouvir os sons). |
 | 8 | Texturas de grama e solo, lagos com água animada, plantação e rochas sem base hexagonal (seção 11) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 | 9 | Catapulta, fosso de piche, estacas e um modificador de onda a cada 5 ondas (seção 12) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
+| 10 | Ferramentas na mão dos trabalhadores, mapa de raio 16 e correção do alvo do morcego (seção 13) | Pronta em 2026-11-06. Vista no navegador do Mac; falta jogar no iPhone. |
 
-## 15. Arte e licenças
+## 16. Arte e licenças
 
 Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art` (lista em `tools/art-manifest.ts`). Detalhes em `LICENSES.md`.
 
@@ -358,6 +390,7 @@ Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art`
 | Skeletons | esqueleto, lâmina |
 | Mystery Monthly | fazendeiros, lobisomem, orc saqueador e machado, orc bruto |
 | Resource Bits | minério |
+| RPG Tools Bits | pá, machado, picareta e martelo |
 | Character Animations | todas as animações |
 
 Os efeitos vêm do pixelfx (MIT); detalhes na seção 6 e em `LICENSES.md`.

@@ -27,6 +27,7 @@ export function saveWorld(w: World): string {
   return JSON.stringify({
     v: VERSION,
     seed: w.seed,
+    R: w.grid.R,
     rng: w.rand.state.a,
     tiles: w.list.map((t) => [TERRAINS.indexOf(t.terrain), t.deco, t.b, t.ruin ? 1 : 0]),
     buildings: [...w.buildings.values()],
@@ -54,7 +55,8 @@ export function loadWorld(json: string): World | null {
     return null;
   }
   if ((d as { v?: number }).v !== VERSION) return null;
-  const w = createWorld(d.seed);
+  // Jogos salvos sem R são do mapa de raio 13 (até a etapa 9).
+  const w = createWorld(d.seed, typeof d.R === 'number' ? d.R : 13);
   w.rand = rng(d.seed, d.rng);
   if (d.tiles.length !== w.list.length) return null;
   w.list.forEach((t, i) => {

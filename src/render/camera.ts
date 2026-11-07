@@ -11,10 +11,11 @@ export class IsoCamera {
   /** Altura da vista em metros (menor = mais perto). */
   view = 24;
   minView = 9;
-  maxView = 46;
+  maxView = 54;
   yaw = Math.PI / 6;
   pitch = 0.82;
-  bound = 24;
+  /** Até onde o centro da vista pode ir (o main ajusta pelo tamanho do mapa). */
+  bound = 30;
   onTap: ((x: number, y: number) => void) | null = null;
   onHover: ((x: number, y: number) => void) | null = null;
   /** Arrastar de um dedo desenha caixa de seleção em vez de mover o mapa (Shift no mouse). */

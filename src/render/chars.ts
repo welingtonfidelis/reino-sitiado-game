@@ -60,6 +60,10 @@ export class CharView {
   private current: Pose | null = null;
   private want: Pose | null = null;
   private wantFor = 0;
+  private art: Art;
+  private handR: THREE.Object3D | null = null;
+  private tool: THREE.Object3D | null = null;
+  private toolKey: WeaponKey | null = null;
 
   constructor(art: Art, kind: CharKey) {
     this.kind = kind;
@@ -78,11 +82,22 @@ export class CharView {
       }
       this.actions.set(pose, a);
     }
+    this.art = art;
+    this.handR = findBone(model, ['handslotr', 'handslot.r']) ?? null;
     const gear = GEAR[kind];
-    if (gear?.r) findBone(model, ['handslotr', 'handslot.r'])?.add(art.weapons[gear.r].clone(true));
+    if (gear?.r) this.handR?.add(art.weapons[gear.r].clone(true));
     if (gear?.l) findBone(model, ['handslotl', 'handslot.l'])?.add(art.weapons[gear.l].clone(true));
     this.mixer.setTime(Math.random() * 2);
     this.play('idle');
+  }
+
+  /** Ferramenta na mão direita, trocada conforme o trabalho (null = mãos vazias). */
+  setTool(k: WeaponKey | null): void {
+    if (k === this.toolKey || !this.handR) return;
+    if (this.tool) this.handR.remove(this.tool);
+    this.tool = k ? this.art.weapons[k].clone(true) : null;
+    if (this.tool) this.handR.add(this.tool);
+    this.toolKey = k;
   }
 
   play(pose: Pose, speed = 1): void {

@@ -487,6 +487,22 @@ describe('monstros novos e chefes (Etapa 6)', () => {
     expect(housesHp()).toBeLessThan(hp);
   });
 
+  it('o morcego passa pela mina junto das fendas e vai para as casas', () => {
+    const w = createWorld(43);
+    calm(w);
+    castle(w)!.cd = 1e9;
+    // Uma mina lá no norte, colada no ponto onde o morcego aparece.
+    const t = w.list.find((x) => x.b < 0 && x.terrain !== 'rift' && hexDist(x.q, x.r, 0, 0) >= w.grid.R - 2 && x.r < 0)!;
+    t.terrain = 'ore';
+    const mine = addBuilding(w, 'mina', t.q, t.r, 1);
+    const p = hexToWorld(t.q, t.r);
+    const bat = monster(w, 'morcego', p.x, p.z + 0.5);
+    run(w, 3);
+    expect(mine.hp).toBe(mine.maxHp);
+    // Voou para longe da mina, rumo ao castelo e às casas.
+    expect(Math.hypot(bat.x, bat.z)).toBeLessThan(Math.hypot(p.x, p.z) - 3);
+  });
+
   it('a bruxa cura a horda; o necromante levanta esqueletos', () => {
     const w = createWorld(42);
     calm(w);
@@ -522,6 +538,18 @@ describe('salvar e continuar (Etapa 7)', () => {
     // Mesmo sorteio e mesmos passos: o mesmo resultado.
     expect(b.kills).toBe(w.kills);
     expect(Math.round(b.res.comida)).toBe(Math.round(w.res.comida));
+  });
+
+  it('mapa maior: o raio vai no jogo salvo, e o salvo antigo (sem raio) abre com 13', () => {
+    const w = createWorld(51);
+    expect(w.grid.R).toBe(CONFIG.mapRadius);
+    expect(loadWorld(saveWorld(w))!.grid.R).toBe(CONFIG.mapRadius);
+    const old = createWorld(51, 13);
+    const json = JSON.parse(saveWorld(old)) as Record<string, unknown>;
+    delete json.R;
+    const b = loadWorld(JSON.stringify(json))!;
+    expect(b.grid.R).toBe(13);
+    expect(b.list.length).toBe(old.list.length);
   });
 });
 

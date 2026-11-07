@@ -141,7 +141,8 @@ export const MONSTERS: Record<MonsterKind, MonsterDef> = {
 
 export const CONFIG = {
   tps: 20,
-  mapRadius: 13,
+  /** Raio do mapa em ladrilhos (13 até a etapa 9; jogos salvos antes disso seguem com 13). */
+  mapRadius: 16,
   start: { comida: 150, madeira: 250, pedra: 150, ferro: 30, cristal: 0, ouro: 0 } as Record<Res, number>,
   startWorkers: 4,
   /** Moradia: um trabalhador chega a cada `arriveEvery` s se houver vaga, teto e comida. */

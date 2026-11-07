@@ -15,12 +15,12 @@
     "nodes" : [
         {
             "mesh" : 0,
-            "name" : "hammer"
+            "name" : "pickaxe"
         }
     ],
     "materials" : [
         {
-            "name" : "hexagons_medieval",
+            "name" : "tools",
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
                     "index" : 0
@@ -32,7 +32,7 @@
     ],
     "meshes" : [
         {
-            "name" : "hammer",
+            "name" : "pickaxe",
             "primitives" : [
                 {
                     "attributes" : {
@@ -55,69 +55,69 @@
     "images" : [
         {
             "mimeType" : "image/png",
-            "name" : "hexagons_medieval",
-            "uri" : "hexagons_medieval.png"
+            "name" : "tools_bits_texture",
+            "uri" : "tools_bits_texture.png"
         }
     ],
     "accessors" : [
         {
             "bufferView" : 0,
             "componentType" : 5126,
-            "count" : 121,
+            "count" : 560,
             "max" : [
-                0.07004718482494354,
-                0.15694043040275574,
-                0.03510262817144394
+                0.7241833806037903,
+                1.160451054573059,
+                0.10420478135347366
             ],
             "min" : [
-                -0.07020323723554611,
-                -0.05838828533887863,
-                -0.035109639167785645
+                -0.7242418527603149,
+                -0.22490279376506805,
+                -0.10420479625463486
             ],
             "type" : "VEC3"
         },
         {
             "bufferView" : 1,
             "componentType" : 5126,
-            "count" : 121,
+            "count" : 560,
             "type" : "VEC2"
         },
         {
             "bufferView" : 2,
             "componentType" : 5126,
-            "count" : 121,
+            "count" : 560,
             "type" : "VEC3"
         },
         {
             "bufferView" : 3,
             "componentType" : 5123,
-            "count" : 240,
+            "count" : 1524,
             "type" : "SCALAR"
         }
     ],
     "bufferViews" : [
         {
             "buffer" : 0,
-            "byteLength" : 1452,
+            "byteLength" : 6720,
             "byteOffset" : 0,
             "target" : 34962
         },
         {
             "buffer" : 0,
-            "byteLength" : 968,
-            "byteOffset" : 1452,
+            "byteLength" : 4480,
+            "byteOffset" : 6720,
             "target" : 34962
         },
         {
             "buffer" : 0,
-            "byteLength" : 1452,
-            "byteOffset" : 2420,
+            "byteLength" : 6720,
+            "byteOffset" : 11200,
             "target" : 34962
         },
         {
             "buffer" : 0,
-            "byteLength" : 480,
-            "byteOffset" : 3872,
+            "byteLength" : 3048,
+            "byteOffset" : 17920,
             "target" : 34963
         }
     ],
@@ -129,8 +129,8 @@
     ],
     "buffers" : [
         {
-            "byteLength" : 4352,
-            "uri" : "hammer.bin"
+            "byteLength" : 20968,
+            "uri" : "pickaxe.bin"
         }
     ]
 }

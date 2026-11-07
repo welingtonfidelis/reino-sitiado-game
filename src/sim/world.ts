@@ -351,8 +351,7 @@ function tileAtAngle(w: World, angle: number, dist: number): Tile {
 /** Ângulos das fendas (norte, nordeste, noroeste): a câmera fica ao sul, livre. */
 export const RIFT_ANGLES = [-Math.PI / 2, -Math.PI / 6, (-5 * Math.PI) / 6];
 
-export function createWorld(seed = 1): World {
-  const R = CONFIG.mapRadius;
+export function createWorld(seed = 1, R = CONFIG.mapRadius): World {
   const grid = new HexIndex(R);
   const tiles: (Tile | null)[] = new Array(grid.size).fill(null);
   const list: Tile[] = [];
@@ -410,14 +409,16 @@ export function createWorld(seed = 1): World {
     t.terrain = 'rift';
     w.rifts.push(t.i);
   }
-  // Florestas, rochas e veios de minério (longe do castelo).
+  // Florestas, rochas e veios de minério (longe do castelo). A quantidade acompanha a área do
+  // mapa, e as distâncias vão até perto da borda; com raio 13 o sorteio é o mesmo de antes.
+  const area = (R / 13) ** 2;
   const ang = () => w.rand() * Math.PI * 2;
-  for (let k = 0; k < 7; k++) grow(w, tileAtAngle(w, ang(), 5 + w.rand() * 7), 6 + Math.floor(w.rand() * 6), 'forest', 4);
+  for (let k = 0; k < Math.round(7 * area); k++) grow(w, tileAtAngle(w, ang(), 5 + w.rand() * (R - 6)), 6 + Math.floor(w.rand() * 6), 'forest', 4);
   // Uma floresta garantida perto, para a primeira serraria.
   grow(w, tileAtAngle(w, Math.PI * (0.15 + w.rand() * 0.7), 4.5), 6, 'forest', 4);
   const rocks: Tile[] = [];
-  for (let k = 0; k < 3; k++) {
-    const t = tileAtAngle(w, ang(), 6 + w.rand() * 5);
+  for (let k = 0; k < Math.round(3 * area); k++) {
+    const t = tileAtAngle(w, ang(), 6 + w.rand() * (R - 8));
     rocks.push(t);
     grow(w, t, 3 + Math.floor(w.rand() * 3), 'rock', 5);
   }
@@ -434,7 +435,7 @@ export function createWorld(seed = 1): World {
   // Etapa 8: um ou dois lagos a meia distância (ninguém atravessa nem constrói na água).
   const lakes = 1 + Math.floor(w.rand() * 2);
   for (let k = 0; k < lakes; k++) {
-    const t = tileAtAngle(w, Math.PI * (0.1 + w.rand() * 0.8) + (k ? Math.PI : 0), 6 + w.rand() * 4);
+    const t = tileAtAngle(w, Math.PI * (0.1 + w.rand() * 0.8) + (k ? Math.PI : 0), 6 + w.rand() * (R - 9));
     // Lago cresce em volta do centro (não em linha), para sair redondo.
     const want = 5 + Math.floor(w.rand() * 4);
     const lake = [t];

@@ -1,7 +1,7 @@
 /**
  * Robô de equilíbrio (Etapa 7): joga partidas inteiras sem tela e diz em que onda o castelo caiu.
  *
- *   node tools/balance.ts [sementes] [onda máxima]
+ *   node tools/balance.ts [sementes] [onda máxima]   (RAIO=13 usa o mapa antigo)
  *
  * "nada" não faz nada (só o castelo atira); "robô" segue uma ordem simples de construção,
  * recruta, conserta e escolhe a primeira bênção. Serve para comparar números da configuração.
@@ -27,6 +27,8 @@ import {
 import type { BuildingKind, UnitKind, World } from '../src/sim/index.ts';
 
 const SEEDS = Number(process.argv[2] ?? 6);
+// RAIO=13 roda no mapa antigo, para comparar.
+if (process.env.RAIO) (CONFIG as { mapRadius: number }).mapRadius = Number(process.env.RAIO);
 const MAX_WAVE = Number(process.argv[3] ?? 40);
 
 function count(w: World, k: BuildingKind): number {

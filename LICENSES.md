@@ -16,8 +16,9 @@ copiados por `npm run art` conforme `tools/art-manifest.ts`.
 | KayKit Skeletons 1.1 (Etapa 6) | Necromancer, Skeleton_Golem, Skeleton_Staff |
 | KayKit Mystery Monthly 5 (Etapa 6) | Witch, FrostGolem |
 | KayKit Mystery Monthly 6 (Etapa 6) | Monstrosity (o troll) |
-| KayKit Medieval Hexagon Pack (Etapa 5) | torre B, igreja, estábulo, ferreiro, oficina; martelo |
+| KayKit Medieval Hexagon Pack (Etapa 5) | torre B, igreja, estábulo, ferreiro, oficina |
 | KayKit Medieval Hexagon Pack (Etapa 9) | torre com catapulta e a pedra da catapulta |
+| KayKit RPG Tools Bits 1.0 (Etapa 10) | axe, pickaxe, shovel, hammer e tools_bits_texture (ferramentas dos trabalhadores e martelo do engenheiro) |
 | KayKit Resource Bits 1.0 | Iron_Nuggets e a textura do pack |
 | KayKit Character Animations 1.1 | Rig_Medium (General, MovementBasic, CombatMelee, CombatRanged, Tools) e Rig_Large (General, MovementBasic, CombatMelee) |
 

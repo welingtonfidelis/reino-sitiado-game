@@ -866,14 +866,22 @@ function flyStep(w: World, m: Monster, def: (typeof MONSTERS)[MonsterKind]): voi
     }
     return;
   }
+  // Casas primeiro (a mais perto do morcego), depois os outros prédios (o mais perto do
+  // castelo, dentro da defesa) e o castelo por último. Muralha, portão e armadilha no chão,
+  // nunca. Antes valia o prédio mais perto do morcego: uma mina junto das fendas virava alvo
+  // fora do alcance das torres, os engenheiros consertavam e a onda não acabava.
+  const home = castle(w);
+  const hc = home ? center(home) : { x: 0, z: 0 };
   let target: Building | null = null;
+  let bt = Infinity;
   let bd = Infinity;
   for (const b of w.buildings.values()) {
-    if (b.kind === 'muralha' || b.kind === 'portao') continue;
+    if (b.kind === 'muralha' || b.kind === 'portao' || BUILDINGS[b.kind].trap) continue;
     const c = center(b);
-    // Casas primeiro (contam como mais perto), o castelo por último.
-    const d = dist(m.x, m.z, c.x, c.z) * (b.kind === 'casa' ? 0.5 : b.kind === 'castelo' ? 1.5 : 1);
-    if (d < bd) {
+    const tier = b.kind === 'casa' ? 0 : b.kind === 'castelo' ? 2 : 1;
+    const d = tier === 1 ? dist(hc.x, hc.z, c.x, c.z) : dist(m.x, m.z, c.x, c.z);
+    if (tier < bt || (tier === bt && d < bd)) {
+      bt = tier;
       bd = d;
       target = b;
     }

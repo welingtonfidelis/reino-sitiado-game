@@ -117,7 +117,11 @@ const WEAPONS = {
   maca: 'weapons/Cleric_Mace.gltf',
   martelo: 'weapons/paladin_hammer.gltf',
   escudoPaladino: 'weapons/paladin_shield.gltf',
-  marreta: 'medieval/hammer.gltf',
+  marreta: 'tools/hammer.gltf',
+  // Ferramentas dos trabalhadores (RPG Tools Bits).
+  machadoLenha: 'tools/axe.gltf',
+  picareta: 'tools/pickaxe.gltf',
+  pa: 'tools/shovel.gltf',
   cajadoOsso: 'weapons/Skeleton_Staff.gltf',
 } as const;
 export type WeaponKey = keyof typeof WEAPONS;
@@ -199,6 +203,11 @@ export async function loadArt(base: string, onProgress?: (k: number) => void): P
   const weapons = {} as Art['weapons'];
   for (const [k, g] of wp) {
     lambertize(g.scene);
+    // A pá do RPG Tools Bits vem com a lâmina para baixo do ponto da mão (as outras
+    // ferramentas e armas apontam para cima): virada, a lâmina vai para o chão ao cavar.
+    if (k === 'pa') g.scene.rotation.x = Math.PI;
+    // Ferramentas 30% maiores, para dar para ver de longe por baixo do chapéu.
+    if (k === 'pa' || k === 'machadoLenha' || k === 'picareta' || k === 'marreta') g.scene.scale.setScalar(1.3);
     weapons[k] = g.scene;
   }
   const clips = new Map<string, THREE.AnimationClip>();

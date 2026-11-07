@@ -141,6 +141,8 @@ function frame(now: number): void {
     view.clearChars();
     view.resetFx();
     view.buildTerrain(w);
+    // O centro da vista anda até perto da borda (o canto do mapa fica a uns 2R metros).
+    cam.bound = 2 * w.grid.R - 2;
   }
   cam.boxMode = game.boxMode;
   view.pxPerMeter = innerHeight / cam.view;

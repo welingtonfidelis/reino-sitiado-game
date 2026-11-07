@@ -14,6 +14,7 @@ const MM4 = 'KayKit Mystery Monthly Series 4 (1.1)';
 const MM5 = 'KayKit Mystery Monthly Series 5 (1.1)';
 const FN = 'KayKit Forest Nature Pack 1.0/Assets/gltf/Color1';
 const MM6 = 'KayKit Mystery Monthly Series 6 (1.1)';
+const TB = 'KayKit RPG Tools Bits 1.0/Assets/gltf';
 
 /** Modelos do pack medieval: [pasta dentro de gltf/, nome]. Todos vão para medieval/. */
 export const MEDIEVAL: [string, string][] = [
@@ -43,7 +44,6 @@ export const MEDIEVAL: [string, string][] = [
   ].map((n) => ['decoration/nature', n] as [string, string]),
   ['decoration/props', 'flag_blue'],
   ['units/neutral', 'projectile_arrow'],
-  ['units/neutral', 'hammer'],
   ['buildings/neutral', 'projectile_catapult'],
 ];
 
@@ -98,6 +98,13 @@ export const ART: [string, string][] = [
   [`${SK}/assets/gltf/Skeleton_Staff.bin`, 'weapons/Skeleton_Staff.bin'],
   [`${SK}/assets/gltf/skeleton_texture_A.png`, 'weapons/skeleton_texture_A.png'],
   [`${MM4}/1 - July 2023 - Orc Raider/assets/gltf/Orc_Axe.gltf.glb`, 'weapons/Orc_Axe.glb'],
+  // Ferramentas dos trabalhadores (RPG Tools Bits): machado na serraria, picareta na pedreira e na mina, pá na fazenda;
+  // o martelo vai para o engenheiro (o do pack medieval ficava minúsculo na mão).
+  ...['axe', 'pickaxe', 'shovel', 'hammer'].flatMap((n) => [
+    [`${TB}/${n}.gltf`, `tools/${n}.gltf`],
+    [`${TB}/${n}.bin`, `tools/${n}.bin`],
+  ] as [string, string][]),
+  [`${TB}/tools_bits_texture.png`, 'tools/tools_bits_texture.png'],
   // Etapa 8: rochas sem base hexagonal (Forest Nature Pack) no lugar das montanhas do pack medieval.
   ...[1, 2, 3, 4].flatMap((n) => [
     [`${FN}/Rock_${n}_A_Color1.gltf`, `forest/Rock_${n}_A_Color1.gltf`],

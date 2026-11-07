@@ -276,10 +276,12 @@ export class World3D {
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     const sc = sun.shadow.camera;
-    sc.left = -34;
-    sc.right = 34;
-    sc.top = 34;
-    sc.bottom = -34;
+    // A sombra cobre o mapa inteiro (o canto do mapa fica a uns 2R metros do castelo).
+    const reach = 2 * CONFIG.mapRadius + 5;
+    sc.left = -reach;
+    sc.right = reach;
+    sc.top = reach;
+    sc.bottom = -reach;
     sc.near = 1;
     sc.far = 90;
     sun.shadow.bias = -0.0008;
@@ -621,6 +623,11 @@ export class World3D {
       } else if (u.state === 'work') {
         const b = w.buildings.get(u.job);
         pose = b?.kind === 'fazenda' ? 'dig' : b?.kind === 'serraria' ? 'chop' : b ? 'pick' : 'idle';
+      }
+      if (u.kind === 'trabalhador' && u.state !== 'dead') {
+        // A ferramenta do trabalho vai na mão desde que ele sai para o serviço.
+        const jk = w.buildings.get(u.job)?.kind;
+        v.setTool(jk === 'fazenda' ? 'pa' : jk === 'serraria' ? 'machadoLenha' : jk === 'pedreira' || jk === 'mina' ? 'picareta' : null);
       }
       v.root.visible = true;
       v.root.position.set(u.x, y, u.z);
