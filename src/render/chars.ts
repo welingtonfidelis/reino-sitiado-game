@@ -76,6 +76,7 @@ const GEAR: Partial<Record<CharKey, { r?: WeaponKey; l?: WeaponKey }>> = {
   mago: { r: 'cajado' },
   clerigo: { r: 'maca' },
   cavaleiro: { r: 'martelo', l: 'escudoPaladino' },
+  cavaleiroElmo: { r: 'martelo', l: 'escudoPaladino' },
   engenheiro: { r: 'marreta' },
   necromante: { r: 'cajadoOsso' },
   barbaro: { r: 'machadoGrande' },
@@ -83,6 +84,19 @@ const GEAR: Partial<Record<CharKey, { r?: WeaponKey; l?: WeaponKey }>> = {
   druida: { r: 'cajadoDruida' },
   cavaleiroNegro: { r: 'espadaNegra', l: 'escudoNegro' },
 };
+
+/** Etapa 19: material com a armadura trocada, um por material original e por textura. */
+const SKIN_MATS = new Map<string, THREE.Material>();
+function skinMat(base: THREE.Material, t: THREE.Texture): THREE.Material {
+  const key = `${base.uuid}:${t.uuid}`;
+  let m = SKIN_MATS.get(key);
+  if (!m) {
+    m = base.clone();
+    (m as THREE.MeshLambertMaterial).map = t;
+    SKIN_MATS.set(key, m);
+  }
+  return m;
+}
 
 export class CharView {
   readonly root = new THREE.Group();
@@ -96,6 +110,10 @@ export class CharView {
   private handR: THREE.Object3D | null = null;
   private tool: THREE.Object3D | null = null;
   private toolKey: WeaponKey | null = null;
+  private model: THREE.Object3D;
+  /** Etapa 19: malhas com textura (corpo e armas) e o material de cada uma, para trocar a armadura. */
+  private skinned: { mesh: THREE.Mesh; base: THREE.Material }[] | null = null;
+  private skin: THREE.Texture | null = null;
   /**
    * Ritmo próprio deste boneco (±8%): quem começa junto vai se desencontrando, e ninguém
    * bate a enxada, marcha ou atira no mesmo compasso do vizinho.
@@ -105,6 +123,7 @@ export class CharView {
   constructor(art: Art, kind: CharKey) {
     this.kind = kind;
     const model = cloneChar(art, kind);
+    this.model = model;
     this.root.add(model);
     this.mixer = new THREE.AnimationMixer(model);
     const names = LARGE.has(kind) ? BIG : MEDIUM;
@@ -126,6 +145,23 @@ export class CharView {
     if (gear?.r) this.handR?.add(art.weapons[gear.r].clone(true));
     if (gear?.l) findBone(model, ['handslotl', 'handslot.l'])?.add(art.weapons[gear.l].clone(true));
     this.play('idle');
+  }
+
+  /**
+   * Etapa 19: troca a armadura (textura do corpo e das armas, que usam o mesmo atlas do KayKit);
+   * null volta à original.
+   */
+  setSkin(t: THREE.Texture | null): void {
+    if (t === this.skin) return;
+    this.skin = t;
+    if (!this.skinned) {
+      const list: { mesh: THREE.Mesh; base: THREE.Material }[] = [];
+      this.model.traverse((o) => {
+        if (o instanceof THREE.Mesh && !Array.isArray(o.material) && (o.material as THREE.MeshLambertMaterial).map) list.push({ mesh: o, base: o.material });
+      });
+      this.skinned = list;
+    }
+    for (const s of this.skinned) s.mesh.material = t ? skinMat(s.base, t) : s.base;
   }
 
   /** Ferramenta na mão direita, trocada conforme o trabalho (null = mãos vazias). */

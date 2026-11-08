@@ -11,6 +11,9 @@ import type { MonsterKind, UnitKind } from '../sim/index.ts';
 
 export const STATIC_MODELS = {
   castelo: 'medieval/building_castle_blue.gltf',
+  // Etapa 19: o castelo do nível 4 (telhados dourados) e os estandartes da porta.
+  casteloOuro: 'medieval/building_castle_yellow.gltf',
+  estandarte: 'medieval/banner_blue_full.gltf',
   casaA: 'medieval/building_home_A_blue.gltf',
   casaB: 'medieval/building_home_B_blue.gltf',
   fazenda: 'medieval/building_grain.gltf',
@@ -84,7 +87,7 @@ export interface StaticModel {
 }
 
 /** O morcego não é personagem: é um sprite do pixelfx (Etapa 6). */
-export type CharKey = UnitKind | 'trabalhadorB' | Exclude<MonsterKind, 'morcego'>;
+export type CharKey = UnitKind | 'trabalhadorB' | 'cavaleiroElmo' | Exclude<MonsterKind, 'morcego'>;
 const CHAR_FILES: Record<CharKey, string> = {
   trabalhador: 'chars/Farmer_A.glb',
   trabalhadorB: 'chars/Farmer_B.glb',
@@ -107,6 +110,8 @@ const CHAR_FILES: Record<CharKey, string> = {
   atiradora: 'chars/Rogue_Hooded.glb',
   druida: 'chars/Druid.glb',
   cavaleiroNegro: 'chars/BlackKnight.glb',
+  // Etapa 19: o cavaleiro com elmo, depois da primeira melhoria de armaduras.
+  cavaleiroElmo: 'chars/Paladin_with_Helmet.glb',
 };
 /** Altura de cada personagem no mundo (um hexágono tem 2 m; a casa tem ~1 m). */
 export const CHAR_HEIGHT: Record<CharKey, number> = {
@@ -132,6 +137,7 @@ export const CHAR_HEIGHT: Record<CharKey, number> = {
   atiradora: 0.7,
   druida: 0.7,
   cavaleiroNegro: 0.78,
+  cavaleiroElmo: 0.66,
 };
 /**
  * Personagens do rig grande (animações do Rig_Large). O Cavaleiro Negro também é: com as
@@ -176,6 +182,39 @@ export interface Art {
   weapons: Record<WeaponKey, THREE.Object3D>;
   clips: Map<string, THREE.AnimationClip>;
   clipsLarge: Map<string, THREE.AnimationClip>;
+  /** Etapa 19: armaduras do soldado pelas melhorias da forja (prateada e dourada). */
+  skins: { prata: THREE.Texture; ouro: THREE.Texture };
+}
+
+/**
+ * Armadura dourada: a prateada do KayKit com os cinzas puxados para o ouro (pele, olhos e
+ * enfeites coloridos ficam como estão). Feita uma vez, ao carregar.
+ */
+function goldenArmor(silver: THREE.Texture): THREE.Texture {
+  const img = silver.image as HTMLImageElement;
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const g = c.getContext('2d')!;
+  g.drawImage(img, 0, 0);
+  const data = g.getImageData(0, 0, c.width, c.height);
+  const px = data.data;
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i]!;
+    const gr = px[i + 1]!;
+    const b = px[i + 2]!;
+    const hi = Math.max(r, gr, b);
+    if (hi - Math.min(r, gr, b) >= 28 || hi <= 70) continue;
+    const l = (r + gr + b) / 3;
+    px[i] = Math.min(255, l * 1.05 + 30);
+    px[i + 1] = Math.min(255, l * 0.82 + 8);
+    px[i + 2] = Math.min(255, l * 0.3);
+  }
+  g.putImageData(data, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.flipY = false;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 const matCache = new Map<string, THREE.Material>();
@@ -291,7 +330,7 @@ export async function loadArt(base: string, onProgress?: (k: number) => void): P
   if (onProgress) manager.onProgress = (_u, done, total) => onProgress(done / total);
   const loader = new GLTFLoader(manager);
   const load = (f: string) => loader.loadAsync(base + f);
-  const [st, ch, wp, am, al, orcSkin] = await Promise.all([
+  const [st, ch, wp, am, al, orcSkin, silver] = await Promise.all([
     Promise.all((Object.keys(STATIC_MODELS) as StaticKey[]).map(async (k) => [k, await load(STATIC_MODELS[k])] as const)),
     Promise.all((Object.keys(CHAR_FILES) as CharKey[]).map(async (k) => [k, await load(CHAR_FILES[k])] as const)),
     Promise.all((Object.keys(WEAPONS) as WeaponKey[]).map(async (k) => [k, await load(WEAPONS[k])] as const)),
@@ -299,7 +338,10 @@ export async function loadArt(base: string, onProgress?: (k: number) => void): P
     Promise.all(ANIMS_LARGE.map(load)),
     // O orc saqueador vem sem textura no .glb; a do pacote fica à parte.
     new THREE.TextureLoader(manager).loadAsync(base + 'chars/orc_texture_A.png'),
+    new THREE.TextureLoader(manager).loadAsync(base + 'chars/knight_texture_alt_A.png'),
   ]);
+  silver.flipY = false;
+  silver.colorSpace = THREE.SRGBColorSpace;
   orcSkin.flipY = false;
   orcSkin.colorSpace = THREE.SRGBColorSpace;
   const statics = {} as Art['statics'];
@@ -320,6 +362,9 @@ export async function loadArt(base: string, onProgress?: (k: number) => void): P
     const box = new THREE.Box3().setFromObject(g.scene);
     chars[k] = { scene: g.scene, scale: CHAR_HEIGHT[k] / (box.max.y - box.min.y || 1) };
   }
+  // Sem elmo o cavaleiro fica mais baixo na caixa: usa a escala da versão com elmo, para o
+  // corpo não mudar de tamanho quando ganha o elmo.
+  chars.cavaleiro.scale = chars.cavaleiroElmo.scale;
   const weapons = {} as Art['weapons'];
   for (const [k, g] of wp) {
     lambertize(g.scene);
@@ -329,6 +374,9 @@ export async function loadArt(base: string, onProgress?: (k: number) => void): P
     // A besta vem com a frente em +Z e a mão do KayKit aponta a arma em +X no tiro de duas
     // mãos: sem girar, a Atiradora atirava para o lado direito. Parada, aponta para o chão.
     if (k === 'besta') g.scene.rotation.y = Math.PI / 2;
+    // O arco vinha com a corda do lado de fora: ao mirar, a corda ficava virada para o inimigo
+    // e a barriga do arco para o arqueiro. Virado no eixo do comprimento, a corda vem para ele.
+    if (k === 'arco') g.scene.rotation.z = Math.PI;
     // Ferramentas 30% maiores, para dar para ver de longe por baixo do chapéu.
     // O machado do orc bruto também: no tamanho do pacote ele some atrás dos braços no golpe.
     if (k === 'pa' || k === 'machadoLenha' || k === 'picareta' || k === 'marreta' || k === 'machadoBruto') g.scene.scale.setScalar(1.3);
@@ -338,7 +386,7 @@ export async function loadArt(base: string, onProgress?: (k: number) => void): P
   for (const g of am) for (const c of g.animations) clips.set(c.name, c);
   const clipsLarge = new Map<string, THREE.AnimationClip>();
   for (const g of al) for (const c of g.animations) clipsLarge.set(c.name, c);
-  return { statics, chars, weapons, clips, clipsLarge };
+  return { statics, chars, weapons, clips, clipsLarge, skins: { prata: silver, ouro: goldenArmor(silver) } };
 }
 
 export function cloneChar(art: Art, kind: CharKey): THREE.Object3D {

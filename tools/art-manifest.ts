@@ -59,6 +59,9 @@ export const MEDIEVAL: [string, string][] = [
   ['decoration/props', 'bucket_water'],
   ['units/neutral', 'projectile_arrow'],
   ['buildings/neutral', 'projectile_catapult'],
+  // Etapa 19: o castelo de telhado dourado (nível 4) e os estandartes da porta (nível 2 em diante).
+  ['buildings/yellow', 'building_castle_yellow'],
+  ['units/blue', 'banner_blue_full'],
 ];
 
 /** [origem relativa à coleção, destino relativo a public/assets/kaykit] */
@@ -81,7 +84,11 @@ export const ART: [string, string][] = [
   [`${ADV}/Characters/gltf/Mage.glb`, 'chars/Mage.glb'],
   [`${ADV}/Characters/gltf/Engineer.glb`, 'chars/Engineer.glb'],
   [`${MM6}/3 - September 2025 - Cleric/characters/Cleric.glb`, 'chars/Cleric.glb'],
-  [`${MM4}/10 - April 2024 - Paladin/characters/gltf/Paladin_with_Helmet.glb`, 'chars/Paladin.glb'],
+  // Etapa 19: o cavaleiro começa sem elmo e ganha o elmo na primeira melhoria de armaduras.
+  [`${MM4}/10 - April 2024 - Paladin/characters/gltf/Paladin.glb`, 'chars/Paladin.glb'],
+  [`${MM4}/10 - April 2024 - Paladin/characters/gltf/Paladin_with_Helmet.glb`, 'chars/Paladin_with_Helmet.glb'],
+  // Etapa 19: armadura prateada do soldado (a dourada sai dela, recolorida ao carregar).
+  [`${ADV}/Textures/knight_texture_alt_A.png`, 'chars/knight_texture_alt_A.png'],
   // Etapa 6: bruxa, troll (a Monstruosidade), necromante e os dois golens chefes.
   [`${MM5}/5 - November 2024 - Witch/characters/Witch.glb`, 'chars/Witch.glb'],
   [`${MM6}/4 - October 2025 - Monstrosity/characters/Monstrosity.glb`, 'chars/Monstrosity.glb'],

@@ -692,6 +692,7 @@ O usuário pediu para revisar os golpes e as armas na mão. Cada personagem foi 
 | Golem de ossos | atacava de mãos vazias | o `Skeleton_Golem_Axe_Large` do pacote Skeletons |
 | Bruxa e Necromante | golpe de espada de mão vazia, e o necromante batia com o cajado como porrete | lançam magia (`MONSTER_ATTACK` em `world3d.ts`) |
 | Lobisomem | golpe de espada de mão vazia | bate com as duas garras (`Melee_Dualwield_Attack_Chop`; o de corte girava o corpo e o deixava de costas) |
+| Arqueiro (visto depois, 2026-11-08) | o arco vinha com a corda do lado de fora: ao mirar, a corda ficava virada para o inimigo | arco virado no eixo do comprimento em `loadArt` (vale para os arqueiros das torres) |
 
 - **Ficou como estava**:
   - O Druida e o Mago seguram o cajado deitado para a frente quando estão parados. É o jeito do KayKit, e em pé o cajado do Druida some atrás dos chifres.
@@ -699,7 +700,51 @@ O usuário pediu para revisar os golpes e as armas na mão. Cada personagem foi 
   - A besta da Atiradora parada encosta um pouco no chão.
 - **Sem defeito**: Soldado, Arqueiro, Mago, Clérigo, Paladino, Engenheiro, Bárbaro, Esqueleto, Troll e Golem de gelo.
 
-## 22. Arquitetura
+## 22. Evolução visual (Etapa 19)
+
+Pedido do usuário (2026-11-08): o castelo e as tropas mudam de aparência conforme o jogador melhora o castelo e as tropas. Tudo com os modelos do KayKit da coleção local. Sem estrelas em cima da cabeça: o jogo também é para crianças, mas não só para elas.
+
+### Castelo (níveis 1 a 4)
+
+O KayKit tem um castelo só (em quatro cores), e ele ocupa o hexágono inteiro: muralhinha e torrezinhas em volta somem atrás dele. Então a evolução é no próprio castelo:
+
+| Nível | Tamanho | Bandeira do topo | O que muda |
+| --- | --- | --- | --- |
+| 1 | 86% | 1,1 | castelo de hoje, um pouco menor, para sobrar onde crescer |
+| 2 | 96% | 1,3 | estandartes azuis dos dois lados da porta |
+| 3 | 106% | 1,6 | maior |
+| 4 | 114% | 2,0 | telhados dourados (`building_castle_yellow`) |
+
+- **Na subida de nível**, o castelo cresce do tamanho antigo para o novo em 1,2 s, com um leve passo além (o mesmo jeito do broto da Etapa 17).
+- **A queda do castelo** (Etapa 13) derruba o castelo do tamanho e do telhado em que ele estava.
+- **A barra de vida** sobe e desce com o tamanho.
+- Números em `CASTLE_SCALE` e `CASTLE_FLAG` (`world3d.ts`).
+
+### Tropas (melhorias da forja)
+
+| Melhoria | Nível | Quem | O que muda |
+| --- | --- | --- | --- |
+| Armaduras | 1 | cavaleiro | ganha o elmo (`Paladin_with_Helmet`); antes ele usava sempre o com elmo, agora começa sem |
+| Armaduras | 2 | soldado | armadura prateada (`knight_texture_alt_A` do Adventurers) |
+| Armaduras | 3 | soldado | armadura dourada: a prateada com os cinzas puxados para o ouro (`goldenArmor` em `assets.ts`); a espada e o escudo, que usam a mesma textura, douram junto |
+| Flechas | 1 a 3 | arqueiros (e torres) | rastro atrás da flecha: curto e fraco no 1, azul no 2, dourado e mais longo no 3 |
+
+- **A troca vale para quem já está em campo**, no quadro seguinte à melhoria.
+- **A armadura** é uma troca de textura no material (um material por textura, guardado), sem modelo novo (`CharView.setSkin`). O cavaleiro troca de modelo (`cavaleiroElmo`), com a mesma escala, para o corpo não mudar de tamanho.
+- **Ficou de fora a aljava a mais**: o arqueiro do KayKit já tem uma aljava nas costas, e a segunda parecia duas.
+- **Também ficou de fora** trocar escudo e espada por nível (na distância do jogo quase não se nota) e as cores alternativas do arqueiro e do mago (trocam rosto e cabelo, parecem outra pessoa).
+
+### Arte
+
+- `building_castle_yellow` e `banner_blue_full` (Medieval Hexagon Pack);
+- `Paladin` sem elmo, além do `Paladin_with_Helmet` (Mystery Monthly 4);
+- `knight_texture_alt_A` (Adventurers 2.0).
+
+### O que falta
+
+Jogar no tablet e no iPhone.
+
+## 23. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
@@ -724,7 +769,7 @@ O usuário pediu para revisar os golpes e as armas na mão. Cada personagem foi 
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. `album.ts`: as figurinhas e o que guarda no navegador. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
 - `src/ui/App.tsx`: HUD, ⋯, botões flutuantes, avisos e telas de começo e fim. O menu do prédio e o leque do Construir ficam em `src/ui/Radial.tsx` (seções 14 e 15).
 
-## 23. Etapas
+## 24. Etapas
 
 | Etapa | O que | Situação |
 | --- | --- | --- |
@@ -746,8 +791,9 @@ O usuário pediu para revisar os golpes e as armas na mão. Cada personagem foi 
 | 16 | Festa da vitória, mundo vivo, estações com tempo, música ambiente e álbum de figurinhas (seção 19) | Pronta em 2026-11-07, na `main`. Vista no navegador do Mac (festa, as quatro estações, chuva, figurinha, álbum no computador e no celular); a música foi conferida por medição, falta ouvir e jogar no iPhone. |
 | 17 | Recursos que acabam e reaparecem longe do castelo, dos portais e das construções; plantação que acaba e se replanta (seção 20) | Pronta em 2026-11-07, na `main`. Vista no navegador do Mac (degraus da floresta e da rocha, toras, cascalho, balões, broto, Replantar no menu); falta jogar no tablet e no iPhone. |
 | 18 | Modo fácil: nada acaba, ondas e mudança mais leves, castelo mais forte; escolhido com figura ao começar (seção 21) | Pronta em 2026-11-07, na `main`. Vista no navegador do Mac (primeira tela no tamanho de celular, Nova partida no ⋯, menu da plantação no fácil); falta jogar no tablet. |
+| 19 | Evolução visual: castelo cresce e doura por nível; elmo, armadura prateada e dourada e rastro das flechas pelas melhorias da forja (seção 22) | Pronta em 2026-11-08. Vista no navegador do Mac (os quatro castelos, a subida de nível, as armaduras, o elmo e o rastro); falta jogar no tablet e no iPhone. |
 
-## 24. Arte e licenças
+## 25. Arte e licenças
 
 Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art` (lista em `tools/art-manifest.ts`). Detalhes em `LICENSES.md`.
 
@@ -762,5 +808,6 @@ Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art`
 | Character Animations | todas as animações (Simulation, da Etapa 16: comemorar, acenar, sentar e flexões) |
 | Heróis (Etapa 14) | Barbarian, Rogue_Hooded e Druid (Adventurers) com machado de duas mãos, besta e cajado; BlackKnight (Mystery Monthly 5) com espada e escudo grandes |
 | Revisão das armas | machado grande do orc bruto, machado do golem de ossos e a textura do orc saqueador |
+| Evolução visual (Etapa 19) | castelo de telhado dourado e estandarte (Medieval); Paladin sem elmo (Mystery Monthly 4); armadura prateada do Knight (Adventurers) |
 
 Os efeitos vêm do pixelfx (MIT); detalhes na seção 6 e em `LICENSES.md`.

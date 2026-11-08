@@ -182,6 +182,13 @@ const SPECIAL_SCALE: Record<'giro' | 'chuva' | 'raizes' | 'pisao', number> = { g
 
 /** Etapa 17: segundos que o recurso novo leva para crescer do chão. */
 const SPROUT_TIME = 1.6;
+/**
+ * Etapa 19: o castelo cresce a cada nível (no 4 os telhados ficam dourados), com a bandeira do
+ * topo maior; os estandartes da porta aparecem no nível 2. A subida de nível cresce em 1,2 s.
+ */
+const CASTLE_SCALE = [0.86, 0.96, 1.06, 1.14];
+const CASTLE_FLAG = [1.1, 1.3, 1.6, 2.0];
+const CASTLE_GROW = 1.2;
 
 /** Torre dos arqueiros: a torre de vigia aberta do KayKit, maior, com os arqueiros na plataforma. */
 const TOWER_SCALE = 1.8;
@@ -338,11 +345,21 @@ export class World3D {
   private land = 0;
   /** Hexágonos que brotaram (índice -> instante): o recurso cresce do chão em SPROUT_TIME. */
   private sprouting = new Map<number, number>();
+  /** Etapa 19: crescimento do castelo na subida de nível e o tamanho com que foi desenhado. */
+  private castleFrom = CASTLE_SCALE[0]!;
+  private castleT0 = -99;
+  private castleSync = 0;
+  private castleDrawn = { level: 1, scale: CASTLE_SCALE[0]! };
   private sproutSync = 0;
   /** Balões de ícone: prédio sem recurso e recurso novo. */
   private bubbles: Bubbles;
   private chars = new Map<number, CharView>();
   private flights: Flight[] = [];
+  /**
+   * Etapa 19: rastro das flechas melhoradas na forja: curto e branco no nível 1, azul no 2 e
+   * dourado no 3. (A aljava a mais ficou de fora: o arqueiro do KayKit já tem uma nas costas.)
+   */
+  private trail: THREE.InstancedMesh;
   private bars: Bars;
   private tmp = new THREE.Matrix4();
   private q = new THREE.Quaternion();
@@ -415,6 +432,8 @@ export class World3D {
     for (const k of ['toras', 'torasB'] as StaticKey[]) big(k, 300);
     for (const k of ['feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote'] as StaticKey[]) big(k, 120);
     for (const k of ['castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina'] as StaticKey[]) big(k, 200);
+    big('casteloOuro', 4);
+    big('estandarte', 8);
     this.crystals = new Instanced(scene, crystalModel(), 200, true, false);
     for (const c of CROPS) this.farms.set(c, new Instanced(scene, cropModel(c), 60, true, true));
     this.pitch = new Instanced(scene, pitchModel(), 120, false, true);
@@ -446,6 +465,14 @@ export class World3D {
     this.orbs.count = 0;
     this.orbs.frustumCulled = false;
     scene.add(this.orbs);
+    this.trail = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(0.05, 8, 6),
+      new THREE.MeshBasicMaterial({ color: '#bfe6ff', transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }),
+      1200,
+    );
+    this.trail.count = 0;
+    this.trail.frustumCulled = false;
+    scene.add(this.trail);
     big('muro', 1400);
     big('poste', 700);
     big('flecha', 400, false);
@@ -581,6 +608,7 @@ export class World3D {
     this.ver = -1;
     this.land = w.land;
     this.sprouting.clear();
+    this.castleT0 = -99;
     this.look.snap(this.season);
   }
 
@@ -603,7 +631,7 @@ export class World3D {
   syncStatic(w: World): void {
     if (w.ver === this.ver) return;
     this.ver = w.ver;
-    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'catapulta', 'poco', 'taverna', 'mercado', 'barril', 'caixa', 'balde', 'arvoreE', 'arvoreF', 'toras', 'torasB'];
+    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casteloOuro', 'estandarte', 'casaA', 'casaB', 'fazenda', 'moinho', 'feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'catapulta', 'poco', 'taverna', 'mercado', 'barril', 'caixa', 'balde', 'arvoreE', 'arvoreF', 'toras', 'torasB'];
     // Etapa 17: o terreno mudou (recurso acabou ou brotou): refaz o chão antes de pintar a vila.
     if (w.land !== this.land) this.rebuildGround(w);
     for (const k of keys) this.sets.get(k)!.begin();
@@ -723,8 +751,16 @@ export class World3D {
         this.quarry(w, b, p.x, p.z);
         continue;
       }
+      if (b.kind === 'castelo') {
+        const lv = Math.max(1, Math.min(b.level, CASTLE_SCALE.length));
+        const s = this.castleScale(lv);
+        this.castleDrawn = { level: lv, scale: s };
+        this.place(lv >= 4 ? 'casteloOuro' : 'castelo', p.x, 0, p.z, 0, s, b.id);
+        this.place('bandeira', p.x, 4.0 * s, p.z, 0, CASTLE_FLAG[lv - 1]!, b.id);
+        if (lv >= 2) for (const sx of [-1, 1]) this.place('estandarte', p.x + sx * 0.47 * s, 0, p.z + 1.06 * s, 0, 1.5, b.id);
+        continue;
+      }
       this.place(key, p.x, 0, p.z, rot, b.kind === 'torre' ? TOWER_SCALE : 1, b.id);
-      if (b.kind === 'castelo') this.place('bandeira', p.x, 4.0, p.z, 0, 1.2, b.id);
       if (b.kind === 'mina') {
         // O minério ao lado da mina diminui com o veio (some quando ele acaba).
         const vein = tileAt(w, b.q, b.r)!;
@@ -768,6 +804,16 @@ export class World3D {
   }
 
   /** Quanto o recurso que brotou já cresceu (1 = pronto), com um pulinho no fim. */
+  /** Etapa 19: tamanho do castelo no nível, crescendo com um leve passo além na subida. */
+  private castleScale(level: number): number {
+    const to = CASTLE_SCALE[level - 1]!;
+    const k = (this.time - this.castleT0) / CASTLE_GROW;
+    if (k >= 1 || k < 0) return to;
+    const c = 1.70158;
+    const e = 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2);
+    return this.castleFrom + (to - this.castleFrom) * e;
+  }
+
   private sproutGrow(i: number): number {
     const t0 = this.sprouting.get(i);
     if (t0 === undefined) return 1;
@@ -808,6 +854,11 @@ export class World3D {
         const p = hexToWorld(t.q, t.r);
         this.fx?.play('poof', p.x, 0.1, p.z, { scale: 0.9 });
       }
+    }
+    // Etapa 19: castelo crescendo na subida de nível.
+    if (this.time - this.castleT0 < CASTLE_GROW + 0.1 && this.time - this.castleSync > 0.04) {
+      this.castleSync = this.time;
+      this.ver = -1;
     }
     if (this.sprouting.size) {
       if (this.time - this.sproutSync > 0.06) {
@@ -992,6 +1043,8 @@ export class World3D {
   }
 
   topOf(b: Building): number {
+    // Etapa 19: o castelo muda de tamanho com o nível.
+    if (b.kind === 'castelo') return (TOP.castelo ?? 1.2) * this.castleDrawn.scale;
     return TOP[b.kind] ?? 1.2;
   }
 
@@ -1047,14 +1100,21 @@ export class World3D {
       } else if (e.type === 'upgrade') {
         const p = castleAt();
         if (p) fx.play('nivel', p.x, 0, p.z + 0.9);
+        this.castleFrom = this.castleDrawn.scale;
+        this.castleT0 = this.time;
       }
     }
     // Personagens.
     const seen = new Set<number>();
+    // Etapa 19: as melhorias de armaduras da forja aparecem nas tropas: elmo no cavaleiro (1),
+    // armadura prateada (2) e dourada (3) no soldado. As de flechas, no rastro das flechas.
+    const armor = w.forge.armaduras;
+    const soldierSkin = armor >= 3 ? this.art.skins.ouro : armor >= 2 ? this.art.skins.prata : null;
     for (const u of w.units.values()) {
       seen.add(u.id);
-      const kind: CharKey = u.kind === 'trabalhador' && u.id % 2 ? 'trabalhadorB' : u.kind;
+      const kind: CharKey = u.kind === 'trabalhador' && u.id % 2 ? 'trabalhadorB' : u.kind === 'cavaleiro' && armor >= 1 ? 'cavaleiroElmo' : u.kind;
       const v = this.charFor(u.id, kind);
+      if (u.kind === 'soldado') v.setSkin(soldierSkin);
       let x = u.x;
       let y = 0;
       let z = u.z;
@@ -1177,13 +1237,28 @@ export class World3D {
       fx?.play('faisca', f.x2, 0, f.z2, { flip: flip(f.x2 - f.x1, f.z2 - f.z1), scale: 0.8 });
       return false;
     });
+    const arrowLv = Math.min(3, w.forge.flechas);
+    const dots = [0, 2, 4, 5][arrowLv]!;
+    // Mistura aditiva: cor mais escura = brilho mais fraco.
+    (this.trail.material as THREE.MeshBasicMaterial).color.set(['#000000', '#8c887c', '#7fc4ff', '#ffcc55'][arrowLv]!);
+    let tn = 0;
     for (const f of this.flights) {
       const k = f.t / f.dur;
       const d = Math.hypot(f.x2 - f.x1, f.z2 - f.z1);
       const arc = d * 0.12;
-      const x = f.x1 + (f.x2 - f.x1) * k;
-      const z = f.z1 + (f.z2 - f.z1) * k;
-      const y = f.y1 + (f.y2 - f.y1) * k + Math.sin(k * Math.PI) * arc;
+      const at = (kk: number) => ({ x: f.x1 + (f.x2 - f.x1) * kk, z: f.z1 + (f.z2 - f.z1) * kk, y: f.y1 + (f.y2 - f.y1) * kk + Math.sin(kk * Math.PI) * arc });
+      const { x, y, z } = at(k);
+      if (dots) {
+        // Pontos de luz atrás da cauda da flecha, cada um menor.
+        for (let j = 0; j < dots && tn < this.trail.instanceMatrix.count; j++) {
+          const kk = k - (0.4 + j * 0.2) / Math.max(1, d);
+          if (kk < 0) break;
+          const q = at(kk);
+          const sc = (1 - j * 0.18) * (arrowLv >= 3 ? 1.25 : 1);
+          this.tmp.makeScale(sc, sc, sc).setPosition(q.x, q.y, q.z);
+          this.trail.setMatrixAt(tn++, this.tmp);
+        }
+      }
       const vy = (f.y2 - f.y1) / f.dur + Math.cos(k * Math.PI) * Math.PI * arc / f.dur;
       const vh = d / f.dur;
       this.p.set(x, y, z);
@@ -1194,6 +1269,8 @@ export class World3D {
       arrows.push(this.tmp);
     }
     arrows.end();
+    this.trail.count = tn;
+    this.trail.instanceMatrix.needsUpdate = true;
     // Pedras da catapulta: arco alto e explosão de terra onde caem.
     const rocks = this.sets.get('pedraCerco')!;
     rocks.begin();
@@ -1464,15 +1541,20 @@ export class World3D {
   private startFall(x: number, z: number): void {
     this.endFall();
     const g = new THREE.Group();
-    for (const part of this.art.statics.castelo.parts) {
+    // Cai o castelo do jeito que estava desenhado (tamanho e telhado do nível).
+    const { level, scale } = this.castleDrawn;
+    const body = new THREE.Group();
+    for (const part of this.art.statics[level >= 4 ? 'casteloOuro' : 'castelo'].parts) {
       const m = new THREE.Mesh(part.geometry, part.material);
       m.castShadow = true;
-      g.add(m);
+      body.add(m);
     }
+    body.scale.setScalar(scale);
+    g.add(body);
     const flag = new THREE.Group();
     for (const part of this.art.statics.bandeira.parts) flag.add(new THREE.Mesh(part.geometry, part.material));
-    flag.position.y = 4.0;
-    flag.scale.setScalar(1.2);
+    flag.position.y = 4.0 * scale;
+    flag.scale.setScalar(CASTLE_FLAG[level - 1]!);
     g.add(flag);
     g.position.set(x, 0, z);
     this.scene.add(g);
