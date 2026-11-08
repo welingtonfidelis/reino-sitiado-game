@@ -15,7 +15,7 @@
     "nodes" : [
         {
             "mesh" : 0,
-            "name" : "BlackKnight_Sword"
+            "name" : "BlackKnight_Shield_Large"
         }
     ],
     "materials" : [
@@ -32,7 +32,7 @@
     ],
     "meshes" : [
         {
-            "name" : "BlackKnight_Sword",
+            "name" : "BlackKnight_Shield_Large",
             "primitives" : [
                 {
                     "attributes" : {
@@ -63,61 +63,61 @@
         {
             "bufferView" : 0,
             "componentType" : 5126,
-            "count" : 999,
+            "count" : 2306,
             "max" : [
-                0.3148459792137146,
-                1.7306413650512695,
-                0.13811442255973816
+                1.2451990842819214,
+                1.2451986074447632,
+                0.16513873636722565
             ],
             "min" : [
-                -0.3148452639579773,
-                -0.32793760299682617,
-                -0.13811342418193817
+                -1.2451988458633423,
+                -1.2451988458633423,
+                -0.3623398244380951
             ],
             "type" : "VEC3"
         },
         {
             "bufferView" : 1,
             "componentType" : 5126,
-            "count" : 999,
+            "count" : 2306,
             "type" : "VEC2"
         },
         {
             "bufferView" : 2,
             "componentType" : 5126,
-            "count" : 999,
+            "count" : 2306,
             "type" : "VEC3"
         },
         {
             "bufferView" : 3,
             "componentType" : 5123,
-            "count" : 2130,
+            "count" : 5922,
             "type" : "SCALAR"
         }
     ],
     "bufferViews" : [
         {
             "buffer" : 0,
-            "byteLength" : 11988,
+            "byteLength" : 27672,
             "byteOffset" : 0,
             "target" : 34962
         },
         {
             "buffer" : 0,
-            "byteLength" : 7992,
-            "byteOffset" : 11988,
+            "byteLength" : 18448,
+            "byteOffset" : 27672,
             "target" : 34962
         },
         {
             "buffer" : 0,
-            "byteLength" : 11988,
-            "byteOffset" : 19980,
+            "byteLength" : 27672,
+            "byteOffset" : 46120,
             "target" : 34962
         },
         {
             "buffer" : 0,
-            "byteLength" : 4260,
-            "byteOffset" : 31968,
+            "byteLength" : 11844,
+            "byteOffset" : 73792,
             "target" : 34963
         }
     ],
@@ -129,8 +129,8 @@
     ],
     "buffers" : [
         {
-            "byteLength" : 36228,
-            "uri" : "BlackKnight_Sword.bin"
+            "byteLength" : 85636,
+            "uri" : "BlackKnight_Shield_Large.bin"
         }
     ]
 }

@@ -24,7 +24,8 @@ copiados por `npm run art` conforme `tools/art-manifest.ts`.
 | KayKit Medieval Hexagon Pack (vila) | poço, taverna, mercado, barril, caixa pequena, balde com água |
 | KayKit Resource Bits (Etapa 17) | Wood_Log_A e Wood_Log_B (toras onde a floresta acabou) |
 | KayKit Adventurers 2.0 (Etapa 14) | Barbarian, Rogue_Hooded, Druid; axe_2handed, crossbow_2handed, druid_staff e as texturas barbarian, rogue e druid |
-| KayKit Mystery Monthly 5 (Etapa 14) | BlackKnight, BlackKnight_Sword, BlackKnight_Shield e a textura |
+| KayKit Mystery Monthly 5 (Etapa 14) | BlackKnight, BlackKnight_Sword_Large, BlackKnight_Shield_Large (a versão do rig grande, desde 2026-11-08) e a textura |
+| Revisão das armas (2026-11-08) | Orc_Axe_Large e orcbrute_texture_A (Mystery Monthly 6, orc bruto); Skeleton_Golem_Axe_Large (Skeletons 1.1); orc_texture_A (Mystery Monthly 4, a pele do orc saqueador) |
 | KayKit Character Animations 1.1 | Rig_Medium (General, MovementBasic, CombatMelee, CombatRanged, Tools, Simulation) e Rig_Large (General, MovementBasic, CombatMelee). Da Simulation (Etapa 16): Cheering, Waving, Sit_Floor_Idle e Push_Ups |
 
 ## pixelfx (Patch e Hugo Duprez) — MIT

@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { BUILDINGS, CONFIG, CROPS, DIRS, HEX, cropOf, farmStage, hexToWorld, isHero, openRifts, resourceDir, stage, tileAt } from '../sim/index.ts';
-import type { Building, BuildingKind, Crop, SimEvent, UnitKind, World } from '../sim/index.ts';
+import type { Building, BuildingKind, Crop, MonsterKind, SimEvent, UnitKind, World } from '../sim/index.ts';
 import type { Art, CharKey, StaticKey, StaticModel, StaticPart } from './assets.ts';
 import { CharView } from './chars.ts';
 import { buildGround, paintVillage } from './ground.ts';
@@ -172,6 +172,11 @@ function farmAngle(w: World, b: Building): number {
 
 /** Pose de luta por tipo (os heróis usam as de duas mãos). */
 const FIGHT_POSE: Partial<Record<UnitKind, Pose>> = { arqueiro: 'shoot', mago: 'cast', clerigo: 'heal', atiradora: 'shoot2', barbaro: 'chop2', druida: 'cast' };
+/**
+ * Golpe dos monstros que não brandem arma (revisão de 2026-11-08): a bruxa e o necromante
+ * lançam magia, e o lobisomem arranha com as duas garras.
+ */
+const MONSTER_ATTACK: Partial<Record<MonsterKind, Pose>> = { bruxa: 'cast', necromante: 'cast', lobisomem: 'claw' };
 /** Tamanho dos golpes especiais na tela (o giro cobre o raio do golpe). */
 const SPECIAL_SCALE: Record<'giro' | 'chuva' | 'raizes' | 'pisao', number> = { giro: 1.4, chuva: 1.3, raizes: 0.9, pisao: 1.8 };
 
@@ -1129,7 +1134,7 @@ export class World3D {
       const v = this.charFor(m.id, m.kind);
       v.root.position.set(m.x, 0, m.z);
       v.root.rotation.y = m.facing;
-      v.play(m.state === 'dead' ? 'death' : m.state === 'attack' ? 'attack' : 'walk', m.kind === 'lobisomem' ? 1.5 : 1);
+      v.play(m.state === 'dead' ? 'death' : m.state === 'attack' ? (MONSTER_ATTACK[m.kind] ?? 'attack') : 'walk', m.kind === 'lobisomem' ? 1.5 : 1);
       v.update(dt);
     }
     for (const [id, slot] of this.batSlots) {

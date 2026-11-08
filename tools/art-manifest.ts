@@ -123,10 +123,19 @@ export const ART: [string, string][] = [
     [`${ADV}/Assets/gltf/${n}.bin`, `weapons/${n}.bin`],
   ] as [string, string][]),
   ...['barbarian_texture.png', 'druid_texture.png', 'rogue_texture.png'].map((n) => [`${ADV}/Assets/gltf/${n}`, `weapons/${n}`] as [string, string]),
-  ...['BlackKnight_Sword', 'BlackKnight_Shield'].flatMap((n) => [
+  // O Cavaleiro Negro é do rig grande: espada e escudo na versão _Large (o dobro).
+  ...['BlackKnight_Sword_Large', 'BlackKnight_Shield_Large'].flatMap((n) => [
     [`${MM5}/3 - September 2024 - Black Knight/assets/gltf/${n}.gltf`, `weapons/${n}.gltf`],
     [`${MM5}/3 - September 2024 - Black Knight/assets/gltf/${n}.bin`, `weapons/${n}.bin`],
   ] as [string, string][]),
+  // Revisão das armas (2026-11-08): o machado grande do próprio orc bruto, o machado do golem de
+  // ossos e a textura do orc saqueador (o .glb dele vem sem textura; ela fica à parte no pacote).
+  [`${MM6}/2 - August 2025 - Orc Brute/assets/gltf/Orc_Axe_Large.gltf`, 'weapons/Orc_Axe_Large.gltf'],
+  [`${MM6}/2 - August 2025 - Orc Brute/assets/gltf/Orc_Axe_Large.bin`, 'weapons/Orc_Axe_Large.bin'],
+  [`${MM6}/2 - August 2025 - Orc Brute/assets/gltf/orcbrute_texture_A.png`, 'weapons/orcbrute_texture_A.png'],
+  [`${SK}/assets/gltf/Skeleton_Golem_Axe_Large.gltf`, 'weapons/Skeleton_Golem_Axe_Large.gltf'],
+  [`${SK}/assets/gltf/Skeleton_Golem_Axe_Large.bin`, 'weapons/Skeleton_Golem_Axe_Large.bin'],
+  [`${MM4}/1 - July 2023 - Orc Raider/textures/orc_texture_A.png`, 'chars/orc_texture_A.png'],
   [`${MM5}/3 - September 2024 - Black Knight/assets/gltf/blackknight_texture.png`, 'weapons/blackknight_texture.png'],
   // Ferramentas dos trabalhadores (RPG Tools Bits): machado na serraria, picareta na pedreira e na mina, pá na fazenda;
   // o martelo vai para o engenheiro (o do pack medieval ficava minúsculo na mão).

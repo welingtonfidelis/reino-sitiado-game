@@ -133,8 +133,11 @@ export const CHAR_HEIGHT: Record<CharKey, number> = {
   druida: 0.7,
   cavaleiroNegro: 0.78,
 };
-/** Personagens do rig grande (animações do Rig_Large). */
-export const LARGE: ReadonlySet<CharKey> = new Set(['bruto', 'troll', 'golem', 'golemOssos']);
+/**
+ * Personagens do rig grande (animações do Rig_Large). O Cavaleiro Negro também é: com as
+ * animações do rig médio ele ficava agachado e encolhido (revisão de 2026-11-08).
+ */
+export const LARGE: ReadonlySet<CharKey> = new Set(['bruto', 'troll', 'golem', 'golemOssos', 'cavaleiroNegro']);
 
 /** Arma na mão direita (e escudo na esquerda). */
 const WEAPONS = {
@@ -156,8 +159,11 @@ const WEAPONS = {
   machadoGrande: 'weapons/axe_2handed.gltf',
   cajadoDruida: 'weapons/druid_staff.gltf',
   besta: 'weapons/crossbow_2handed.gltf',
-  espadaNegra: 'weapons/BlackKnight_Sword.gltf',
-  escudoNegro: 'weapons/BlackKnight_Shield.gltf',
+  // Rig grande: as versões _Large (o dobro), feitas para a mão dele.
+  espadaNegra: 'weapons/BlackKnight_Sword_Large.gltf',
+  escudoNegro: 'weapons/BlackKnight_Shield_Large.gltf',
+  machadoBruto: 'weapons/Orc_Axe_Large.gltf',
+  machadoGolem: 'weapons/Skeleton_Golem_Axe_Large.gltf',
 } as const;
 export type WeaponKey = keyof typeof WEAPONS;
 
@@ -285,17 +291,30 @@ export async function loadArt(base: string, onProgress?: (k: number) => void): P
   if (onProgress) manager.onProgress = (_u, done, total) => onProgress(done / total);
   const loader = new GLTFLoader(manager);
   const load = (f: string) => loader.loadAsync(base + f);
-  const [st, ch, wp, am, al] = await Promise.all([
+  const [st, ch, wp, am, al, orcSkin] = await Promise.all([
     Promise.all((Object.keys(STATIC_MODELS) as StaticKey[]).map(async (k) => [k, await load(STATIC_MODELS[k])] as const)),
     Promise.all((Object.keys(CHAR_FILES) as CharKey[]).map(async (k) => [k, await load(CHAR_FILES[k])] as const)),
     Promise.all((Object.keys(WEAPONS) as WeaponKey[]).map(async (k) => [k, await load(WEAPONS[k])] as const)),
     Promise.all(ANIMS_MEDIUM.map(load)),
     Promise.all(ANIMS_LARGE.map(load)),
+    // O orc saqueador vem sem textura no .glb; a do pacote fica à parte.
+    new THREE.TextureLoader(manager).loadAsync(base + 'chars/orc_texture_A.png'),
   ]);
+  orcSkin.flipY = false;
+  orcSkin.colorSpace = THREE.SRGBColorSpace;
   const statics = {} as Art['statics'];
   for (const [k, g] of st) statics[k] = toStatic(g.scene);
   const chars = {} as Art['chars'];
   for (const [k, g] of ch) {
+    if (k === 'orc') {
+      g.scene.traverse((o) => {
+        if (!(o instanceof THREE.Mesh)) return;
+        const m = o.material as THREE.MeshStandardMaterial;
+        if (m.map) return;
+        m.map = orcSkin;
+        m.color.set(0xffffff);
+      });
+    }
     lambertize(g.scene);
     mergeSkinned(g.scene);
     const box = new THREE.Box3().setFromObject(g.scene);
@@ -307,8 +326,12 @@ export async function loadArt(base: string, onProgress?: (k: number) => void): P
     // A pá do RPG Tools Bits vem com a lâmina para baixo do ponto da mão (as outras
     // ferramentas e armas apontam para cima): virada, a lâmina vai para o chão ao cavar.
     if (k === 'pa') g.scene.rotation.x = Math.PI;
+    // A besta vem com a frente em +Z e a mão do KayKit aponta a arma em +X no tiro de duas
+    // mãos: sem girar, a Atiradora atirava para o lado direito. Parada, aponta para o chão.
+    if (k === 'besta') g.scene.rotation.y = Math.PI / 2;
     // Ferramentas 30% maiores, para dar para ver de longe por baixo do chapéu.
-    if (k === 'pa' || k === 'machadoLenha' || k === 'picareta' || k === 'marreta') g.scene.scale.setScalar(1.3);
+    // O machado do orc bruto também: no tamanho do pacote ele some atrás dos braços no golpe.
+    if (k === 'pa' || k === 'machadoLenha' || k === 'picareta' || k === 'marreta' || k === 'machadoBruto') g.scene.scale.setScalar(1.3);
     weapons[k] = g.scene;
   }
   const clips = new Map<string, THREE.AnimationClip>();

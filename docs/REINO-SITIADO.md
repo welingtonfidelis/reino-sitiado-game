@@ -679,6 +679,26 @@ Ver o filho do usuário jogando o Fácil no tablet: se ainda está difícil, os 
   - As dicas de jogo ficam fechadas em "Como jogar".
   - Sem partida salva, a tela continua como antes: dicas e os dois botões de modo.
 
+### Revisão das armas e dos golpes (2026-11-08)
+
+O usuário pediu para revisar os golpes e as armas na mão. Cada personagem foi fotografado de perto (vista do jogo, de lado e de cima, com uma seta na frente do boneco), atacando, parado e andando. Correções:
+
+| Quem | Problema | Correção |
+| --- | --- | --- |
+| Atiradora | a besta vem com a frente em +Z, e a mão do KayKit aponta a arma em +X no tiro de duas mãos: ela atirava para o lado direito | besta girada 90° em `loadArt`; parada, aponta para o chão |
+| Cavaleiro Negro | o modelo é do rig grande, mas recebia as animações do rig médio: ficava agachado, com a espada pequena e o escudo escondido | entra em `LARGE`; golpe `Melee_1H_Slash` (`BIG_BY_KIND` em `chars.ts`); espada e escudo na versão `_Large` |
+| Orc saqueador | todo branco: o `.glb` vem sem textura, que fica à parte no pacote | `orc_texture_A.png` aplicada ao carregar |
+| Orc bruto | segurava o machado do orc saqueador, pequeno para ele | o `Orc_Axe_Large` do pacote dele, 30% maior (no tamanho do pacote sumia atrás dos braços no golpe) |
+| Golem de ossos | atacava de mãos vazias | o `Skeleton_Golem_Axe_Large` do pacote Skeletons |
+| Bruxa e Necromante | golpe de espada de mão vazia, e o necromante batia com o cajado como porrete | lançam magia (`MONSTER_ATTACK` em `world3d.ts`) |
+| Lobisomem | golpe de espada de mão vazia | bate com as duas garras (`Melee_Dualwield_Attack_Chop`; o de corte girava o corpo e o deixava de costas) |
+
+- **Ficou como estava**:
+  - O Druida e o Mago seguram o cajado deitado para a frente quando estão parados. É o jeito do KayKit, e em pé o cajado do Druida some atrás dos chifres.
+  - Os soldados e o Bárbaro fazem flexão com a arma na mão.
+  - A besta da Atiradora parada encosta um pouco no chão.
+- **Sem defeito**: Soldado, Arqueiro, Mago, Clérigo, Paladino, Engenheiro, Bárbaro, Esqueleto, Troll e Golem de gelo.
+
 ## 22. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
@@ -740,6 +760,7 @@ Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art`
 | Resource Bits | minério |
 | RPG Tools Bits | pá, machado, picareta e martelo |
 | Character Animations | todas as animações (Simulation, da Etapa 16: comemorar, acenar, sentar e flexões) |
-| Heróis (Etapa 14) | Barbarian, Rogue_Hooded e Druid (Adventurers) com machado de duas mãos, besta e cajado; BlackKnight (Mystery Monthly 5) com espada e escudo |
+| Heróis (Etapa 14) | Barbarian, Rogue_Hooded e Druid (Adventurers) com machado de duas mãos, besta e cajado; BlackKnight (Mystery Monthly 5) com espada e escudo grandes |
+| Revisão das armas | machado grande do orc bruto, machado do golem de ossos e a textura do orc saqueador |
 
 Os efeitos vêm do pixelfx (MIT); detalhes na seção 6 e em `LICENSES.md`.

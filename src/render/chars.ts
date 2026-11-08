@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { LARGE, cloneChar, findBone } from './assets.ts';
 import type { Art, CharKey, WeaponKey } from './assets.ts';
 
-export type Pose = 'idle' | 'walk' | 'run' | 'attack' | 'shoot' | 'aim' | 'dig' | 'chop' | 'pick' | 'cast' | 'heal' | 'repair' | 'death' | 'shoot2' | 'chop2' | 'spin' | 'cheer' | 'wave' | 'sit' | 'pushups';
+export type Pose = 'idle' | 'walk' | 'run' | 'attack' | 'shoot' | 'aim' | 'dig' | 'chop' | 'pick' | 'cast' | 'heal' | 'repair' | 'death' | 'shoot2' | 'chop2' | 'spin' | 'cheer' | 'wave' | 'sit' | 'pushups' | 'claw';
 
 const MEDIUM: Record<Pose, string> = {
   idle: 'Idle_A',
@@ -31,6 +31,9 @@ const MEDIUM: Record<Pose, string> = {
   wave: 'Waving',
   sit: 'Sit_Floor_Idle',
   pushups: 'Push_Ups',
+  // Revisão de 2026-11-08: o lobisomem bate com as duas garras (o golpe de corte girava o
+  // corpo e ele ficava de costas para o alvo).
+  claw: 'Melee_Dualwield_Attack_Chop',
 };
 const BIG: Record<Pose, string> = {
   idle: 'Idle_A',
@@ -53,6 +56,11 @@ const BIG: Record<Pose, string> = {
   wave: 'Idle_A',
   sit: 'Idle_A',
   pushups: 'Idle_A',
+  claw: 'Melee_2H_Attack',
+};
+/** Golpe próprio de quem é do rig grande mas luta com uma mão (espada e escudo). */
+const BIG_BY_KIND: Partial<Record<CharKey, Partial<Record<Pose, string>>>> = {
+  cavaleiroNegro: { attack: 'Melee_1H_Slash' },
 };
 
 /** Poses que contam do começo (o resto entra em laço num ponto qualquer). */
@@ -63,7 +71,8 @@ const GEAR: Partial<Record<CharKey, { r?: WeaponKey; l?: WeaponKey }>> = {
   arqueiro: { l: 'arco' },
   esqueleto: { r: 'lamina' },
   orc: { r: 'machado' },
-  bruto: { r: 'machado' },
+  bruto: { r: 'machadoBruto' },
+  golemOssos: { r: 'machadoGolem' },
   mago: { r: 'cajado' },
   clerigo: { r: 'maca' },
   cavaleiro: { r: 'martelo', l: 'escudoPaladino' },
@@ -100,8 +109,9 @@ export class CharView {
     this.mixer = new THREE.AnimationMixer(model);
     const names = LARGE.has(kind) ? BIG : MEDIUM;
     const clips = LARGE.has(kind) ? art.clipsLarge : art.clips;
+    const own = LARGE.has(kind) ? BIG_BY_KIND[kind] : undefined;
     for (const pose of Object.keys(names) as Pose[]) {
-      const clip = clips.get(names[pose]);
+      const clip = clips.get(own?.[pose] ?? names[pose]);
       if (!clip) continue;
       const a = this.mixer.clipAction(clip);
       if (pose === 'death') {
