@@ -186,6 +186,11 @@ export const CONFIG = {
    */
   move: { pack: 0.75, packMin: 3 },
   /**
+   * Fendas dos monstros (2026-11-07): `count` fendas sorteadas em qualquer ponto da borda, a
+   * pelo menos `gap` (radianos) uma da outra.
+   */
+  rifts: { count: 3, gap: (50 * Math.PI) / 180 },
+  /**
    * Etapa 17: recursos que acabam e reaparecem. Estoque por hexágono; cada hexágono que acaba
    * entra na conta do tipo, e no fim da onda, quando a conta chega ao `due`, nasce uma mancha
    * nova (tamanho entre `size`) longe do castelo, dos portais e das construções.

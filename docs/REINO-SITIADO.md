@@ -1,6 +1,6 @@
 # Reino Sitiado
 
-Tower defense sem fim em 2.5D isométrico. O jogador ergue um reino em volta do castelo: planta, corta madeira, quebra pedra, minera ferro, constrói casas para ter quem trabalhe, treina soldados e arqueiros e fecha tudo com muralhas e portões. As hordas saem de fendas no norte, a cada onda maiores, mais fortes e mais variadas. A partida acaba quando o castelo cai.
+Tower defense sem fim em 2.5D isométrico. O jogador ergue um reino em volta do castelo: planta, corta madeira, quebra pedra, minera ferro, constrói casas para ter quem trabalhe, treina soldados e arqueiros e fecha tudo com muralhas e portões. As hordas saem de fendas na beira do mapa (o lugar muda a cada partida), a cada onda maiores, mais fortes e mais variadas. A partida acaba quando o castelo cai.
 
 Nome provisório. Proposta visual (canvas, design system Vigília): https://claude.ai/artifact/E2kdbKNuRkqvb9bmsePrsy
 
@@ -49,7 +49,7 @@ No console: `game`, `view`, `cam` e `snap('nome')` (salva `reports/snap-nome.png
 
 ## 3. O que a v1 tem
 
-- **Mapa:** hexagonal de raio 16 (era 13 até a etapa 9; veja a seção 13), sorteado pela semente. Tem florestas, rochas, veios de minério e três fendas na borda norte; a 1ª abre na onda 1, a 2ª na 10 e a 3ª na 20.
+- **Mapa:** hexagonal de raio 16 (era 13 até a etapa 9; veja a seção 13), sorteado pela semente. Tem florestas, rochas, veios de minério e três fendas em pontos sorteados da borda (até 2026-11-07 ficavam sempre ao norte; veja a seção 21); a 1ª abre na onda 1, a 2ª na 10 e a 3ª na 20.
 - **Começo:** castelo, duas casas, uma fazenda e quatro trabalhadores.
 - **Economia:** comida, madeira, pedra, ferro e ouro. O ouro vem das ondas e de chamar a onda antes da hora.
 - **Prédios:**
@@ -662,6 +662,22 @@ Para rodar no fácil: `MODO=facil npm run balance`.
 ### O que falta
 
 Ver o filho do usuário jogando o Fácil no tablet: se ainda está difícil, os números da tabela são o lugar de mexer.
+
+### Ajustes depois da Etapa 18 (2026-11-07)
+
+- **Fendas em qualquer lugar da borda** (pedido do usuário). Antes as três ficavam sempre ao norte (norte, nordeste e noroeste), em qualquer semente.
+  - **O sorteio**: agora cada partida sorteia três pontos da borda pela semente, em qualquer combinação (uma ao norte e duas ao sul; leste, sul e oeste...). Elas só ficam a 50° ou mais uma da outra (`CONFIG.rifts`). A ordem do sorteio é a ordem em que abrem.
+  - **O lado calmo**: a floresta e a rocha garantidas perto do castelo nascem no maior vão entre as fendas (`calmSide` em `world.ts`), e não mais sempre ao sul.
+  - **Caminho garantido**: se a rocha ou um lago fecharem a passagem de uma fenda até o castelo, o mapa abre uma trilha reta de grama (`openRiftPaths`).
+  - **Aviso**: diz de que lado a fenda nova abriu ("Uma nova fenda se abriu a sudeste.", `sideName` em `step.ts`).
+  - **Salvo**: guarda as fendas (`rifts`). Um salvo de antes fica com as três do norte (`legacyRifts`).
+  - **Desenho**: ao trocar de partida, os círculos das fendas antigas saem da cena. Antes ficavam, mas não se notava, porque caíam sempre no mesmo lugar.
+  - **Robô (6 sementes)**: normal 23,5 (era 23,2), fácil 31,2 (era 32,0). "Nada" 4,3 e 7,5.
+- **Continuar em destaque na tela de começo** (pedido do usuário: o botão pequeno induzia a começar outra partida).
+  - Com partida salva, o Continuar é o botão grande da tela, com o triângulo de tocar, a onda e o modo da partida, e brilha devagar.
+  - Começar outra virou um botão pequeno ("Começar outra partida"). Só depois de tocar nele aparece a escolha do modo, com o aviso de que a partida salva some e um Voltar.
+  - As dicas de jogo ficam fechadas em "Como jogar".
+  - Sem partida salva, a tela continua como antes: dicas e os dois botões de modo.
 
 ## 22. Arquitetura
 

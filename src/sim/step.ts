@@ -1066,7 +1066,19 @@ function startWave(w: World): void {
   w.spawnT = 0;
   w.waveState = 'spawning';
   w.events.push({ type: 'waveStart', wave: w.wave });
-  if (CONFIG.waves.riftOpens.includes(w.wave) && w.wave > 1) toast(w, 'Uma nova fenda se abriu na borda norte.', 'bad');
+  if (CONFIG.waves.riftOpens.includes(w.wave) && w.wave > 1) {
+    const t = w.tiles[w.rifts[openRifts(w.wave) - 1]!];
+    toast(w, t ? `Uma nova fenda se abriu ${sideName(t.q, t.r)}.` : 'Uma nova fenda se abriu.', 'bad');
+  }
+}
+
+const SIDES = ['a leste', 'a nordeste', 'ao norte', 'a noroeste', 'a oeste', 'a sudoeste', 'ao sul', 'a sudeste'];
+
+/** Lado do mapa de um hexágono, visto do castelo ("ao norte", "a sudeste"...). */
+export function sideName(q: number, r: number): string {
+  const p = hexToWorld(q, r);
+  const a = Math.atan2(-p.z, p.x);
+  return SIDES[(Math.round(a / (Math.PI / 4)) + 8) % 8]!;
 }
 
 function spawnMonster(w: World, kind: MonsterKind): void {

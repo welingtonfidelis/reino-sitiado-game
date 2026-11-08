@@ -468,8 +468,84 @@ function tileAtAngle(w: World, angle: number, dist: number): Tile {
   return best!;
 }
 
-/** Ângulos das fendas (norte, nordeste, noroeste): a câmera fica ao sul, livre. */
+/**
+ * Ângulos das fendas até 2026-11-07 (norte, nordeste, noroeste). Hoje cada partida sorteia os
+ * seus (`riftAngles`); estes só servem para abrir um salvo antigo, que não guardava as fendas.
+ */
 export const RIFT_ANGLES = [-Math.PI / 2, -Math.PI / 6, (-5 * Math.PI) / 6];
+
+/** Fendas de um salvo antigo, na ordem em que abriam. */
+export function legacyRifts(w: World): number[] {
+  return RIFT_ANGLES.map((a) => tileAtAngle(w, a, w.grid.R).i);
+}
+
+const angleGap = (a: number, b: number) => {
+  const d = Math.abs(a - b) % (Math.PI * 2);
+  return Math.min(d, Math.PI * 2 - d);
+};
+
+/**
+ * Pedido do usuário (2026-11-07): as fendas nascem em qualquer ponto da borda, sorteadas pela
+ * semente (uma ao norte e duas ao sul, ou leste, sul e oeste...). Só ficam a `gap` uma da outra,
+ * para não saírem coladas. A ordem é a ordem em que abrem.
+ */
+function riftAngles(w: World): number[] {
+  const { count, gap } = CONFIG.rifts;
+  const out: number[] = [];
+  for (let k = 0; out.length < count && k < 500; k++) {
+    const a = w.rand() * Math.PI * 2 - Math.PI;
+    if (out.every((b) => angleGap(a, b) >= gap)) out.push(a);
+  }
+  // Sem lugar (não acontece com 3 fendas a 50°): completa em volta da primeira.
+  while (out.length < count) out.push((out[0] ?? 0) + (out.length * Math.PI * 2) / count);
+  return out;
+}
+
+/** Meio do maior vão entre as fendas (o lado mais calmo do mapa) e a largura desse vão. */
+function calmSide(angles: number[]): { at: number; width: number } {
+  const s = [...angles].sort((a, b) => a - b);
+  let at = 0;
+  let width = -1;
+  s.forEach((a, k) => {
+    const next = k + 1 < s.length ? s[k + 1]! : s[0]! + Math.PI * 2;
+    if (next - a > width) {
+      width = next - a;
+      at = a + width / 2;
+    }
+  });
+  return { at, width };
+}
+
+/**
+ * Cada fenda precisa chegar ao castelo: se a rocha ou a água fecharem a passagem, abre uma
+ * trilha em linha reta da fenda até o miolo (vira grama o que estiver no meio).
+ */
+function openRiftPaths(w: World): void {
+  const blocked = (t: Tile) => t.terrain === 'rock' || t.terrain === 'water';
+  const reach = () => {
+    const seen = new Uint8Array(w.grid.size);
+    const queue = [w.grid.idx(0, 0)];
+    seen[queue[0]!] = 1;
+    for (let h = 0; h < queue.length; h++) {
+      for (const n of neighbors(w, w.tiles[queue[h]!]!)) {
+        if (seen[n.i] || blocked(n)) continue;
+        seen[n.i] = 1;
+        queue.push(n.i);
+      }
+    }
+    return seen;
+  };
+  let seen = reach();
+  for (const i of w.rifts) {
+    if (seen[i]) continue;
+    let t = w.tiles[i]!;
+    while (hexDist(t.q, t.r, 0, 0) > 0 && !seen[t.i]) {
+      t = neighbors(w, t).reduce((a, b) => (hexDist(b.q, b.r, 0, 0) < hexDist(a.q, a.r, 0, 0) ? b : a));
+      if (blocked(t)) t.terrain = 'grass';
+    }
+    seen = reach();
+  }
+}
 
 export function createWorld(seed = 1, R = CONFIG.mapRadius, mode: Mode = 'normal'): World {
   const grid = new HexIndex(R);
@@ -527,27 +603,32 @@ export function createWorld(seed = 1, R = CONFIG.mapRadius, mode: Mode = 'normal
   };
   for (const t of list) t.deco = Math.floor(w.rand() * 1000);
 
-  // Fendas na borda norte; a primeira abre na onda 1, as outras depois.
-  for (const a of RIFT_ANGLES) {
+  // Fendas sorteadas na borda; a primeira abre na onda 1, as outras depois.
+  const riftAt = riftAngles(w);
+  for (const a of riftAt) {
     const t = tileAtAngle(w, a, R);
     t.terrain = 'rift';
     w.rifts.push(t.i);
   }
+  // O lado mais calmo do mapa (o maior vão entre as fendas): é lá que nascem a floresta e a
+  // rocha garantidas perto do castelo, longe do caminho da horda.
+  const calm = calmSide(riftAt);
+  const calmAngle = () => calm.at + (w.rand() - 0.5) * Math.min(Math.PI * 0.7, calm.width * 0.5);
   // Florestas, rochas e veios de minério (longe do castelo). A quantidade acompanha a área do
   // mapa, e as distâncias vão até perto da borda; com raio 13 o sorteio é o mesmo de antes.
   const area = (R / 13) ** 2;
   const ang = () => w.rand() * Math.PI * 2;
   for (let k = 0; k < Math.round(7 * area); k++) grow(w, tileAtAngle(w, ang(), 5 + w.rand() * (R - 6)), 6 + Math.floor(w.rand() * 6), 'forest', 4);
   // Uma floresta garantida perto, para a primeira serraria.
-  grow(w, tileAtAngle(w, Math.PI * (0.15 + w.rand() * 0.7), 4.5), 6, 'forest', 4);
+  grow(w, tileAtAngle(w, calmAngle(), 4.5), 6, 'forest', 4);
   const rocks: Tile[] = [];
   for (let k = 0; k < Math.round(3 * area); k++) {
     const t = tileAtAngle(w, ang(), 6 + w.rand() * (R - 8));
     rocks.push(t);
     grow(w, t, 3 + Math.floor(w.rand() * 3), 'rock', 5);
   }
-  // Rocha e veio garantidos a meia distância, ao sul (do lado de cá).
-  const nearRock = tileAtAngle(w, Math.PI * (0.2 + w.rand() * 0.6), 6);
+  // Rocha e veio garantidos a meia distância, do lado calmo.
+  const nearRock = tileAtAngle(w, calmAngle(), 6);
   grow(w, nearRock, 3, 'rock', 5);
   rocks.push(nearRock);
   // Veios: o primeiro grupo de rocha (perto, ao sul) dá ferro; os outros alternam cristal e ferro.
@@ -576,6 +657,7 @@ export function createWorld(seed = 1, R = CONFIG.mapRadius, mode: Mode = 'normal
   // Ninguém nasce emparedado: as fendas e o miolo ficam livres.
   for (const i of w.rifts) for (const n of neighbors(w, tiles[i]!)) if (n.terrain !== 'grass') n.terrain = 'grass';
   for (const t of list) if (hexDist(t.q, t.r, 0, 0) <= 2) t.terrain = 'grass';
+  openRiftPaths(w);
   // Etapa 17: cada floresta, rocha e veio começa cheio.
   for (const t of list) t.stock = fullStock(t.terrain);
 

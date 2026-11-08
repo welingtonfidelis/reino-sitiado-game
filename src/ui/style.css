@@ -1480,3 +1480,102 @@ button.chip {
   85% { opacity: 1; transform: translate(-50%, 0) scale(1); }
   100% { opacity: 0; transform: translate(-50%, 10px) scale(0.95); }
 }
+
+/* Tela de começo com partida salva (2026-11-07): Continuar grande e chamativo; começar outra é
+   um botão pequeno que abre a escolha do modo. */
+.continue-big {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 112px;
+  margin: 1rem 0 0;
+  padding: 14px 18px;
+  background: var(--primary);
+  border: 2px solid var(--gold);
+  border-radius: 18px;
+  color: var(--primary-text);
+  text-align: left;
+  cursor: pointer;
+  animation: continue-glow 1.4s ease-in-out infinite alternate;
+}
+.continue-big:hover {
+  background: var(--primary-hover);
+}
+.continue-big:active {
+  transform: scale(0.97);
+}
+@keyframes continue-glow {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 0%, transparent); }
+  to { box-shadow: 0 0 22px 4px color-mix(in srgb, var(--gold) 60%, transparent); }
+}
+.continue-play {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: #2a1d08;
+}
+.continue-play .ico {
+  width: 44px;
+  height: 44px;
+  margin-left: 5px;
+  fill: currentColor;
+}
+.continue-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.continue-text strong {
+  font-size: 1.7rem;
+  line-height: 1.1;
+}
+.continue-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 1rem;
+  opacity: 0.9;
+}
+.continue-info span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.continue-info .ico {
+  width: 20px;
+  height: 20px;
+}
+.btn.new-game {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0.9rem 0 0;
+  min-height: 2.2rem;
+  padding: 4px 12px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.btn.new-game .ico {
+  width: 16px;
+  height: 16px;
+}
+.btn.new-game.back {
+  margin-top: 0.6rem;
+}
+.intro-tips {
+  margin-top: 0.9rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.intro-tips summary {
+  cursor: pointer;
+}
+

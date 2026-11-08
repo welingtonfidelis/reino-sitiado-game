@@ -6,7 +6,7 @@
 import { CONFIG } from './config.ts';
 import type { Mode } from './config.ts';
 import { rng } from './hex.ts';
-import { createWorld, fullStock } from './world.ts';
+import { createWorld, fullStock, legacyRifts } from './world.ts';
 import type { Building, Monster, Terrain, Unit, World } from './world.ts';
 
 const VERSION = 1;
@@ -35,6 +35,7 @@ export function saveWorld(w: World): string {
     R: w.grid.R,
     rng: w.rand.state.a,
     tiles: w.list.map((t) => [TERRAINS.indexOf(t.terrain), t.deco, t.b, t.ruin ? 1 : 0, Math.round(t.stock), t.left]),
+    rifts: w.rifts,
     buildings: [...w.buildings.values()],
     units: [...w.units.values()],
     monsters: [...w.monsters.values()],
@@ -86,6 +87,8 @@ export function loadWorld(json: string): World | null {
   w.monsters = new Map(d.monsters.map((m) => [m.id, m]));
   const target = w as unknown as Record<string, unknown>;
   for (const k of PLAIN) if (k in d) target[k] = d[k];
+  // As fendas são sorteadas desde 2026-11-07; um salvo de antes ficou com as três do norte.
+  w.rifts = Array.isArray(d.rifts) ? (d.rifts as number[]) : legacyRifts(w);
   w.events = [];
   w.dirty = true;
   return w;

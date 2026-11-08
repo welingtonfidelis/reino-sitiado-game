@@ -619,33 +619,75 @@ function Report({ game }: { game: Game }) {
   );
 }
 
+/**
+ * Tela de começo. Com partida salva (2026-11-07, pedido do usuário), o Continuar é o botão
+ * grande da tela, com figura e a onda; começar outra fica num botão pequeno que só então mostra
+ * a escolha do modo, para a criança não apagar a partida sem querer.
+ */
 function Intro({ game }: { game: Game }) {
   const saved = Game.saved();
+  const [another, setAnother] = useState(false);
+  const tips = (
+    <ul>
+      <li>Os trabalhadores chegam sozinhos enquanto houver casa vaga, comida e teto no castelo.</li>
+      <li>Construa fazendas, serraria perto da floresta, pedreira perto da rocha e mina em cima do veio.</li>
+      <li>Toque num prédio para recrutar, marcar o ponto de encontro, melhorar, mover, consertar ou destruir.</li>
+      <li>Toque numa tropa (ou use Selecionar e arraste) e depois no mapa para mandá-las até lá.</li>
+      <li>Muralhas desviam a horda; orcs derrubam. Torres só atiram com arqueiros dentro.</li>
+      <li>Arraste para mover o mapa e use a pinça ou a roda do mouse para o zoom.</li>
+    </ul>
+  );
   return (
     <div class="overlay">
       <article class="report-card">
         <header>
           <small>Tower defense sem fim</small>
           <h2>Reino Sitiado</h2>
-          <p>As hordas saem das fendas ao norte. Até quando o castelo aguenta?</p>
+          <p>As hordas saem das fendas na beira do mapa. Até quando o castelo aguenta?</p>
         </header>
-        <ul>
-          <li>Os trabalhadores chegam sozinhos enquanto houver casa vaga, comida e teto no castelo.</li>
-          <li>Construa fazendas, serraria perto da floresta, pedreira perto da rocha e mina em cima do veio.</li>
-          <li>Toque num prédio para recrutar, marcar o ponto de encontro, melhorar, mover, consertar ou destruir.</li>
-          <li>Toque numa tropa (ou use Selecionar e arraste) e depois no mapa para mandá-las até lá.</li>
-          <li>Muralhas desviam a horda; orcs derrubam. Torres só atiram com arqueiros dentro.</li>
-          <li>Arraste para mover o mapa e use a pinça ou a roda do mouse para o zoom.</li>
-        </ul>
         {saved ? (
-          <div class="report-actions">
-            <button class="btn primary" onClick={() => game.continueSaved()}>
-              {saved.wave > 0 ? `Continuar partida (onda ${saved.wave} · ${MODE_NAMES[saved.mode].toLowerCase()})` : `Continuar partida (${MODE_NAMES[saved.mode].toLowerCase()})`}
+          <>
+            <button class="continue-big" onClick={() => game.continueSaved()} aria-label={`Continuar a partida da onda ${saved.wave}`}>
+              <span class="continue-play">
+                <Icon name="play" />
+              </span>
+              <span class="continue-text">
+                <strong>Continuar</strong>
+                <span class="continue-info">
+                  <span>
+                    <Icon name="caveira" /> Onda {Math.max(1, saved.wave)}
+                  </span>
+                  <span>
+                    <Icon name={saved.mode === 'facil' ? 'sol' : 'espadas'} /> {MODE_NAMES[saved.mode]}
+                  </span>
+                </span>
+              </span>
             </button>
-          </div>
-        ) : null}
-        <p class="mode-title">{saved ? 'Ou comece outra:' : 'Como quer jogar?'}</p>
-        <ModePick current={saved ? saved.mode : readGameMode()} onPick={(m) => (saved ? game.restart(newSeed(), m) : game.begin(m))} />
+            {another ? (
+              <>
+                <p class="mode-title">Outra partida (a salva some):</p>
+                <ModePick current={saved.mode} onPick={(m) => game.restart(newSeed(), m)} />
+                <button class="btn new-game back" onClick={() => setAnother(false)}>
+                  <Icon name="voltar" /> Voltar
+                </button>
+              </>
+            ) : (
+              <button class="btn new-game" onClick={() => setAnother(true)}>
+                <Icon name="novo" /> Começar outra partida
+              </button>
+            )}
+            <details class="intro-tips">
+              <summary>Como jogar</summary>
+              {tips}
+            </details>
+          </>
+        ) : (
+          <>
+            {tips}
+            <p class="mode-title">Como quer jogar?</p>
+            <ModePick current={readGameMode()} onPick={(m) => game.begin(m)} />
+          </>
+        )}
       </article>
     </div>
   );

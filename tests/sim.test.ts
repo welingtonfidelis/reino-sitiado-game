@@ -36,6 +36,7 @@ import { CROPS, DIRS, MONSTERS, UNITS, buyHero, cropOf, heroCost, heroOf, heroPr
 import { demolish, moveBuilding, moveProblem, packTime, recruitProblem, tileAt } from '../src/sim/index.ts';
 import { allyPath, fullStock, regrow, replant, replantProblem, sourceOf, stage, worldToHex } from '../src/sim/index.ts';
 import { MODES, saveInfo, waveInterval } from '../src/sim/index.ts';
+import { legacyRifts, openRifts, sideName } from '../src/sim/index.ts';
 import type { Tile } from '../src/sim/index.ts';
 import type { Monster, MonsterKind, World } from '../src/sim/index.ts';
 
@@ -1256,3 +1257,66 @@ describe('modo fácil (Etapa 18)', () => {
     expect(saveInfo(JSON.stringify(old))!.mode).toBe('normal');
   });
 });
+
+describe('fendas sorteadas (2026-11-07)', () => {
+  const angle = (w: World, i: number) => {
+    const p = hexToWorld(w.tiles[i]!.q, w.tiles[i]!.r);
+    return Math.atan2(p.z, p.x);
+  };
+  const gap = (a: number, b: number) => {
+    const d = Math.abs(a - b) % (Math.PI * 2);
+    return Math.min(d, Math.PI * 2 - d);
+  };
+
+  it('cada semente põe as três fendas num lugar da borda, separadas, e não só ao norte', () => {
+    const sides = new Set<string>();
+    const layouts = new Set<string>();
+    for (let seed = 1; seed <= 40; seed++) {
+      const w = createWorld(seed);
+      expect(new Set(w.rifts).size).toBe(3);
+      for (const i of w.rifts) {
+        const t = w.tiles[i]!;
+        expect(t.terrain).toBe('rift');
+        expect(hexDist(t.q, t.r, 0, 0)).toBe(w.grid.R);
+        sides.add(sideName(t.q, t.r));
+      }
+      for (let a = 0; a < 3; a++) for (let b = a + 1; b < 3; b++) expect(gap(angle(w, w.rifts[a]!), angle(w, w.rifts[b]!))).toBeGreaterThanOrEqual(CONFIG.rifts.gap - 0.15);
+      layouts.add(w.rifts.join(','));
+    }
+    expect(sides.has('ao sul')).toBe(true);
+    expect(sides.has('a leste')).toBe(true);
+    expect(sides.has('a oeste')).toBe(true);
+    expect(layouts.size).toBeGreaterThan(30);
+    // A mesma semente dá o mesmo mapa.
+    expect(createWorld(7).rifts).toEqual(createWorld(7).rifts);
+  });
+
+  it('toda fenda chega ao castelo, mesmo com rocha e lago no caminho', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      const w = createWorld(seed);
+      step(w);
+      for (const i of w.rifts) expect(Number.isFinite(w.flowDist[i]!)).toBe(true);
+    }
+  });
+
+  it('a fenda nova avisa de que lado abriu', () => {
+    const w = createWorld(11);
+    w.wave = CONFIG.waves.riftOpens[1]! - 1;
+    w.waveTimer = 0.01;
+    step(w);
+    expect(openRifts(w.wave)).toBe(2);
+    const t = w.tiles[w.rifts[1]!]!;
+    expect(w.events.some((e) => e.type === 'toast' && e.text === `Uma nova fenda se abriu ${sideName(t.q, t.r)}.`)).toBe(true);
+  });
+
+  it('o salvo guarda as fendas; o salvo antigo (sem elas) fica com as três do norte', () => {
+    const w = createWorld(52);
+    expect(loadWorld(saveWorld(w))!.rifts).toEqual(w.rifts);
+    const json = JSON.parse(saveWorld(w)) as Record<string, unknown>;
+    delete json.rifts;
+    const old = loadWorld(JSON.stringify(json))!;
+    expect(old.rifts).toEqual(legacyRifts(old));
+    expect(old.rifts.map((i) => sideName(old.tiles[i]!.q, old.tiles[i]!.r))).toEqual(['ao norte', 'a nordeste', 'a noroeste']);
+  });
+});
+

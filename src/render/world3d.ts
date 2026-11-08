@@ -344,6 +344,8 @@ export class World3D {
   private s = new THREE.Vector3();
   private p = new THREE.Vector3();
   private rifts: THREE.Mesh[] = [];
+  /** Os grupos das fendas (buraco, borda e brilho), para tirar da cena quando o mapa troca. */
+  private riftGroups: THREE.Group[] = [];
   private ghost = new THREE.Group();
   private ghostMat = new THREE.MeshBasicMaterial({ color: '#8cc56a', transparent: true, opacity: 0.5, depthWrite: false });
   private ghostKey: string | null = null;
@@ -542,7 +544,15 @@ export class World3D {
       const p = hexToWorld(t.q, t.r);
       this.waterSpots.push({ x: p.x, z: p.z });
     }
-    for (const m of this.rifts) this.scene.remove(m);
+    // Tira os grupos inteiros: as fendas mudam de lugar a cada partida desde 2026-11-07.
+    for (const g of this.riftGroups) {
+      this.scene.remove(g);
+      for (const m of g.children as THREE.Mesh[]) {
+        m.geometry.dispose();
+        (m.material as THREE.Material).dispose();
+      }
+    }
+    this.riftGroups = [];
     this.rifts = [];
     w.rifts.forEach((i) => {
       const t = w.tiles[i]!;
@@ -560,6 +570,7 @@ export class World3D {
       g.add(hole, rim, glow);
       g.position.set(p.x, 0, p.z);
       this.scene.add(g);
+      this.riftGroups.push(g);
       this.rifts.push(rim);
     });
     this.ver = -1;
