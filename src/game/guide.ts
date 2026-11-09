@@ -65,6 +65,12 @@ const TIPS: TipDef[] = [
     when: (w) => [...w.buildings.values()].some((b) => b.dry && b.kind === 'fazenda'),
   },
   {
+    id: 'portao',
+    icons: ['muralha', 'seta', 'portao', 'espadas'],
+    text: 'Soldados não atravessam muralha. Ponha um portão para eles saírem para a luta.',
+    when: (w) => !!w.flags.muralhaBloqueia,
+  },
+  {
     id: 'ladrao',
     icons: ['ouro', 'seta', 'espadas'],
     text: 'O acumulador rouba recursos e foge para a fenda. Derrube ele que o roubo volta!',

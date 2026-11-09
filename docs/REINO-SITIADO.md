@@ -869,12 +869,34 @@ O usuário pediu tropas novas para o castelo, "algo estilo um cavaleiro espartan
   - Nas partidas em que ele cai na onda 15, ele chega só com arqueiros e o castelo no nível 1: gasta tudo em torres, e o acumulador leva um pouco.
   - Isso é limite do robô, não das tropas. Contra o golem, o jogador tem catapulta, soldados, lanceiros e agora os anões.
 
-### Para conversar depois (pedido do usuário, 2026-11-09)
+### Mapa maior e duas fendas (2026-11-09)
 
-- Aumentar o mapa. A quantidade de recursos e a renovação quando um lugar acaba estão boas.
-- Abandonar as várias fendas e ter uma só de onde saem os inimigos.
+Decidido com o usuário depois da conversa sobre mapa e fendas:
+- **Mapa:** raio 22 na partida nova com os gráficos normais (1.519 hexágonos, quase o dobro de antes), e 16 com os gráficos leves, por causa do tablet de entrada (`CONFIG.mapRadius` e `mapRadiusLight`; a escolha é feita em `Game` ao criar a partida). Florestas, rochas e veios acompanham a área, e a quantidade e a renovação ficam como estavam (o usuário achou boas). Cada salvo segue com o raio dele. No ⋯, os gráficos dizem "mapa maior" e "mapa menor", que vale para a próxima partida. A sombra do sol cobre o raio da partida aberta. Em 12 mapas de raio 22, nenhum modelo parado (árvores, rochas) passou de 85% do que dá para desenhar.
+- **Fendas:** duas em vez de três (`CONFIG.rifts.count`). A segunda abre na onda 5 no normal e na 10 no fácil. Um salvo antigo com três fica com as duas primeiras, e a terceira vira grama.
+- **Robô (12 sementes, até a onda 80):**
+  - raio 22 com duas fendas: média 22,6, quedas na 15 e na 30 e nenhuma partida até o limite;
+  - raio 16 com duas fendas: 17,9;
+  - antes, raio 16 com três fendas e o mesmo conteúdo: 20,2.
+  - Com menos fendas a horda chega mais concentrada num lado. No mapa grande ela anda mais até o castelo, e isso ajuda.
+  - A onda 30 é o muro: é o teto, traz o golem de ossos e é a primeira com dois modificadores. Nenhum robô passou dela. Se o usuário também não passar, o próximo ajuste é ali.
 
-## 25. Arquitetura
+### Socorro das tropas e o portão (2026-11-09)
+
+O usuário notou que às vezes alguns soldados ficavam parados com ataque acontecendo. Havia quatro motivos:
+1. Cada tropa defendia só um raio em volta do posto: 11 m, 15 m no cavaleiro.
+2. Com ordem do jogador, só 5 m.
+3. Soldado não atravessa muralha (`reach`).
+4. Sem caminho até o monstro, a tropa ficava tentando o mesmo alvo para sempre.
+
+O que mudou:
+- **Socorro (`CONFIG.help`):** tropa sem ordem do jogador (soldado, cavaleiro, lanceiro, anão, mago, arqueiro sem torre e os heróis), sem monstro na área dela, vai até o monstro mais perto, a até 40 m, que esteja batendo em algo do reino ou a menos de 14 m do castelo. Acabou a ameaça, ela volta ao posto. Quem tem ordem do jogador continua segurando o ponto, porque foi escolha dele (`meleeTarget`, `helpTarget`, `rangedHelp` em `step.ts`).
+- **Sem caminho:** o monstro fica de lado por 8 s (`skip`) e a tropa volta ao posto em vez de empacar (`chase`).
+- **Portão:** quando a horda está perto de um posto mas fora do alcance a pé, e o reino tem muralha, o Sábio mostra "Soldados não atravessam muralha. Ponha um portão para eles saírem para a luta." (`w.flags.muralhaBloqueia`, dica `portao`).
+- **Robô** (12 sementes, raio 22, até a onda 80): média 27,6 (antes do socorro, 22,6). Duas partidas passaram do muro da onda 30 e foram até a 60 e a 68. Morrem mais tropas por onda, porque elas saem mais para lutar. Em 12 partidas até a onda 60, nenhuma luta passou de 4 minutos.
+- **Testes:** o soldado sem ordem ajuda e o com ordem fica; o anão vai até a briga; e a dica do portão com um anel de muralha fechado.
+
+## 25. Arquitetura## 25. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
@@ -926,6 +948,8 @@ O usuário pediu tropas novas para o castelo, "algo estilo um cavaleiro espartan
 | — | Rebalanceamento: começo mais curto, horda que cresce mais devagar e para na onda 30, chefes em linha, forja até o 5, aldeões que fogem e o monstro que empacava (seção 23) | Pronto em 2026-11-09. Medido com o robô e visto no navegador do Mac (começo, fuga e volta, forja); falta jogar no tablet e no iPhone. |
 | — | Inimigos novos (esqueleto guerreiro, acumulador, vampiro), chefe de musgo, elfos no inverno e o Sábio (seção 24) | Pronto em 2026-11-09. Visto no navegador do Mac (os quatro monstros, o balão do roubo, os morcegos do vampiro, os elfos na neve, o Sábio no computador e no celular); falta jogar no tablet e no iPhone. |
 | — | Tropas novas: lanceiro espartano (Acampamento) e anão de espingarda (Torre de pólvora) (seção 24) | Pronto em 2026-11-09. Visto no navegador do Mac (bronze, crista, lança, elmo de chifres, os dois prédios e o tiro); falta jogar no tablet e no iPhone. |
+| — | Mapa de raio 22 (16 nos gráficos leves) e duas fendas (seção 24) | Pronto em 2026-11-09. Visto no navegador do Mac (o mapa inteiro com as duas fendas); falta jogar no tablet e no iPhone. |
+| — | Socorro das tropas sem ordem, tropa que não empaca sem caminho e a dica do portão (seção 24) | Pronto em 2026-11-09. Medido com o robô e nos testes; falta jogar no tablet e no iPhone. |
 
 ## 27. Arte e licenças
 

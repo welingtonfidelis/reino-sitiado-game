@@ -39,6 +39,7 @@ import { allyPath, fullStock, regrow, replant, replantProblem, sourceOf, stage, 
 import { MODES, saveInfo, waveInterval } from '../src/sim/index.ts';
 import { computeFlow, damageMonster, legacyRifts, openRifts, sideName } from '../src/sim/index.ts';
 import type { Tile } from '../src/sim/index.ts';
+import { TIP_IDS, pickTip } from '../src/game/guide.ts';
 import type { Monster, MonsterKind, World } from '../src/sim/index.ts';
 
 function run(w: World, seconds: number, stop?: (w: World) => boolean): void {
@@ -952,6 +953,8 @@ describe('inimigos novos (2026-11-09)', () => {
     // Um soldado forte colado nele: cada golpe devolve vida.
     const s = addUnit(w, 'soldado', v.x + 0.4, v.z);
     s.hp = s.maxHp = 1e6;
+    // Ele não revida (com o socorro de 2026-11-09 o soldado iria bater no vampiro).
+    s.cd = 1e9;
     v.hp = 300;
     v.cd = 0;
     const engage = CONFIG.soldierEngage;
@@ -1041,6 +1044,75 @@ describe('tropas novas: lanceiro e anão (2026-11-09)', () => {
     expect(a.hp).toBeCloseTo(5000 - UNITS.anao.dmg, 6);
     expect(b.hp).toBeCloseTo(5000 - UNITS.anao.dmg * CONFIG.gun.splashMul, 6);
     expect(far.hp).toBe(5000);
+  });
+});
+
+describe('socorro das tropas (2026-11-09)', () => {
+  function monster(w: World, kind: MonsterKind, x: number, z: number) {
+    const def = MONSTERS[kind];
+    const m: Monster = { id: w.nextId++, kind, x, z, hp: 1e6, maxHp: 1e6, speed: 0, dmg: def.dmg, cd: 0, state: 'walk', facing: 0, deadT: 0, burnT: 99, healT: 99, summonT: 99, owner: -1 };
+    w.monsters.set(m.id, m);
+    return m;
+  }
+
+  it('soldado sem ordem sai do posto para ajudar onde a horda bate; com ordem, segura o ponto', () => {
+    const w = createWorld(81);
+    calm(w);
+    castle(w)!.cd = 1e9;
+    const c = hexToWorld(castle(w)!.q, castle(w)!.r);
+    // Monstro batendo no castelo; soldados a uns 20 m, bem fora da área deles.
+    const m = monster(w, 'orc', c.x + 1.4, c.z);
+    const free = addUnit(w, 'soldado', c.x - 20, c.z);
+    free.postX = free.x;
+    free.postZ = free.z;
+    const held = addUnit(w, 'soldado', c.x - 20, c.z + 1);
+    held.postX = held.x;
+    held.postZ = held.z;
+    held.order = 2;
+    run(w, 30, () => free.state === 'fight');
+    expect(m.state).not.toBe('dead');
+    expect(free.state).toBe('fight');
+    expect(Math.hypot(held.x - held.postX, held.z - held.postZ)).toBeLessThan(0.5);
+  });
+
+  it('o anão sem ordem também vai até a briga e atira', () => {
+    const w = createWorld(82);
+    calm(w);
+    castle(w)!.cd = 1e9;
+    const c = hexToWorld(castle(w)!.q, castle(w)!.r);
+    const m = monster(w, 'orc', c.x + 1.4, c.z);
+    const a = addUnit(w, 'anao', c.x - 22, c.z);
+    a.postX = a.x;
+    a.postZ = a.z;
+    run(w, 20, () => m.hp < 1e6);
+    expect(m.hp).toBeLessThan(1e6);
+  });
+
+  it('com a horda fora da muralha e sem caminho, o Sábio sugere um portão', () => {
+    const w = createWorld(83);
+    calm(w);
+    const k = castle(w)!;
+    // Um anel inteiro de muralha (num raio sem prédio no caminho), o soldado dentro e o monstro fora.
+    const ring = (d: number) => w.list.filter((t) => hexDist(t.q, t.r, k.q, k.r) === d);
+    const R0 = [4, 5, 6, 7].find((d) => ring(d).every((t) => t.b < 0))!;
+    for (const t of ring(R0)) {
+      if (t.terrain === 'rock' || t.terrain === 'water') continue;
+      t.terrain = 'grass';
+      addBuilding(w, 'muralha', t.q, t.r, 1);
+    }
+    const out = ring(R0 + 1).find((t) => t.terrain === 'grass' && t.b < 0)!;
+    const o = hexToWorld(out.q, out.r);
+    const c = hexToWorld(k.q, k.r);
+    const toward = (R0 - 1) / (R0 + 1);
+    const s = addUnit(w, 'soldado', c.x + (o.x - c.x) * toward, c.z + (o.z - c.z) * toward);
+    s.postX = s.x;
+    s.postZ = s.z;
+    monster(w, 'esqueleto', o.x, o.z);
+    w.waveState = 'attack';
+    run(w, 2);
+    expect(w.flags.muralhaBloqueia).toBe(true);
+    for (const id of TIP_IDS) if (id !== 'portao') w.flags[`guia:${id}`] = true;
+    expect(pickTip(w)?.id).toBe('portao');
   });
 });
 
@@ -1588,19 +1660,19 @@ describe('fendas sorteadas (2026-11-07)', () => {
     return Math.min(d, Math.PI * 2 - d);
   };
 
-  it('cada semente põe as três fendas num lugar da borda, separadas, e não só ao norte', () => {
+  it('cada semente põe as fendas (duas desde 2026-11-09) num lugar da borda, separadas, e não só ao norte', () => {
     const sides = new Set<string>();
     const layouts = new Set<string>();
     for (let seed = 1; seed <= 40; seed++) {
       const w = createWorld(seed);
-      expect(new Set(w.rifts).size).toBe(3);
+      expect(new Set(w.rifts).size).toBe(CONFIG.rifts.count);
       for (const i of w.rifts) {
         const t = w.tiles[i]!;
         expect(t.terrain).toBe('rift');
         expect(hexDist(t.q, t.r, 0, 0)).toBe(w.grid.R);
         sides.add(sideName(t.q, t.r));
       }
-      for (let a = 0; a < 3; a++) for (let b = a + 1; b < 3; b++) expect(gap(angle(w, w.rifts[a]!), angle(w, w.rifts[b]!))).toBeGreaterThanOrEqual(CONFIG.rifts.gap - 0.15);
+      for (let a = 0; a < w.rifts.length; a++) for (let b = a + 1; b < w.rifts.length; b++) expect(gap(angle(w, w.rifts[a]!), angle(w, w.rifts[b]!))).toBeGreaterThanOrEqual(CONFIG.rifts.gap - 0.15);
       layouts.add(w.rifts.join(','));
     }
     expect(sides.has('ao sul')).toBe(true);
@@ -1629,14 +1701,26 @@ describe('fendas sorteadas (2026-11-07)', () => {
     expect(w.events.some((e) => e.type === 'toast' && e.text === `Uma nova fenda se abriu ${sideName(t.q, t.r)}.`)).toBe(true);
   });
 
-  it('o salvo guarda as fendas; o salvo antigo (sem elas) fica com as três do norte', () => {
+  it('mapa: raio 22 por padrão e 16 nos gráficos leves; o salvo guarda o raio (2026-11-09)', () => {
+    expect(createWorld(5).grid.R).toBe(22);
+    const small = createWorld(5, CONFIG.mapRadiusLight);
+    expect(small.grid.R).toBe(16);
+    expect(loadWorld(saveWorld(small))!.grid.R).toBe(16);
+    // Mais área, mais floresta.
+    const forest = (w: ReturnType<typeof createWorld>) => w.list.filter((t) => t.terrain === 'forest').length;
+    expect(forest(createWorld(5))).toBeGreaterThan(forest(small) * 1.4);
+  });
+
+  it('o salvo guarda as fendas; o salvo antigo (sem elas) fica com as duas primeiras do norte', () => {
     const w = createWorld(52);
     expect(loadWorld(saveWorld(w))!.rifts).toEqual(w.rifts);
     const json = JSON.parse(saveWorld(w)) as Record<string, unknown>;
     delete json.rifts;
     const old = loadWorld(JSON.stringify(json))!;
-    expect(old.rifts).toEqual(legacyRifts(old));
-    expect(old.rifts.map((i) => sideName(old.tiles[i]!.q, old.tiles[i]!.r))).toEqual(['ao norte', 'a nordeste', 'a noroeste']);
+    expect(old.rifts).toEqual(legacyRifts(old).slice(0, 2));
+    expect(old.rifts.map((i) => sideName(old.tiles[i]!.q, old.tiles[i]!.r))).toEqual(['ao norte', 'a nordeste']);
+    // A terceira fenda de antes vira grama.
+    expect(old.tiles[legacyRifts(old)[2]!]!.terrain).toBe('grass');
   });
 });
 

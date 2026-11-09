@@ -320,7 +320,7 @@ function MoreMenu({ game, onClose, onAlbum }: { game: Game; onClose: () => void;
         <button class="more-row" onClick={() => game.setQuality(game.quality === 'leve' ? 'normal' : 'leve')}>
           <Icon name={game.quality === 'leve' ? 'pena' : 'brilho'} />
           <span>{game.quality === 'leve' ? 'Gráficos leves' : 'Gráficos normais'}</span>
-          <small class="more-hint">{game.quality === 'leve' ? 'roda melhor' : 'mais bonito'}</small>
+          <small class="more-hint">{game.quality === 'leve' ? 'roda melhor, mapa menor' : 'mais bonito, mapa maior'}</small>
         </button>
         <label class="more-row">
           <input type="checkbox" checked={game.autoReport} onChange={(e) => game.setAutoReport((e.target as HTMLInputElement).checked)} />

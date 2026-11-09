@@ -500,11 +500,11 @@ export function damageMonster(w: World, m: Monster, dmg: number, src: DmgSrc = '
 /** Nome do recurso nos avisos do acumulador. */
 const RES_NAME: Record<Res, string> = { comida: 'comida', madeira: 'madeira', pedra: 'pedra', ferro: 'ferro', cristal: 'cristal', ouro: 'ouro' };
 
-function nearestMonster(w: World, x: number, z: number, range: number, needReach: boolean, src: DmgSrc = 'melee'): Monster | null {
+function nearestMonster(w: World, x: number, z: number, range: number, needReach: boolean, src: DmgSrc = 'melee', skip = -1): Monster | null {
   let best: Monster | null = null;
   let bd = range;
   for (const m of w.monsters.values()) {
-    if (m.state === 'dead') continue;
+    if (m.state === 'dead' || m.id === skip) continue;
     const def = MONSTERS[m.kind];
     // Corpo a corpo não alcança quem voa; ninguém mira em quem não pode ferir.
     if (src === 'melee' && def.flying) continue;
@@ -632,7 +632,8 @@ function unitsStep(w: World): void {
         }
         continue;
       }
-      guard(w, u);
+      u.repath -= DT;
+      if (!rangedHelp(w, u, 'arrow')) guard(w, u);
       continue;
     }
     // Soldado: procura o monstro mais perto que dá para alcançar a pé.
@@ -654,13 +655,10 @@ function unitsStep(w: World): void {
       gunnerStep(w, u);
       continue;
     }
-    // Soldado e cavaleiro. Com ordem do jogador, segura o ponto: só sai atrás de quem chega perto.
+    // Soldado, cavaleiro e lanceiro. Com ordem do jogador, segura o ponto: só sai atrás de quem
+    // chega perto. Sem ordem, sai em socorro de onde a horda está batendo (2026-11-09).
     const engage = u.order === 2 ? CONFIG.holdEngage : u.kind === 'cavaleiro' ? CONFIG.knightEngage : CONFIG.soldierEngage;
-    if (!m || m.state === 'dead' || dist(u.postX, u.postZ, m.x, m.z) > engage * 1.3) m = undefined;
-    if (!m && u.repath <= 0) {
-      m = nearestMonster(w, u.postX, u.postZ, engage, true) ?? undefined;
-      u.target = m ? m.id : -1;
-    }
+    m = meleeTarget(w, u, engage);
     if (!m) {
       u.target = -1;
       guard(w, u);
@@ -680,17 +678,105 @@ function unitsStep(w: World): void {
       }
       continue;
     }
-    if (u.repath <= 0) {
-      u.repath = 0.5;
-      const goal = tileIndexAt(w, m.x, m.z);
-      if (goal < 0 || !setGoalFresh(w, u, goal)) {
-        u.target = -1;
-        continue;
+    if (!chase(w, u, m)) guard(w, u);
+  }
+}
+
+/**
+ * Alvo de quem luta a pé: primeiro a área do posto; sem nada ali, quem não tem ordem do jogador
+ * sai em socorro (2026-11-09). Também nota quando a muralha deixa a horda fora do alcance.
+ */
+function meleeTarget(w: World, u: Unit, engage: number): Monster | undefined {
+  if (u.skipT !== undefined && (u.skipT -= DT) <= 0) {
+    u.skip = undefined;
+    u.skipT = undefined;
+  }
+  let m = u.target >= 0 ? w.monsters.get(u.target) : undefined;
+  if (m && (m.state === 'dead' || (!u.helping && dist(u.postX, u.postZ, m.x, m.z) > engage * 1.3))) m = undefined;
+  if (!m && u.repath <= 0) {
+    m = nearestMonster(w, u.postX, u.postZ, engage, true, 'melee', u.skip ?? -1) ?? undefined;
+    u.helping = false;
+    if (!m) {
+      wallHint(w, u, engage);
+      if (u.order !== 2) {
+        m = helpTarget(w, u, 'melee') ?? undefined;
+        u.helping = !!m;
       }
     }
-    u.state = 'walk';
-    walk(w, u, m.x, m.z, def.speed);
+    u.target = m ? m.id : -1;
   }
+  if (!m) u.helping = false;
+  return m;
+}
+
+/** Monstro mais perto (até `help.radius`) batendo em algo do reino ou perto do castelo. */
+function helpTarget(w: World, u: Unit, src: DmgSrc): Monster | null {
+  const c = castle(w);
+  if (!c) return null;
+  const cp = center(c);
+  let best: Monster | null = null;
+  let bd = CONFIG.help.radius;
+  for (const m of w.monsters.values()) {
+    if (m.state === 'dead' || m.id === u.skip) continue;
+    const def = MONSTERS[m.kind];
+    if (src === 'melee' && def.flying) continue;
+    if ((src === 'arrow' && def.immuneArrows) || (src === 'magic' && def.immuneMagic)) continue;
+    if (m.state !== 'attack' && dist(m.x, m.z, cp.x, cp.z) > CONFIG.help.kingdom) continue;
+    const ti = tileIndexAt(w, m.x, m.z);
+    if (!def.flying && (ti < 0 || !w.reach[ti])) continue;
+    const d = dist(u.x, u.z, m.x, m.z);
+    if (d < bd) {
+      bd = d;
+      best = m;
+    }
+  }
+  return best;
+}
+
+/** Anda até o monstro; sem caminho, deixa ele de lado por um tempo (não empaca). */
+function chase(w: World, u: Unit, m: Monster): boolean {
+  if (u.repath <= 0) {
+    u.repath = 0.5;
+    const goal = tileIndexAt(w, m.x, m.z);
+    if (goal < 0 || !setGoalFresh(w, u, goal)) {
+      u.target = -1;
+      u.helping = false;
+      u.skip = m.id;
+      u.skipT = CONFIG.help.skip;
+      return false;
+    }
+  }
+  u.state = 'walk';
+  walk(w, u, m.x, m.z, UNITS[u.kind].speed);
+  return true;
+}
+
+/** Quem atira de longe (anão, mago, arqueiro no chão, heroínas de longe) também sai em socorro. */
+function rangedHelp(w: World, u: Unit, src: DmgSrc): boolean {
+  if (u.order === 2) return false;
+  let m = u.helping && u.target >= 0 ? w.monsters.get(u.target) : undefined;
+  if (m && m.state === 'dead') m = undefined;
+  if (!m && u.repath <= 0) {
+    m = helpTarget(w, u, src) ?? undefined;
+    u.target = m ? m.id : -1;
+  }
+  u.helping = !!m;
+  if (!m) return false;
+  return chase(w, u, m);
+}
+
+/** A horda está perto do posto mas fora do alcance a pé, e há muralha: o Sábio sugere um portão. */
+function wallHint(w: World, u: Unit, engage: number): void {
+  if (w.flags.muralhaBloqueia || w.waveState === 'calm') return;
+  const m = nearestMonster(w, u.postX, u.postZ, engage, false, 'melee');
+  if (!m) return;
+  const ti = tileIndexAt(w, m.x, m.z);
+  if (ti < 0 || w.reach[ti]) return;
+  for (const b of w.buildings.values())
+    if (b.kind === 'muralha' && b.built >= 1) {
+      w.flags.muralhaBloqueia = true;
+      return;
+    }
 }
 
 /** Mago: dano em área no monstro mais perto; cada feitiço gasta cristal. */
@@ -698,7 +784,7 @@ function mageStep(w: World, u: Unit): void {
   const def = UNITS.mago;
   const m = nearestMonster(w, u.x, u.z, def.range * rk(w), false, 'magic');
   if (!m) {
-    guard(w, u);
+    if (!rangedHelp(w, u, 'magic')) guard(w, u);
     return;
   }
   u.facing = Math.atan2(m.x - u.x, m.z - u.z);
@@ -728,7 +814,7 @@ function gunnerStep(w: World, u: Unit): void {
   const def = UNITS.anao;
   const m = nearestMonster(w, u.x, u.z, def.range * rk(w), false, 'tiro');
   if (!m) {
-    guard(w, u);
+    if (!rangedHelp(w, u, 'tiro')) guard(w, u);
     return;
   }
   u.facing = Math.atan2(m.x - u.x, m.z - u.z);
@@ -923,7 +1009,8 @@ function heroStep(w: World, u: Unit, k: HeroKind): void {
     const src: DmgSrc = k === 'atiradora' ? 'arrow' : 'magic';
     const m = nearestMonster(w, u.x, u.z, def.range * rk(w), false, src);
     if (!m) {
-      guard(w, u);
+      u.repath -= DT;
+      if (!rangedHelp(w, u, src)) guard(w, u);
       return;
     }
     u.state = 'fight';
@@ -938,12 +1025,7 @@ function heroStep(w: World, u: Unit, k: HeroKind): void {
   // Bárbaro e Cavaleiro Negro: corpo a corpo, como o cavaleiro (vão longe atrás da horda).
   u.repath -= DT;
   const engage = u.order === 2 ? CONFIG.holdEngage : CONFIG.knightEngage;
-  let m = u.target >= 0 ? w.monsters.get(u.target) : undefined;
-  if (!m || m.state === 'dead' || dist(u.postX, u.postZ, m.x, m.z) > engage * 1.3) m = undefined;
-  if (!m && u.repath <= 0) {
-    m = nearestMonster(w, u.postX, u.postZ, engage, true) ?? undefined;
-    u.target = m ? m.id : -1;
-  }
+  const m = meleeTarget(w, u, engage);
   if (!m) {
     u.target = -1;
     guard(w, u);
@@ -962,16 +1044,7 @@ function heroStep(w: World, u: Unit, k: HeroKind): void {
     }
     return;
   }
-  if (u.repath <= 0) {
-    u.repath = 0.5;
-    const goal = tileIndexAt(w, m.x, m.z);
-    if (goal < 0 || !setGoalFresh(w, u, goal)) {
-      u.target = -1;
-      return;
-    }
-  }
-  u.state = 'walk';
-  walk(w, u, m.x, m.z, def.speed);
+  if (!chase(w, u, m)) guard(w, u);
 }
 
 /** Golpe especial automático de cada herói; devolve se saiu (senão tenta de novo no passo seguinte). */

@@ -101,6 +101,10 @@ export interface Unit {
   level?: number;
   downT?: number;
   specialT?: number;
+  /** Socorro (2026-11-09): saiu do posto para ajudar; monstro sem caminho que ele deixa de lado por um tempo. */
+  helping?: boolean;
+  skip?: number;
+  skipT?: number;
   /** Fuga sozinho (2026-11-09): prédio onde o aldeão corre para se esconder e há quanto tempo está calmo. */
   hideIn?: number;
   hideT?: number;

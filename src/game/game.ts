@@ -126,7 +126,7 @@ export class Game {
   private listeners = new Set<() => void>();
 
   constructor(seed: number, mode: GameMode = readGameMode()) {
-    this.world = createWorld(seed, undefined, mode);
+    this.world = createWorld(seed, mapRadius(this.quality), mode);
     refresh(this.world);
   }
 
@@ -137,7 +137,7 @@ export class Game {
   begin(mode: GameMode): void {
     writeGameMode(mode);
     if (mode !== this.world.mode) {
-      this.world = createWorld(this.world.seed, undefined, mode);
+      this.world = createWorld(this.world.seed, mapRadius(this.quality), mode);
       refresh(this.world);
     }
     this.started = true;
@@ -148,7 +148,7 @@ export class Game {
   restart(seed: number, mode: GameMode = this.world.mode): void {
     clearSave();
     writeGameMode(mode);
-    this.world = createWorld(seed, undefined, mode);
+    this.world = createWorld(seed, mapRadius(this.quality), mode);
     refresh(this.world);
     this.mode = { kind: 'none' };
     this.selected = -1;
@@ -649,6 +649,11 @@ export class Game {
   nameOf(b: BuildingKind): string {
     return BUILDINGS[b].name;
   }
+}
+
+/** Raio do mapa da partida nova: o grande no normal, o de antes nos gráficos leves (2026-11-09). */
+function mapRadius(q: Quality): number {
+  return q === 'leve' ? CONFIG.mapRadiusLight : CONFIG.mapRadius;
 }
 
 /** Preferências do jogador (só neste navegador; se o armazenamento falhar, vale o padrão). */

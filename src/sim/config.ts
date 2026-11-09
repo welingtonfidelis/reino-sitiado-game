@@ -190,8 +190,13 @@ export const MONSTERS: Record<MonsterKind, MonsterDef> = {
 
 export const CONFIG = {
   tps: 20,
-  /** Raio do mapa em ladrilhos (13 até a etapa 9; jogos salvos antes disso seguem com 13). */
-  mapRadius: 16,
+  /**
+   * Raio do mapa em ladrilhos. 13 até a etapa 9, 16 até 2026-11-09 e 22 desde então (quase o
+   * dobro da área; florestas, rochas e veios acompanham a área). Com os gráficos leves (tablet
+   * de entrada) a partida nova continua com `mapRadiusLight`. Cada salvo segue com o raio dele.
+   */
+  mapRadius: 22,
+  mapRadiusLight: 16,
   startWorkers: 4,
   /** Moradia: um trabalhador chega a cada `arriveEvery` s se houver vaga, teto e comida. */
   arriveEvery: 20,
@@ -222,9 +227,10 @@ export const CONFIG = {
   move: { pack: 0.75, packMin: 3 },
   /**
    * Fendas dos monstros (2026-11-07): `count` fendas sorteadas em qualquer ponto da borda, a
-   * pelo menos `gap` (radianos) uma da outra.
+   * pelo menos `gap` (radianos) uma da outra. Duas desde 2026-11-09 (eram três), a pedido do
+   * usuário; um salvo com três fica só com as duas primeiras.
    */
-  rifts: { count: 3, gap: (50 * Math.PI) / 180 },
+  rifts: { count: 2, gap: (50 * Math.PI) / 180 },
   /**
    * Etapa 17: recursos que acabam e reaparecem. Estoque por hexágono; cada hexágono que acaba
    * entra na conta do tipo, e no fim da onda, quando a conta chega ao `due`, nasce uma mancha
@@ -331,6 +337,12 @@ export const CONFIG = {
   },
   /** Raio em que a tropa mandada para um ponto ainda sai para lutar. */
   holdEngage: 5,
+  /**
+   * Socorro (2026-11-09): tropa sem ordem do jogador e sem monstro na área dela vai ajudar contra
+   * o monstro mais perto (até `radius` m) que esteja batendo em algo do reino ou a menos de
+   * `kingdom` m do castelo; acabou a ameaça, volta ao posto. Monstro sem caminho fica de lado por `skip` s.
+   */
+  help: { radius: 40, kingdom: 14, skip: 8 },
   /** Lanceiro (2026-11-09): o dano vezes `bigMul` nos grandes (orc bruto, troll, vampiro e chefes). */
   spear: { bigMul: 1.6, big: ['bruto', 'troll', 'vampiro', 'golem', 'golemOssos', 'golemMusgo'] as MonsterKind[] },
   /**
@@ -400,7 +412,7 @@ export const MODES: Record<Mode, ModeDef> = {
     // cedo, fendas novas nas ondas 5 e 12 e um pouco mais de monstros.
     start: { comida: 150, madeira: 200, pedra: 110, ferro: 30, cristal: 0, ouro: 0 },
     first: 90,
-    riftOpens: [1, 5, 12],
+    riftOpens: [1, 5],
     base: 5,
     perWave: 3,
     hungryWork: CONFIG.hungryWork,
@@ -419,7 +431,7 @@ export const MODES: Record<Mode, ModeDef> = {
     // O começo do fácil fica como era antes do rebalanceamento (o 1,5× dos recursos de antes).
     start: { comida: 225, madeira: 375, pedra: 225, ferro: 45, cristal: 0, ouro: 0 },
     first: 120,
-    riftOpens: [1, 10, 20],
+    riftOpens: [1, 10],
     base: 4,
     perWave: 2.5,
     hungryWork: 0.75,

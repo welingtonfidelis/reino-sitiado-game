@@ -88,7 +88,13 @@ export function loadWorld(json: string): World | null {
   const target = w as unknown as Record<string, unknown>;
   for (const k of PLAIN) if (k in d) target[k] = d[k];
   // As fendas são sorteadas desde 2026-11-07; um salvo de antes ficou com as três do norte.
-  w.rifts = Array.isArray(d.rifts) ? (d.rifts as number[]) : legacyRifts(w);
+  // Desde 2026-11-09 são duas: a terceira de um salvo antigo vira grama.
+  const rifts = Array.isArray(d.rifts) ? (d.rifts as number[]) : legacyRifts(w);
+  w.rifts = rifts.slice(0, CONFIG.rifts.count);
+  for (const i of rifts.slice(CONFIG.rifts.count)) {
+    const t = w.tiles[i];
+    if (t && t.terrain === 'rift') t.terrain = 'grass';
+  }
   w.events = [];
   w.dirty = true;
   return w;

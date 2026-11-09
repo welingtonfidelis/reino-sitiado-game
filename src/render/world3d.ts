@@ -563,6 +563,14 @@ export class World3D {
 
   /** Chão, fendas: só uma vez por partida. */
   buildTerrain(w: World): void {
+    // A sombra cobre o mapa desta partida (raio 22, ou 16 nos gráficos leves e nos salvos antigos).
+    const reach = 2 * w.grid.R + 5;
+    const sc = this.sun.shadow.camera;
+    sc.left = -reach;
+    sc.right = reach;
+    sc.top = reach;
+    sc.bottom = -reach;
+    sc.updateProjectionMatrix();
     // Chão contínuo: a grade hexagonal fica só na lógica (e aparece ao construir).
     for (const o of [this.ground, this.grid, this.water]) {
       if (!o) continue;
