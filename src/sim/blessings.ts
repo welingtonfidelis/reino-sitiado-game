@@ -109,6 +109,8 @@ const EPITAPHS: Record<UnitKind, string[]> = {
   clerigo: ['Cuidou dos outros até o fim.', 'Rezou de pé no meio da horda.'],
   cavaleiro: ['Carregou contra a horda mais uma vez.', 'Caiu longe dos portões.'],
   engenheiro: ['Morreu com o martelo na mão, consertando a muralha.', 'A muralha ficou; ele não.'],
+  lanceiro: ['Caiu de lança erguida.', 'O escudo segurou até o fim.'],
+  anao: ['A espingarda ainda estava quente.', 'Disparou o último tiro de pé.'],
   // Heróis não morrem (desmaiam e voltam); a frase só existe para o tipo fechar.
   barbaro: ['Desmaiou no meio da horda.'],
   atiradora: ['Desmaiou de besta na mão.'],
@@ -123,6 +125,8 @@ const ROLE: Record<UnitKind, [string, string]> = {
   clerigo: ['clérigo', 'clériga'],
   cavaleiro: ['cavaleiro', 'cavaleira'],
   engenheiro: ['engenheiro', 'engenheira'],
+  lanceiro: ['lanceiro', 'lanceira'],
+  anao: ['anão', 'anã'],
   barbaro: ['bárbaro', 'bárbaro'],
   atiradora: ['atiradora', 'atiradora'],
   druida: ['druida', 'druida'],

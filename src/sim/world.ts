@@ -101,6 +101,9 @@ export interface Unit {
   level?: number;
   downT?: number;
   specialT?: number;
+  /** Fuga sozinho (2026-11-09): prédio onde o aldeão corre para se esconder e há quanto tempo está calmo. */
+  hideIn?: number;
+  hideT?: number;
 }
 
 export interface Monster {
@@ -123,6 +126,11 @@ export interface Monster {
   owner: number;
   /** Etapa 14: preso por raízes ou atordoado (s). */
   stunT?: number;
+  /** Acumulador (2026-11-09): o que leva na mochila, quanto tempo tem para fugir e a fenda de onde veio. */
+  loot?: { res: Res; n: number };
+  fleeT?: number;
+  homeX?: number;
+  homeZ?: number;
 }
 
 export type SimEvent =
@@ -139,7 +147,9 @@ export type SimEvent =
   | { type: 'destroyed'; id: number; kind: BuildingKind; q: number; r: number }
   | { type: 'hit'; fx: 'espada' | 'garra' | 'pancada' | 'golpe' | 'faisca' | 'cura'; x: number; z: number; dx: number; dz: number }
   | { type: 'spell'; x1: number; z1: number; x2: number; z2: number }
-  | { type: 'monsterFx'; fx: 'bloom' | 'alma'; x: number; z: number }
+  | { type: 'monsterFx'; fx: 'bloom' | 'alma' | 'poof' | 'moedas'; x: number; z: number }
+  /** Tiro da espingarda do anão (2026-11-09): fumaça na boca do cano e faísca no alvo. */
+  | { type: 'gun'; x1: number; z1: number; x2: number; z2: number; fly: boolean }
   | { type: 'special'; fx: 'giro' | 'chuva' | 'raizes' | 'pisao'; x: number; z: number; id: number }
   | { type: 'heroLevel'; x: number; z: number; level: number }
   | { type: 'heroBack'; x: number; z: number }
@@ -572,12 +582,12 @@ export function createWorld(seed = 1, R = CONFIG.mapRadius, mode: Mode = 'normal
     units: new Map(),
     monsters: new Map(),
     nextId: CASTLE_ID,
-    res: Object.fromEntries(Object.entries(CONFIG.start).map(([k, v]) => [k, Math.round(v * M.start)])) as Record<Res, number>,
+    res: { ...M.start },
     housesBuilt: 0,
     arriveT: 0,
     wave: 0,
     waveState: 'calm',
-    waveTimer: CONFIG.waves.first + M.calm,
+    waveTimer: M.first + M.calm,
     spawnQueue: [],
     spawnT: 0,
     rifts: [],

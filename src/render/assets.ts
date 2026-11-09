@@ -13,6 +13,9 @@ export const STATIC_MODELS = {
   castelo: 'medieval/building_castle_blue.gltf',
   // Etapa 19: o castelo do nível 4 (telhados dourados) e os estandartes da porta.
   casteloOuro: 'medieval/building_castle_yellow.gltf',
+  // Tropas novas (2026-11-09): a tenda azul (Acampamento) e a torre de canhão (Torre de pólvora).
+  acampamento: 'medieval/building_tent_blue.gltf',
+  polvora: 'medieval/building_tower_cannon_blue.gltf',
   estandarte: 'medieval/banner_blue_full.gltf',
   casaA: 'medieval/building_home_A_blue.gltf',
   casaB: 'medieval/building_home_B_blue.gltf',
@@ -87,7 +90,7 @@ export interface StaticModel {
 }
 
 /** O morcego não é personagem: é um sprite do pixelfx (Etapa 6). */
-export type CharKey = UnitKind | 'trabalhadorB' | 'cavaleiroElmo' | Exclude<MonsterKind, 'morcego'>;
+export type CharKey = UnitKind | 'trabalhadorB' | 'cavaleiroElmo' | 'elfoA' | 'elfoB' | Exclude<MonsterKind, 'morcego'>;
 const CHAR_FILES: Record<CharKey, string> = {
   trabalhador: 'chars/Farmer_A.glb',
   trabalhadorB: 'chars/Farmer_B.glb',
@@ -112,6 +115,18 @@ const CHAR_FILES: Record<CharKey, string> = {
   cavaleiroNegro: 'chars/BlackKnight.glb',
   // Etapa 19: o cavaleiro com elmo, depois da primeira melhoria de armaduras.
   cavaleiroElmo: 'chars/Paladin_with_Helmet.glb',
+  // Tropas novas (2026-11-09): o lanceiro é o Knight de bronze, sem viseira e de crista; o anão é
+  // o Engenheiro (ruivo) sem os óculos, mais baixo e largo, de elmo de chifres.
+  lanceiro: 'chars/Knight.glb',
+  anao: 'chars/Engineer.glb',
+  // Inimigos novos (2026-11-09).
+  esqueletoGuerreiro: 'chars/Skeleton_Warrior.glb',
+  vampiro: 'chars/Vampire.glb',
+  acumulador: 'chars/Hoarder.glb',
+  golemMusgo: 'chars/4GTN_Forgotten.glb',
+  // Enfeite do inverno (2026-11-09): elfos passeando pela vila entre as ondas.
+  elfoA: 'chars/Helper_A.glb',
+  elfoB: 'chars/Helper_B.glb',
 };
 /** Altura de cada personagem no mundo (um hexágono tem 2 m; a casa tem ~1 m). */
 export const CHAR_HEIGHT: Record<CharKey, number> = {
@@ -138,12 +153,21 @@ export const CHAR_HEIGHT: Record<CharKey, number> = {
   druida: 0.7,
   cavaleiroNegro: 0.78,
   cavaleiroElmo: 0.66,
+  lanceiro: 0.64,
+  anao: 0.5,
+  esqueletoGuerreiro: 0.6,
+  // O vampiro é meio-chefe: um pouco maior que a horda.
+  vampiro: 0.74,
+  acumulador: 0.6,
+  golemMusgo: 1.85,
+  elfoA: 0.48,
+  elfoB: 0.48,
 };
 /**
  * Personagens do rig grande (animações do Rig_Large). O Cavaleiro Negro também é: com as
  * animações do rig médio ele ficava agachado e encolhido (revisão de 2026-11-08).
  */
-export const LARGE: ReadonlySet<CharKey> = new Set(['bruto', 'troll', 'golem', 'golemOssos', 'cavaleiroNegro']);
+export const LARGE: ReadonlySet<CharKey> = new Set(['bruto', 'troll', 'golem', 'golemOssos', 'golemMusgo', 'cavaleiroNegro']);
 
 /** Arma na mão direita (e escudo na esquerda). */
 const WEAPONS = {
@@ -170,6 +194,15 @@ const WEAPONS = {
   escudoNegro: 'weapons/BlackKnight_Shield_Large.gltf',
   machadoBruto: 'weapons/Orc_Axe_Large.gltf',
   machadoGolem: 'weapons/Skeleton_Golem_Axe_Large.gltf',
+  // Inimigos novos (2026-11-09).
+  machadoOsso: 'weapons/Skeleton_Axe.gltf',
+  escudoOsso: 'weapons/Skeleton_Shield_Small_A.gltf',
+  espadaVampiro: 'weapons/Vampire_Sword.gltf',
+  bengalaDoce: 'weapons/Candycane.gltf',
+  // Tropas novas (2026-11-09).
+  lanca: 'weapons/spear_A.gltf',
+  espingarda: 'weapons/shotgun.gltf',
+  elmoChifres: 'medieval/helmet.gltf',
 } as const;
 export type WeaponKey = keyof typeof WEAPONS;
 
@@ -186,11 +219,14 @@ export interface Art {
   skins: { prata: THREE.Texture; ouro: THREE.Texture };
 }
 
+/** Peças tiradas do personagem ao carregar (antes de virar uma malha só). */
+const DROP: Partial<Record<CharKey, string[]>> = { lanceiro: ['Knight_HelmetVisor'], anao: ['Engineer_Goggles'] };
+
 /**
  * Armadura dourada: a prateada do KayKit com os cinzas puxados para o ouro (pele, olhos e
  * enfeites coloridos ficam como estão). Feita uma vez, ao carregar.
  */
-function goldenArmor(silver: THREE.Texture): THREE.Texture {
+function goldenArmor(silver: THREE.Texture, tone: [number, number, number, number, number] = [1.05, 30, 0.82, 8, 0.3]): THREE.Texture {
   const img = silver.image as HTMLImageElement;
   const c = document.createElement('canvas');
   c.width = img.width;
@@ -206,9 +242,9 @@ function goldenArmor(silver: THREE.Texture): THREE.Texture {
     const hi = Math.max(r, gr, b);
     if (hi - Math.min(r, gr, b) >= 28 || hi <= 70) continue;
     const l = (r + gr + b) / 3;
-    px[i] = Math.min(255, l * 1.05 + 30);
-    px[i + 1] = Math.min(255, l * 0.82 + 8);
-    px[i + 2] = Math.min(255, l * 0.3);
+    px[i] = Math.min(255, l * tone[0] + tone[1]);
+    px[i + 1] = Math.min(255, l * tone[2] + tone[3]);
+    px[i + 2] = Math.min(255, l * tone[4]);
   }
   g.putImageData(data, 0, 0);
   const t = new THREE.CanvasTexture(c);
@@ -348,6 +384,31 @@ export async function loadArt(base: string, onProgress?: (k: number) => void): P
   for (const [k, g] of st) statics[k] = toStatic(g.scene);
   const chars = {} as Art['chars'];
   for (const [k, g] of ch) {
+    const drop = DROP[k];
+    if (drop) {
+      const gone: THREE.Object3D[] = [];
+      g.scene.traverse((o) => {
+        if (drop.some((n) => o.name.startsWith(n))) gone.push(o);
+      });
+      for (const o of gone) o.removeFromParent();
+    }
+    if (k === 'lanceiro') {
+      // Bronze do lanceiro espartano: a textura do próprio Knight (capa vermelha) com os cinzas
+      // da armadura puxados para o bronze, pela mesma conta do ouro.
+      const made = new Map<string, THREE.Texture>();
+      g.scene.traverse((o) => {
+        if (!(o instanceof THREE.Mesh)) return;
+        const m = o.material as THREE.MeshStandardMaterial;
+        if (!m.map) return;
+        let t = made.get(m.map.uuid);
+        if (!t) {
+          t = goldenArmor(m.map, [0.95, 30, 0.7, 12, 0.38]);
+          made.set(m.map.uuid, t);
+        }
+        o.material = m.clone();
+        (o.material as THREE.MeshStandardMaterial).map = t;
+      });
+    }
     if (k === 'orc') {
       g.scene.traverse((o) => {
         if (!(o instanceof THREE.Mesh)) return;
@@ -377,6 +438,15 @@ export async function loadArt(base: string, onProgress?: (k: number) => void): P
     // O arco vinha com a corda do lado de fora: ao mirar, a corda ficava virada para o inimigo
     // e a barriga do arco para o arqueiro. Virado no eixo do comprimento, a corda vem para ele.
     if (k === 'arco') g.scene.rotation.z = Math.PI;
+    // Espingarda do anão: o cano vem em +Z, como a besta.
+    if (k === 'espingarda') g.scene.rotation.y = Math.PI / 2;
+    // Lança: fica como a espada do soldado (comprimento em Y): de cima ela aparece inteira, com a
+    // ponta para a frente e para baixo, e a estocada do KayKit leva a ponta direto no alvo.
+    // Elmo de chifres do pack medieval (peça de tabuleiro, pequena): do tamanho da cabeça do anão.
+    if (k === 'elmoChifres') {
+      g.scene.scale.setScalar(5.6);
+      g.scene.position.y = 0.55;
+    }
     // Ferramentas 30% maiores, para dar para ver de longe por baixo do chapéu.
     // O machado do orc bruto também: no tamanho do pacote ele some atrás dos braços no golpe.
     if (k === 'pa' || k === 'machadoLenha' || k === 'picareta' || k === 'marreta' || k === 'machadoBruto') g.scene.scale.setScalar(1.3);

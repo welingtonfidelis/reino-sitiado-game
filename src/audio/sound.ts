@@ -3,9 +3,9 @@
  * mínimo, para cem flechas por segundo não virarem um chiado. O áudio só liga depois do
  * primeiro toque (exigência do iPhone).
  */
-export type Sfx = 'arco' | 'golpe' | 'morte' | 'pronto' | 'onda' | 'vitoria' | 'castelo' | 'magia' | 'cura' | 'nivel' | 'queda' | 'fogos' | 'figurinha';
+export type Sfx = 'arco' | 'tiro' | 'golpe' | 'morte' | 'pronto' | 'onda' | 'vitoria' | 'castelo' | 'magia' | 'cura' | 'nivel' | 'queda' | 'fogos' | 'figurinha';
 
-const GAP: Record<Sfx, number> = { arco: 0.07, golpe: 0.09, morte: 0.08, pronto: 0.2, onda: 1, vitoria: 1, castelo: 0.4, magia: 0.12, cura: 0.3, nivel: 1, queda: 3, fogos: 0.12, figurinha: 0.8 };
+const GAP: Record<Sfx, number> = { arco: 0.07, tiro: 0.12, golpe: 0.09, morte: 0.08, pronto: 0.2, onda: 1, vitoria: 1, castelo: 0.4, magia: 0.12, cura: 0.3, nivel: 1, queda: 3, fogos: 0.12, figurinha: 0.8 };
 
 export class Sound {
   private ctx: AudioContext | null = null;
@@ -91,6 +91,12 @@ export class Sound {
       case 'arco':
         this.noise(0.08, 0.25, 'highpass', 2500, 6000);
         this.tone('triangle', 520, 380, 0.07, 0.06);
+        break;
+      case 'tiro':
+        // Espingarda do anão (2026-11-09): estalo seco, chiado de pólvora e um baque grave.
+        this.noise(0.05, 0.45, 'highpass', 1800, 900);
+        this.noise(0.28, 0.3, 'lowpass', 2200, 200);
+        this.tone('sine', 110, 45, 0.2, 0.35);
         break;
       case 'golpe':
         this.tone('sine', 160, 60, 0.12, 0.35);

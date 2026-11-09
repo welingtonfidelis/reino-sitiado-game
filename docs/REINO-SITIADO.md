@@ -634,11 +634,11 @@ Pedido do usuário (2026-11-07): um modo fácil de dificuldade, em que uma das m
 | Mudar prédio de lugar | desmonta e monta (75% + 100% do tempo da obra) | metade desse tempo |
 | Vida dos monstros | como hoje | 30% menos (os esqueletos do necromante também) |
 | Monstros por onda | como hoje | 25% menos de cada (o chefe continua um só) |
-| Calmaria | 120 s antes da primeira onda; depois 90 s, caindo até 45 s | 30 s a mais em cada uma, caindo até 75 s |
+| Calmaria | 90 s antes da primeira onda (120 s até 2026-11-09); depois 90 s, caindo até 45 s | 120 s antes da primeira, 30 s a mais em cada uma, caindo até 75 s |
 | Chefe | a cada 15 ondas | a cada 20 (a figurinha do chefe segue o modo) |
 | Modificadores de onda | a cada 5 ondas | só a partir da onda 20 |
 | Vida do castelo | 1500 | 2250, e recupera o dobro entre as ondas |
-| Recursos no começo | como hoje | 50% a mais |
+| Recursos no começo | 200 de madeira e 110 de pedra (desde 2026-11-09) | 375 de madeira e 225 de pedra (o 1,5× de antes, mantido) |
 | Fome | o trabalho cai pela metade | o trabalho cai só 25% |
 
 ### Equilíbrio (6 sementes)
@@ -757,7 +757,124 @@ O usuário achou "Reino Sitiado" genérico demais. Das opções, escolheu **Hord
 - O nome entrou no título da aba, na tela de carregar, na tela de começo, no README, no `package.json` e no título deste arquivo.
 - O endereço (`reino-sitiado-game`), o repositório, a pasta, este arquivo e as chaves `reino.*` do armazenamento ficam como estão. Assim, o link e os saves não mudam.
 
-## 23. Arquitetura
+## 23. Rebalanceamento e teto da horda (2026-11-09)
+
+O usuário contou que, no normal, até a onda 15 ou 20 era fácil demais e depois difícil demais. Com os recursos do começo já dava para erguer duas serrarias, a mina, a pedreira, duas plantações e os arqueiros que seguravam as ondas. Da onda 20 em diante, mesmo com flechas, armas e armaduras no nível 3, muitas torres com arqueiros, soldados, clérigos e um herói, a horda costumava invadir e matar aldeões. Ele também pediu que, jogando bem, desse para ter um reino que luta para sempre.
+
+### O que o robô mostrou
+
+Medido com uma sonda por onda, feita a partir do robô:
+- Até a onda 14 não se perdia ninguém e o castelo nunca era atingido.
+- Na onda 15, o golem de gelo era um paredão.
+- Da onda 20 em diante, o exército parava em uns 67 (castelo no teto, forja no 3), enquanto a vida somada da horda crescia uns 15% por onda (8% de vida × quantidade em linha). Na onda 30, cada monstro tinha 9× a vida da onda 1. O reino sempre caía: crescimento sem fim contra um reino com teto.
+- Os aldeões morriam no trabalho (plantação 28, serraria 25, pedreira 19, mina 17, em 6 sementes), mortos por orcs, esqueletos, trolls e brutos que escapavam das torres.
+
+### O que mudou
+
+| O quê | Antes | Agora |
+| --- | --- | --- |
+| Começo do normal (`MODES.normal`) | 250 de madeira, 150 de pedra; primeira onda em 120 s; fendas nas ondas 1, 10 e 20; 4 + 2,5 monstros por onda | 200 de madeira, 110 de pedra; primeira onda em 90 s; fendas nas ondas 1, 5 e 12; 5 + 3 por onda |
+| Começo do fácil | — | igual ao de antes (375 de madeira, 225 de pedra, 120 s, fendas 1, 10 e 20, 4 + 2,5 por onda) |
+| Vida dos monstros | +8% por onda, sem fim | +7,5% por onda até a 20, +5% depois |
+| Quantidade | sem fim | depois da onda 20, +1,5 por onda |
+| **Teto da horda** (`capFrom`) | não havia | da onda 30 em diante, vida, quantidade e mistura param; seguem os dois modificadores, os chefes e o sorteio |
+| Chefes | vida no ritmo da horda (golem de ossos na 30: 32.600) | vida em linha, +7% da base por onda (golem de gelo na 15: 3.564; de ossos na 30: 10.605), parada no teto |
+| Saída das fendas | o começo da onda saía quase de uma vez | +0,3 s entre um monstro e outro: a onda grande chega em fila |
+| Forja | 3 níveis | 5 níveis; o 4 e o 5 pedem cristal (160 de ferro, 180 de ouro e 15 de cristal; 240, 300 e 30) |
+
+- **Aldeões fogem sozinhos** (`CONFIG.flee`): monstro a menos de 6 m, o aldeão larga o trabalho e corre (35% mais rápido) para a casa pronta ou o castelo mais perto que não esteja a menos de 3 m do monstro. Escondido, some e não vira presa. Sai pela porta depois de 3 s sem monstro a menos de 8 m do abrigo e volta ao mesmo trabalho. A perda vira produção parada (uns 15% do tempo das ondas), não aldeão morto. O Recolher no castelo continua; ao liberar, quem tinha corrido para uma casa sai dela.
+- **Aviso do teto:** ao vencer a onda 30, um aviso dourado diz que a horda chegou à força máxima e que quem aguentou até ali pode lutar para sempre.
+- **Onda que não acabava:** o monstro perseguia gente parada num ladrilho onde ele não entra (soldado na porta do quartel). Ficava andando sem sair do lugar na beira, e o soldado não o atacava porque o bolsão estava fora do `reach`. Uma onda do golem chegou a 5 minutos. Agora quem está num ladrilho bloqueado e fora do alcance do golpe não vira presa, e o monstro segue o campo de fluxo e bate no prédio. Na sonda, nenhuma luta passou de 4 minutos.
+- **Robô:** só fazia torres e arqueiros e chegava ao golem da onda 15 sem soldado. Agora o quartel e os soldados vêm antes da quarta torre.
+
+### Resultado (robô novo, 12 sementes, até a onda 80)
+
+| | Antes | Agora |
+| --- | --- | --- |
+| Normal | caía entre 15 e 30, média 24,0; da onda 20 em diante, de 1 a 6 aldeões perdidos por onda | média 32 (partidas no limite contam como 76 e 77); 2 das 12 aguentam até o limite do teste (onda 76 a 77, 150 min de jogo) com perdas que não crescem; aldeões perdidos por onda entre 0 e 1 |
+| "Nada" (só o castelo) | onda 4,3 | onda 4,0 |
+| Fácil (6 sementes, `npm run balance` até 50) | 32,0 | as 6 chegam à onda 50 |
+
+- Quem derruba o robô são os chefes (ondas 15 e 30) e as ondas 20 a 29. Ele quase não usa soldados, catapulta e cavaleiros contra o golem, como uma pessoa faria.
+- A onda 30 é a mais dura de todas: é o teto, tem o golem de ossos e é a primeira com dois modificadores. Passou dela, o jogo é aguentar.
+- O começo segue folgado para o robô: lotar as torres de arqueiros basta até a onda 14. Se o usuário ainda achar o começo fácil, os próximos passos são o tiro do castelo no nível 1 e o preço da torre.
+
+### Onde está
+
+- `config.ts`: `CONFIG.waves` (`hpGrowth`, `hpGrowthLate`, `lateFrom`, `perWaveLate`, `spawnGap`, `bossGrowth`, `capFrom`), `CONFIG.flee`, `CONFIG.forge.cost` com 5 níveis e, em `MODES`, `start`, `first`, `riftOpens`, `base` e `perWave` por modo.
+- `step.ts`: `monsterHpMul` (vida da onda, dos chefes e do teto), `waveSize` com o teto, `threatNear`, `startFlee` e `hideStep` (a fuga), e a presa que o monstro alcança.
+- Testes: as ondas crescem mais devagar e param no teto, o aviso do teto, a fuga e a volta, liberar o recolhimento e o monstro que não empaca.
+
+## 24. Inimigos novos, chefe de musgo, elfos e o Sábio (2026-11-09)
+
+O usuário viu a folha de personagens do KayKit que o jogo ainda não usava e escolheu estes:
+- Inimigos: o 4 (vampiro), o 1 (esqueleto guerreiro) e o 8 (acumulador).
+- Chefe novo: o 9 (4GTN esquecido).
+- O 15 (guia) e o 21 (elfo).
+
+O esqueleto mago, que ataca de longe, fica para depois, a pedido dele. O guerreiro planta (o 16, que seria um aliado guardião das hortas nascido do celeiro) ficou de fora, também a pedido dele.
+
+### Inimigos
+
+| Monstro | Modelo | Desde | O que faz |
+| --- | --- | --- | --- |
+| Esqueleto guerreiro | Skeleton_Warrior, machado e escudo pequeno do Skeletons | onda 6 | 70 de vida; flecha pega 60% (`arrowResist`). Vem no lugar de parte dos esqueletos: 5% a mais por onda, até 35% deles. |
+| Acumulador | Hoarder (mochila com baú) | onda 7 | 60 de vida, rápido, não briga e ninguém é presa dele. No primeiro prédio do caminho rouba 15 + 2 × onda (até 80) do recurso daquele prédio: serraria madeira, pedreira pedra, mina ferro, plantação/celeiro/casa comida, o resto ouro. Sem esse recurso, leva o que o reino tiver mais. Foge reto para a fenda de onde veio, com 14 s. Derrubado, devolve tudo (moedas e aviso verde); chegando à fenda, some com o roubo. Um por onda, dois da onda 19 em diante. Um balão com o desenho do que ele leva vai em cima da mochila. |
+| Vampiro | Vampire, com a espada dele | onda 18 | Meio-chefe: 500 de vida, 40% do golpe vira vida para ele (em gente e em prédio). Chama dois morcegos a cada 9 s, até 3 vivos. Um por onda, dois da onda 28 em diante (o fácil também tem um, sem desconto). |
+| Golem de musgo (chefe) | 4GTN_Forgotten, rig grande | onda 45 | 2600 de vida, recupera 2% por segundo e cura 15 a horda em 4 m a cada 3 s, a não ser que o fogo o pegue (magia, piche aceso, flecha em brasa). Os chefes agora se revezam: gelo (15), ossos (30), musgo (45), gelo (60)... |
+
+- **Onda que não acabava (de antes):** o esqueleto levantado pelo necromante às vezes nascia dentro de rocha ou água e ficava preso andando contra a pedra. Agora ele nasce num ladrilho livre ao lado, ou, sem lugar livre, onde o necromante está.
+- **Equilíbrio (robô, 12 sementes, até a onda 80):**
+  - com os quatro inimigos, média 23,7 (antes deles, 32); só 1 partida aguenta até o limite do teste;
+  - sem nenhum dos três, volta a 26,0 com a mesma régua até 40;
+  - tirar um só não basta, porque eles somam: o acumulador e o esqueleto guerreiro deixam o reino mais fraco antes do golem da onda 15, onde metade das partidas do robô cai;
+  - por isso o acumulador rouba menos e vem menos vezes, o guerreiro sobe mais devagar e o vampiro ficou com 500 de vida, 40% de roubo e 3 morcegos;
+  - é o começo mais tenso que o usuário pediu. Se pesar no jogo dele, os botões são os números acima.
+
+### Elfos no inverno
+
+No inverno, entre as ondas, de 1 a 4 elfos (Helper_A e Helper_B, dos Helpers, de bengala doce na mão) passeiam de porta em porta pela vila e acenam ao chegar. Somem numa nuvenzinha quando a onda começa ou quando o inverno acaba. São só enfeite (`stepElves` em `world3d.ts`), não existem na simulação e saem nos gráficos leves.
+
+### O Sábio (dicas em figuras)
+
+- **Quem é:** um velhinho de barba e óculos (o Lorekeeper). O retrato `public/ui/sabio.png` foi fotografado do modelo.
+- **Onde aparece:** no canto de baixo à esquerda, com um balão de figuras ligadas por setas e uma frase curta embaixo.
+- **Como some:** tocar fecha; sozinho, some em 14 s.
+- **Quando aparece:** uma dica por vez, e cada uma só uma vez por partida (marcada em `world.flags`, que vai no salvo), quando faz sentido. As dicas, em `src/game/guide.ts`:
+  - olá (casa, gente, trabalho);
+  - torre com arqueiros;
+  - pouca comida;
+  - casas cheias;
+  - a fuga dos aldeões;
+  - recurso que acabou;
+  - plantação colhida;
+  - o acumulador;
+  - a forja;
+  - o herói;
+  - chefe na próxima;
+  - o vampiro.
+- **Para desligar:** no ⋯, em "Dicas do Sábio" (`reino.guia` no navegador).
+
+### Tropas novas: lanceiro espartano e anão de espingarda
+
+O usuário pediu tropas novas para o castelo, "algo estilo um cavaleiro espartano com lança" e "anões com armas de fogo rústicas". O rascunho está em `reports/tropas-novas-rascunho.png` (fora do git), e ele escolheu o anão ruivo.
+
+| Tropa | Prédio | Modelo | Números | O que faz |
+| --- | --- | --- | --- | --- |
+| Lanceiro | Acampamento (a tenda azul do Medieval): 60 de madeira, 30 de pedra e 10 de ferro | Knight do Adventurers, sem viseira, com a armadura recolorida para bronze a partir da textura dele (a capa fica vermelha), crista vermelha feita no código, `spear_A` do Fantasy Weapons e o escudo redondo | 110 de vida, dano 13 a cada 1,2 s, alcance 1,5 m. Custa 25 de comida, 10 de madeira e 15 de ferro | A lança alcança por trás dos soldados e dá 1,6× nos grandes (`CONFIG.spear`): orc bruto, troll, vampiro e os três golens. Estocada (`Melee_1H_Attack_Stab`); parado, faz flexões como o soldado. |
+| Anão | Torre de pólvora (a torre de canhão do Medieval), castelo nível 2: 60 de pedra, 30 de madeira e 30 de ferro | Engineer do Adventurers sem os óculos, 12% mais largo e 10% mais baixo, com o elmo de chifres do Medieval (`units/neutral/helmet`, 5,6×) e a `shotgun` do Adventurers | 80 de vida, dano 28 a cada 2,6 s, alcance 6 m. Custa 20 de comida, 20 de ferro e 10 de ouro | Tiro de espingarda (dano `tiro`): pega também quem voa e o golem de gelo, e atravessa o escudo do esqueleto guerreiro e a armadura dos Blindados. Respinga 50% em quem estiver a 0,9 m do alvo (`CONFIG.gun`). Fumaça na boca do cano, faísca no alvo e um som novo (`tiro`). |
+
+- A lança fica na mesma posição da espada do soldado. De cima ela aparece inteira, e a estocada leva a ponta no alvo. Em pé, de cima, ela quase sumia.
+- O robô aprendeu a usar os dois: o Acampamento a partir da onda 5 (até 8 lanceiros) e a Torre de pólvora a partir da onda 9 com o castelo nível 2 (até 8 anões), antes da quarta torre. A média ficou em 20,2 (12 sementes).
+  - Nas partidas em que ele cai na onda 15, ele chega só com arqueiros e o castelo no nível 1: gasta tudo em torres, e o acumulador leva um pouco.
+  - Isso é limite do robô, não das tropas. Contra o golem, o jogador tem catapulta, soldados, lanceiros e agora os anões.
+
+### Para conversar depois (pedido do usuário, 2026-11-09)
+
+- Aumentar o mapa. A quantidade de recursos e a renovação quando um lugar acaba estão boas.
+- Abandonar as várias fendas e ter uma só de onde saem os inimigos.
+
+## 25. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
@@ -782,7 +899,7 @@ O usuário achou "Reino Sitiado" genérico demais. Das opções, escolheu **Hord
 - `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. `album.ts`: as figurinhas e o que guarda no navegador. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
 - `src/ui/App.tsx`: HUD, ⋯, botões flutuantes, avisos e telas de começo e fim. O menu do prédio e o leque do Construir ficam em `src/ui/Radial.tsx` (seções 14 e 15).
 
-## 24. Etapas
+## 26. Etapas
 
 | Etapa | O que | Situação |
 | --- | --- | --- |
@@ -806,8 +923,11 @@ O usuário achou "Reino Sitiado" genérico demais. Das opções, escolheu **Hord
 | 18 | Modo fácil: nada acaba, ondas e mudança mais leves, castelo mais forte; escolhido com figura ao começar (seção 21) | Pronta em 2026-11-07, na `main`. Vista no navegador do Mac (primeira tela no tamanho de celular, Nova partida no ⋯, menu da plantação no fácil); falta jogar no tablet. |
 | 19 | Evolução visual: castelo cresce e doura por nível; elmo, armadura prateada e dourada e rastro das flechas pelas melhorias da forja (seção 22) | Pronta em 2026-11-08. Vista no navegador do Mac (os quatro castelos, a subida de nível, as armaduras, o elmo e o rastro); falta jogar no tablet e no iPhone. |
 | — | Nome Hordas & Hortas e ícone do castelo dourado no hexágono (seção 22, "Nome e ícone") | Pronto em 2026-11-09. Visto no navegador do Mac; falta ver na tela inicial do tablet e do iPhone. |
+| — | Rebalanceamento: começo mais curto, horda que cresce mais devagar e para na onda 30, chefes em linha, forja até o 5, aldeões que fogem e o monstro que empacava (seção 23) | Pronto em 2026-11-09. Medido com o robô e visto no navegador do Mac (começo, fuga e volta, forja); falta jogar no tablet e no iPhone. |
+| — | Inimigos novos (esqueleto guerreiro, acumulador, vampiro), chefe de musgo, elfos no inverno e o Sábio (seção 24) | Pronto em 2026-11-09. Visto no navegador do Mac (os quatro monstros, o balão do roubo, os morcegos do vampiro, os elfos na neve, o Sábio no computador e no celular); falta jogar no tablet e no iPhone. |
+| — | Tropas novas: lanceiro espartano (Acampamento) e anão de espingarda (Torre de pólvora) (seção 24) | Pronto em 2026-11-09. Visto no navegador do Mac (bronze, crista, lança, elmo de chifres, os dois prédios e o tiro); falta jogar no tablet e no iPhone. |
 
-## 25. Arte e licenças
+## 27. Arte e licenças
 
 Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art` (lista em `tools/art-manifest.ts`). Detalhes em `LICENSES.md`.
 
@@ -824,5 +944,7 @@ Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art`
 | Revisão das armas | machado grande do orc bruto, machado do golem de ossos e a textura do orc saqueador |
 | Evolução visual (Etapa 19) | castelo de telhado dourado e estandarte (Medieval); Paladin sem elmo (Mystery Monthly 4); armadura prateada do Knight (Adventurers) |
 | Ícone (2026-11-09) | castelo de telhado dourado e estandartes (Medieval), fotografados para o ícone |
+| Inimigos novos (2026-11-09) | Skeleton_Warrior, Skeleton_Axe e Skeleton_Shield_Small_A (Skeletons); Vampire e a espada (Mystery Monthly 5); Hoarder e 4GTN_Forgotten (Mystery Monthly 6); Helper_A, Helper_B e a bengala doce (Mystery Monthly 5, Helpers); o retrato do Sábio sai do Lorekeeper (Mystery Monthly 6) |
+| Tropas novas (2026-11-09) | tenda azul e torre de canhão, elmo de chifres (Medieval); spear_A (Fantasy Weapons); shotgun (Adventurers); o lanceiro é o Knight em bronze e o anão o Engineer |
 
 Os efeitos vêm do pixelfx (MIT); detalhes na seção 6 e em `LICENSES.md`.

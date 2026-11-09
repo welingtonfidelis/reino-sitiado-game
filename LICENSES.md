@@ -28,6 +28,9 @@ copiados por `npm run art` conforme `tools/art-manifest.ts`.
 | Evolução visual (Etapa 19) | building_castle_yellow e banner_blue_full (Medieval Hexagon Pack); Paladin, sem elmo (Mystery Monthly 4); knight_texture_alt_A (Adventurers 2.0) |
 | Revisão das armas (2026-11-08) | Orc_Axe_Large e orcbrute_texture_A (Mystery Monthly 6, orc bruto); Skeleton_Golem_Axe_Large (Skeletons 1.1); orc_texture_A (Mystery Monthly 4, a pele do orc saqueador) |
 | Ícone (2026-11-09) | building_castle_yellow e banner_blue_full (Medieval Hexagon Pack), fotografados para `public/icons/`; a ilha, o fundo e o hexágono são do próprio projeto |
+| Inimigos novos (2026-11-09) | Skeleton_Warrior, Skeleton_Axe, Skeleton_Shield_Small_A (Skeletons 1.1); Vampire, Vampire_Sword e vampire_texture (Mystery Monthly 5); Hoarder e 4GTN_Forgotten (Mystery Monthly 6) |
+| Elfos e o Sábio (2026-11-09) | Helper_A, Helper_B, Candycane e helpers_texture (Mystery Monthly 5, Helpers); `public/ui/sabio.png`, retrato fotografado do Lorekeeper (Mystery Monthly 6) |
+| Tropas novas (2026-11-09) | building_tent_blue, building_tower_cannon_blue e o elmo de chifres `units/neutral/helmet` (Medieval Hexagon Pack); spear_A e weapons_bits_texture (Fantasy Weapons Bits 1.0); shotgun e engineer_texture (Adventurers 2.0) |
 | KayKit Character Animations 1.1 | Rig_Medium (General, MovementBasic, CombatMelee, CombatRanged, Tools, Simulation) e Rig_Large (General, MovementBasic, CombatMelee). Da Simulation (Etapa 16): Cheering, Waving, Sit_Floor_Idle e Push_Ups |
 
 ## pixelfx (Patch e Hugo Duprez) — MIT

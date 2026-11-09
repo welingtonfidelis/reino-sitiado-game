@@ -62,6 +62,11 @@ export const MEDIEVAL: [string, string][] = [
   // Etapa 19: o castelo de telhado dourado (nível 4) e os estandartes da porta (nível 2 em diante).
   ['buildings/yellow', 'building_castle_yellow'],
   ['units/blue', 'banner_blue_full'],
+  // Tropas novas (2026-11-09): a tenda vira o Acampamento dos lanceiros, a torre de canhão a
+  // Torre de pólvora dos anões, e o elmo de chifres vai na cabeça do anão.
+  ['buildings/blue', 'building_tent_blue'],
+  ['buildings/blue', 'building_tower_cannon_blue'],
+  ['units/neutral', 'helmet'],
 ];
 
 /** [origem relativa à coleção, destino relativo a public/assets/kaykit] */
@@ -100,6 +105,31 @@ export const ART: [string, string][] = [
   [`${ADV}/Characters/gltf/Rogue_Hooded.glb`, 'chars/Rogue_Hooded.glb'],
   [`${ADV}/Characters/gltf/Druid.glb`, 'chars/Druid.glb'],
   [`${MM5}/3 - September 2024 - Black Knight/characters/BlackKnight.glb`, 'chars/BlackKnight.glb'],
+  // Inimigos novos (2026-11-09): esqueleto guerreiro, vampiro, acumulador e o golem de musgo (o 4GTN esquecido).
+  [`${SK}/characters/gltf/Skeleton_Warrior.glb`, 'chars/Skeleton_Warrior.glb'],
+  [`${MM5}/4 - October 2024 - Vampire/characters/Vampire.glb`, 'chars/Vampire.glb'],
+  [`${MM6}/8 - February 2026 - Hoarder/characters/Hoarder.glb`, 'chars/Hoarder.glb'],
+  [`${MM6}/7 - January 2026 - 4GTN/characters/4GTN_Forgotten.glb`, 'chars/4GTN_Forgotten.glb'],
+  ...['Skeleton_Axe', 'Skeleton_Shield_Small_A'].flatMap((n) => [
+    [`${SK}/assets/gltf/${n}.gltf`, `weapons/${n}.gltf`],
+    [`${SK}/assets/gltf/${n}.bin`, `weapons/${n}.bin`],
+  ] as [string, string][]),
+  [`${MM5}/4 - October 2024 - Vampire/assets/gltf/Vampire_Sword.gltf`, 'weapons/Vampire_Sword.gltf'],
+  [`${MM5}/4 - October 2024 - Vampire/assets/gltf/Vampire_Sword.bin`, 'weapons/Vampire_Sword.bin'],
+  [`${MM5}/4 - October 2024 - Vampire/assets/gltf/vampire_texture.png`, 'weapons/vampire_texture.png'],
+  // Lança do lanceiro (Fantasy Weapons Bits) e espingarda do anão (Adventurers 2.0).
+  [`KayKit Fantasy Weapons Bits 1.0/Assets/gltf/spear_A.gltf`, 'weapons/spear_A.gltf'],
+  [`KayKit Fantasy Weapons Bits 1.0/Assets/gltf/spear_A.bin`, 'weapons/spear_A.bin'],
+  [`KayKit Fantasy Weapons Bits 1.0/Assets/gltf/weapons_bits_texture.png`, 'weapons/weapons_bits_texture.png'],
+  [`${ADV}/Assets/gltf/shotgun.gltf`, 'weapons/shotgun.gltf'],
+  [`${ADV}/Assets/gltf/shotgun.bin`, 'weapons/shotgun.bin'],
+  [`${ADV}/Assets/gltf/engineer_texture.png`, 'weapons/engineer_texture.png'],
+  // Elfos que passeiam pela vila no inverno (2026-11-09), de bengala doce na mão.
+  [`${MM5}/6 - December 2024 - Helpers/characters/Helper_A.glb`, 'chars/Helper_A.glb'],
+  [`${MM5}/6 - December 2024 - Helpers/characters/Helper_B.glb`, 'chars/Helper_B.glb'],
+  [`${MM5}/6 - December 2024 - Helpers/assets/gltf/Candycane.gltf`, 'weapons/Candycane.gltf'],
+  [`${MM5}/6 - December 2024 - Helpers/assets/gltf/Candycane.bin`, 'weapons/Candycane.bin'],
+  [`${MM5}/6 - December 2024 - Helpers/assets/gltf/helpers_texture.png`, 'weapons/helpers_texture.png'],
   // Armas.
   ...['sword_1handed', 'shield_round_color', 'bow_withString'].flatMap((n) => [
     [`${ADV}/Assets/gltf/${n}.gltf`, `weapons/${n}.gltf`],

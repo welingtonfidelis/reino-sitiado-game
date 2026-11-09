@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { LARGE, cloneChar, findBone } from './assets.ts';
 import type { Art, CharKey, WeaponKey } from './assets.ts';
 
-export type Pose = 'idle' | 'walk' | 'run' | 'attack' | 'shoot' | 'aim' | 'dig' | 'chop' | 'pick' | 'cast' | 'heal' | 'repair' | 'death' | 'shoot2' | 'chop2' | 'spin' | 'cheer' | 'wave' | 'sit' | 'pushups' | 'claw';
+export type Pose = 'idle' | 'walk' | 'run' | 'attack' | 'shoot' | 'aim' | 'dig' | 'chop' | 'pick' | 'cast' | 'heal' | 'repair' | 'death' | 'shoot2' | 'chop2' | 'spin' | 'cheer' | 'wave' | 'sit' | 'pushups' | 'claw' | 'stab';
 
 const MEDIUM: Record<Pose, string> = {
   idle: 'Idle_A',
@@ -34,6 +34,8 @@ const MEDIUM: Record<Pose, string> = {
   // Revisão de 2026-11-08: o lobisomem bate com as duas garras (o golpe de corte girava o
   // corpo e ele ficava de costas para o alvo).
   claw: 'Melee_Dualwield_Attack_Chop',
+  // Lanceiro (2026-11-09): estocada com a lança.
+  stab: 'Melee_1H_Attack_Stab',
 };
 const BIG: Record<Pose, string> = {
   idle: 'Idle_A',
@@ -57,6 +59,7 @@ const BIG: Record<Pose, string> = {
   sit: 'Idle_A',
   pushups: 'Idle_A',
   claw: 'Melee_2H_Attack',
+  stab: 'Melee_2H_Attack',
 };
 /** Golpe próprio de quem é do rig grande mas luta com uma mão (espada e escudo). */
 const BIG_BY_KIND: Partial<Record<CharKey, Partial<Record<Pose, string>>>> = {
@@ -83,7 +86,17 @@ const GEAR: Partial<Record<CharKey, { r?: WeaponKey; l?: WeaponKey }>> = {
   atiradora: { r: 'besta' },
   druida: { r: 'cajadoDruida' },
   cavaleiroNegro: { r: 'espadaNegra', l: 'escudoNegro' },
+  esqueletoGuerreiro: { r: 'machadoOsso', l: 'escudoOsso' },
+  vampiro: { r: 'espadaVampiro' },
+  lanceiro: { r: 'lanca', l: 'escudo' },
+  anao: { r: 'espingarda' },
+  elfoA: { r: 'bengalaDoce' },
+  elfoB: { r: 'bengalaDoce' },
 };
+
+/** Crista de crina vermelha do lanceiro: meia-lua achatada, de frente para trás. */
+const CREST_GEO = new THREE.CylinderGeometry(0.42, 0.42, 0.09, 20, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2);
+const CREST_MAT = new THREE.MeshLambertMaterial({ color: '#c0392b', flatShading: true });
 
 /** Etapa 19: material com a armadura trocada, um por material original e por textura. */
 const SKIN_MATS = new Map<string, THREE.Material>();
@@ -144,6 +157,18 @@ export class CharView {
     const gear = GEAR[kind];
     if (gear?.r) this.handR?.add(art.weapons[gear.r].clone(true));
     if (gear?.l) findBone(model, ['handslotl', 'handslot.l'])?.add(art.weapons[gear.l].clone(true));
+    // Tropas novas (2026-11-09): crista do lanceiro, elmo de chifres e corpo largo do anão.
+    const head = findBone(model, ['head']);
+    if (kind === 'lanceiro' && head) {
+      const crest = new THREE.Mesh(CREST_GEO, CREST_MAT);
+      crest.position.set(0, 0.98, -0.02);
+      crest.scale.setScalar(1.15);
+      head.add(crest);
+    }
+    if (kind === 'anao') {
+      head?.add(art.weapons.elmoChifres.clone(true));
+      model.scale.multiply(new THREE.Vector3(1.12, 0.9, 1.12));
+    }
     this.play('idle');
   }
 

@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 
-export type BubbleIcon = 'arvore' | 'pedra' | 'ferro' | 'cristal' | 'trigo' | 'semMadeira' | 'semPedra' | 'semFerro' | 'semComida';
+export type BubbleIcon = 'arvore' | 'pedra' | 'ferro' | 'cristal' | 'trigo' | 'ouro' | 'semMadeira' | 'semPedra' | 'semFerro' | 'semComida';
 
 const PX = 128;
 
@@ -106,6 +106,25 @@ function draw(icon: BubbleIcon): THREE.CanvasTexture {
     g.ellipse(64, 16, 5, 8, 0, 0, Math.PI * 2);
     g.fill();
     g.stroke();
+  } else if (base === 'ouro') {
+    // Moedas de ouro empilhadas (o que o acumulador leva do cofre).
+    g.strokeStyle = '#8a5a12';
+    g.lineWidth = 4;
+    for (const [x, y] of [
+      [50, 74],
+      [78, 74],
+      [64, 50],
+    ]) {
+      g.fillStyle = '#f2c23a';
+      g.beginPath();
+      g.ellipse(x!, y!, 18, 18, 0, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+      g.fillStyle = '#ffe58a';
+      g.beginPath();
+      g.ellipse(x! - 4, y! - 4, 6, 6, 0, 0, Math.PI * 2);
+      g.fill();
+    }
   } else if (base === 'cristal') {
     g.fillStyle = '#5ab4f0';
     g.strokeStyle = '#1f5a8a';

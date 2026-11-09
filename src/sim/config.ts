@@ -24,17 +24,33 @@ export type BuildingKind =
   | 'estabulo'
   | 'forja'
   | 'oficina'
+  | 'acampamento'
+  | 'polvora'
   | 'catapulta'
   | 'piche'
   | 'estacas';
 
 export type Category = 'economia' | 'defesa' | 'militar' | 'moradia';
-export type UnitKind = 'trabalhador' | 'soldado' | 'arqueiro' | 'mago' | 'clerigo' | 'cavaleiro' | 'engenheiro' | HeroKind;
+export type UnitKind = 'trabalhador' | 'soldado' | 'arqueiro' | 'mago' | 'clerigo' | 'cavaleiro' | 'engenheiro' | 'lanceiro' | 'anao' | HeroKind;
 /** Etapa 14: heróis comprados no castelo (um de cada, caros, golpe especial automático). */
 export type HeroKind = 'barbaro' | 'atiradora' | 'druida' | 'cavaleiroNegro';
 export const HERO_KINDS: HeroKind[] = ['barbaro', 'atiradora', 'druida', 'cavaleiroNegro'];
 export const isHero = (k: UnitKind): k is HeroKind => (HERO_KINDS as UnitKind[]).includes(k);
-export type MonsterKind = 'esqueleto' | 'lobisomem' | 'orc' | 'bruto' | 'morcego' | 'bruxa' | 'troll' | 'necromante' | 'golem' | 'golemOssos';
+export type MonsterKind =
+  | 'esqueleto'
+  | 'esqueletoGuerreiro'
+  | 'lobisomem'
+  | 'orc'
+  | 'acumulador'
+  | 'bruto'
+  | 'morcego'
+  | 'bruxa'
+  | 'troll'
+  | 'necromante'
+  | 'vampiro'
+  | 'golem'
+  | 'golemOssos'
+  | 'golemMusgo';
 /** Onde o prédio pode ficar: chão livre, vizinho da floresta, vizinho da rocha, em cima do veio, em cima de muralha. */
 export type Site = 'grass' | 'nearForest' | 'nearRock' | 'ore' | 'wall' | 'nearBarn';
 
@@ -87,10 +103,13 @@ export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
   piche: { name: 'Fosso de piche', category: 'defesa', blurb: 'Quem passa anda pela metade. Aceso, queima quem estiver em cima.', cost: { pedra: 30 }, hp: 1, build: 4, site: 'grass', breakCost: 0, trap: true },
   estacas: { name: 'Estacas', category: 'defesa', blurb: 'Ferem quem cruza e quebram depois de 20 golpes.', cost: { madeira: 15 }, hp: 20, build: 3, site: 'grass', breakCost: 0, trap: true },
   oficina: { name: 'Oficina', category: 'militar', blurb: 'Treina engenheiros, que consertam até no meio da onda.', cost: { madeira: 40, pedra: 20 }, hp: 250, build: 8, site: 'grass', recruits: 'engenheiro', breakCost: 6 },
+  // Tropas novas (2026-11-09): o lanceiro espartano e o anão de espingarda.
+  acampamento: { name: 'Acampamento', category: 'militar', blurb: 'Treina lanceiros: a lança alcança por trás dos soldados e bate forte nos grandes.', cost: { madeira: 60, pedra: 30, ferro: 10 }, hp: 350, build: 10, site: 'grass', recruits: 'lanceiro', breakCost: 6 },
+  polvora: { name: 'Torre de pólvora', category: 'militar', blurb: 'Treina anões de espingarda: tiro forte e lento, que acerta quem voa e atravessa escudo e gelo.', cost: { pedra: 60, madeira: 30, ferro: 30 }, hp: 380, build: 12, site: 'grass', recruits: 'anao', breakCost: 6, needsLevel: 2 },
 };
 
 /** O que aparece no menu Construir, em ordem. O portão vira de uma muralha. */
-export const BUILD_MENU: BuildingKind[] = ['casa', 'celeiro', 'fazenda', 'serraria', 'pedreira', 'mina', 'muralha', 'portao', 'torre', 'catapulta', 'piche', 'estacas', 'quartel', 'campo', 'oficina', 'capela', 'forja', 'torreMago', 'estabulo'];
+export const BUILD_MENU: BuildingKind[] = ['casa', 'celeiro', 'fazenda', 'serraria', 'pedreira', 'mina', 'muralha', 'portao', 'torre', 'catapulta', 'piche', 'estacas', 'quartel', 'campo', 'acampamento', 'oficina', 'capela', 'forja', 'torreMago', 'polvora', 'estabulo'];
 
 export interface UnitDef {
   name: string;
@@ -110,6 +129,8 @@ export const UNITS: Record<UnitKind, UnitDef> = {
   clerigo: { name: 'Clérigo', hp: 45, speed: 1.5, dmg: 0, cd: 2.0, range: 3.5, cost: { comida: 25, ouro: 10 }, train: 10 },
   cavaleiro: { name: 'Cavaleiro', hp: 130, speed: 3.2, dmg: 20, cd: 1.2, range: 0.9, cost: { comida: 40, ferro: 25, ouro: 10 }, train: 12 },
   engenheiro: { name: 'Engenheiro', hp: 35, speed: 1.8, dmg: 0, cd: 1, range: 1.3, cost: { comida: 15, pedra: 10 }, train: 8 },
+  lanceiro: { name: 'Lanceiro', hp: 110, speed: 1.6, dmg: 13, cd: 1.2, range: 1.5, cost: { comida: 25, madeira: 10, ferro: 15 }, train: 10 },
+  anao: { name: 'Anão', hp: 80, speed: 1.4, dmg: 28, cd: 2.6, range: 6, cost: { comida: 20, ferro: 20, ouro: 10 }, train: 10 },
   // Heróis (Etapa 14): o preço está em CONFIG.heroes; a vida e o dano crescem com o nível.
   barbaro: { name: 'Bárbaro', hp: 420, speed: 2.0, dmg: 30, cd: 1.0, range: 0.9, cost: {}, train: 0 },
   atiradora: { name: 'Atiradora', hp: 220, speed: 1.9, dmg: 22, cd: 0.8, range: 9.5, cost: {}, train: 0 },
@@ -137,18 +158,33 @@ export interface MonsterDef {
   heal?: { amount: number; radius: number; every: number };
   /** Levanta esqueletos ao lado. */
   summon?: { every: number; max: number };
+  /** Inimigos novos (2026-11-09). Fração do dano de flecha que sente (esqueleto guerreiro, de escudo). */
+  arrowResist?: number;
+  /** Fração do dano do golpe que vira vida para ele (vampiro). */
+  lifesteal?: number;
+  /** Chama morcegos ao lado (vampiro). */
+  bats?: { every: number; max: number };
+  /**
+   * Ladrão (acumulador): não briga; no primeiro prédio do caminho rouba `base` + `perWave` × onda
+   * (até `max`) de um recurso e foge para a fenda. Tem `flee` s para escapar; derrubado, devolve.
+   */
+  thief?: { base: number; perWave: number; max: number; flee: number; carrySpeed: number };
   blurb: string;
 }
 export const MONSTERS: Record<MonsterKind, MonsterDef> = {
   esqueleto: { name: 'Esqueleto', hp: 30, speed: 1.1, dmg: 4, cd: 1.0, structMul: 1, from: 1, blurb: 'Vem em bando.' },
+  esqueletoGuerreiro: { name: 'Esqueleto guerreiro', hp: 70, speed: 1.0, dmg: 7, cd: 1.1, structMul: 1, from: 6, arrowResist: 0.6, blurb: 'De elmo e escudo: flecha pega bem menos. Espada, lança e magia resolvem.' },
   lobisomem: { name: 'Lobisomem', hp: 26, speed: 2.1, dmg: 6, cd: 0.9, structMul: 0.6, from: 2, blurb: 'Rápido, rodeia a muralha atrás de brecha.' },
+  acumulador: { name: 'Acumulador', hp: 60, speed: 1.5, dmg: 0, cd: 1, structMul: 0, from: 7, thief: { base: 15, perWave: 2, max: 80, flee: 14, carrySpeed: 1.2 }, blurb: 'Não briga: enche a mochila de recursos no primeiro prédio que alcança e foge para a fenda. Derrubado, devolve tudo.' },
   orc: { name: 'Orc saqueador', hp: 75, speed: 0.9, dmg: 9, cd: 1.2, structMul: 3, from: 4, blurb: 'Bate três vezes mais forte em muralhas e prédios.' },
   bruto: { name: 'Orc bruto', hp: 260, speed: 0.65, dmg: 22, cd: 1.8, structMul: 2.5, from: 8, blurb: 'Muita vida e golpe pesado.' },
   morcego: { name: 'Morcego gigante', hp: 18, speed: 2.6, dmg: 4, cd: 0.8, structMul: 1, from: 8, flying: true, blurb: 'Voa por cima das muralhas, direto para as casas. Só flecha, magia e castelo alcançam.' },
   bruxa: { name: 'Bruxa', hp: 45, speed: 0.85, dmg: 3, cd: 1.2, structMul: 0.5, from: 9, heal: { amount: 10, radius: 3, every: 2.5 }, blurb: 'Fica atrás e cura a horda em volta. Derrube primeiro.' },
   troll: { name: 'Troll', hp: 180, speed: 0.75, dmg: 16, cd: 1.5, structMul: 2, from: 12, regen: 0.03, blurb: 'Recupera a vida, a não ser que magia ou flecha em brasa o queime.' },
   necromante: { name: 'Necromante', hp: 70, speed: 0.8, dmg: 6, cd: 1.2, structMul: 0.5, from: 16, summon: { every: 6, max: 5 }, blurb: 'Levanta esqueletos ao lado enquanto anda.' },
+  vampiro: { name: 'Vampiro', hp: 500, speed: 0.9, dmg: 14, cd: 1.0, structMul: 1, from: 18, lifesteal: 0.4, bats: { every: 9, max: 3 }, blurb: 'Meio-chefe. Chama morcegos e cada golpe que dá vira vida para ele.' },
   golem: { name: 'Golem de gelo', hp: 1800, speed: 0.5, dmg: 50, cd: 2.2, structMul: 3, from: 15, boss: true, immuneArrows: true, blurb: 'Chefe. Flechas não o ferem: magia, soldados e cavaleiros sim.' },
+  golemMusgo: { name: 'Golem de musgo', hp: 2600, speed: 0.5, dmg: 55, cd: 2.2, structMul: 3, from: 45, boss: true, regen: 0.02, heal: { amount: 15, radius: 4, every: 3 }, blurb: 'Chefe. Se cura e cura a horda em volta, a não ser que o fogo o pegue: magia, piche aceso ou flecha em brasa.' },
   golemOssos: { name: 'Golem de ossos', hp: 3500, speed: 0.55, dmg: 70, cd: 2.2, structMul: 3.5, from: 30, boss: true, immuneMagic: true, blurb: 'Chefe. Magia não o fere: flechas e espadas sim.' },
 };
 
@@ -156,7 +192,6 @@ export const CONFIG = {
   tps: 20,
   /** Raio do mapa em ladrilhos (13 até a etapa 9; jogos salvos antes disso seguem com 13). */
   mapRadius: 16,
-  start: { comida: 150, madeira: 250, pedra: 150, ferro: 30, cristal: 0, ouro: 0 } as Record<Res, number>,
   startWorkers: 4,
   /** Moradia: um trabalhador chega a cada `arriveEvery` s se houver vaga, teto e comida. */
   arriveEvery: 20,
@@ -212,24 +247,42 @@ export const CONFIG = {
    */
   farm: { harvest: 300, replant: { madeira: 10 } as Cost },
   repairShare: 0.5,
+  /**
+   * Ondas. Rebalanceamento de 2026-11-09 (doc §23): o começo, os recursos iniciais e quando abrem
+   * as fendas ficam por modo em MODES; aqui fica a curva de força da horda, igual nos dois modos.
+   */
   waves: {
-    first: 120,
     interval: 90,
     intervalStep: 3,
     intervalMin: 45,
-    hpGrowth: 1.08,
-    base: 4,
-    perWave: 2.5,
+    /** Vida dos monstros: cresce `hpGrowth` por onda até `lateFrom` e `hpGrowthLate` depois. */
+    hpGrowth: 1.075,
+    /**
+     * Da onda 20 em diante o reino para de crescer (teto do castelo, forja no máximo); antes a
+     * horda seguia ganhando uns 15% de vida somada por onda e sempre vencia.
+     */
+    hpGrowthLate: 1.05,
+    lateFrom: 20,
+    /** Monstros a mais por onda depois de `lateFrom` (antes vale o `perWave` do modo). */
+    perWaveLate: 1.5,
     spawnSpread: 10,
+    /** Segundos a mais entre um monstro e outro: onda grande chega em fila, não num bolo só. */
+    spawnGap: 0.3,
+    /** Chefe: a vida cresce em linha (fração da base por onda), não no ritmo da horda. */
+    bossGrowth: 0.07,
+    /**
+     * Teto da horda (pedido do usuário: quem joga bem pode lutar para sempre). Da onda 30 em diante
+     * a vida, a quantidade e a mistura param de crescer; as ondas seguem variando nos dois
+     * modificadores, nos chefes e no sorteio. 0 = sem teto.
+     */
+    capFrom: 30,
     goldBase: 15,
     goldPerWave: 5,
-    /** Ondas em que abre mais uma fenda. */
-    riftOpens: [1, 10, 20],
   },
   monsterAggro: 1.6,
   /** Altura de voo do morcego. */
   flyHeight: 1.8,
-  /** Chefes: um golem a cada 15 ondas (gelo nas ímpares, ossos nas pares). */
+  /** Chefes: um golem a cada 15 ondas, em rodízio: gelo, ossos e musgo (desde 2026-11-09). */
   bossEvery: 15,
   /**
    * Heróis (Etapa 14): castelo nível 2 (o 3 pede ferro, que falta, e os heróis chegavam só lá pela onda 28); preço em ouro e cristal (o ferro já falta), +50% a cada
@@ -271,10 +324,26 @@ export const CONFIG = {
       { ferro: 30, ouro: 20 },
       { ferro: 60, ouro: 50 },
       { ferro: 100, ouro: 100 },
+      // Níveis 4 e 5 (2026-11-09): para o reino ter onde crescer depois do teto do castelo.
+      { ferro: 160, ouro: 180, cristal: 15 },
+      { ferro: 240, ouro: 300, cristal: 30 },
     ] as Cost[],
   },
   /** Raio em que a tropa mandada para um ponto ainda sai para lutar. */
   holdEngage: 5,
+  /** Lanceiro (2026-11-09): o dano vezes `bigMul` nos grandes (orc bruto, troll, vampiro e chefes). */
+  spear: { bigMul: 1.6, big: ['bruto', 'troll', 'vampiro', 'golem', 'golemOssos', 'golemMusgo'] as MonsterKind[] },
+  /**
+   * Anão (2026-11-09): o tiro acerta o alvo inteiro e `splashMul` de quem estiver a `splash` m
+   * dele; atravessa o escudo do esqueleto guerreiro, a armadura dos Blindados e o gelo do golem.
+   */
+  gun: { splash: 0.9, splashMul: 0.5 },
+  /**
+   * Fuga sozinho (2026-11-09): o aldeão que vê monstro a menos de `radius` m larga o trabalho e
+   * corre (`run` × o passo) para a casa ou o castelo mais perto que não esteja a menos de `avoid` m
+   * do monstro; sai depois de `wait` s sem monstro a menos de `calm` m de onde se escondeu.
+   */
+  flee: { radius: 6, avoid: 3, calm: 8, wait: 3, run: 1.35 },
 };
 
 /**
@@ -301,8 +370,15 @@ export interface ModeDef {
   /** Fator da vida do castelo e da recuperação entre ondas. */
   castleHp: number;
   castleRegen: number;
-  /** Fator dos recursos do começo. */
-  start: number;
+  /** Recursos do começo. */
+  start: Record<Res, number>;
+  /** Segundos até a primeira onda (mais `calm`). */
+  first: number;
+  /** Ondas em que abre mais uma fenda. */
+  riftOpens: number[];
+  /** Monstros da onda n: base + perWave × n (até `lateFrom`; depois cresce `perWaveLate`). */
+  base: number;
+  perWave: number;
   /** Quanto rende o trabalho com fome. */
   hungryWork: number;
 }
@@ -319,7 +395,14 @@ export const MODES: Record<Mode, ModeDef> = {
     modsFrom: 1,
     castleHp: 1,
     castleRegen: 1,
-    start: 1,
+    // Rebalanceamento de 2026-11-09: o começo era folgado demais (dava para erguer a economia
+    // inteira e os arqueiros só com o que se ganhava), então menos recursos, primeira onda mais
+    // cedo, fendas novas nas ondas 5 e 12 e um pouco mais de monstros.
+    start: { comida: 150, madeira: 200, pedra: 110, ferro: 30, cristal: 0, ouro: 0 },
+    first: 90,
+    riftOpens: [1, 5, 12],
+    base: 5,
+    perWave: 3,
     hungryWork: CONFIG.hungryWork,
   },
   facil: {
@@ -333,7 +416,12 @@ export const MODES: Record<Mode, ModeDef> = {
     modsFrom: 20,
     castleHp: 1.5,
     castleRegen: 2,
-    start: 1.5,
+    // O começo do fácil fica como era antes do rebalanceamento (o 1,5× dos recursos de antes).
+    start: { comida: 225, madeira: 375, pedra: 225, ferro: 45, cristal: 0, ouro: 0 },
+    first: 120,
+    riftOpens: [1, 10, 20],
+    base: 4,
+    perWave: 2.5,
     hungryWork: 0.75,
   },
 };

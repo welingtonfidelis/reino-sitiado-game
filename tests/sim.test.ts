@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished } from 'vitest';
 import {
   BUILDINGS,
   CONFIG,
@@ -30,13 +30,14 @@ import {
   toggleShelter,
   troops,
   waveSize,
+  monsterHpMul,
   workers,
 } from '../src/sim/index.ts';
 import { CROPS, DIRS, MONSTERS, UNITS, buyHero, cropOf, heroCost, heroOf, heroProblem } from '../src/sim/index.ts';
 import { demolish, moveBuilding, moveProblem, packTime, recruitProblem, tileAt } from '../src/sim/index.ts';
 import { allyPath, fullStock, regrow, replant, replantProblem, sourceOf, stage, worldToHex } from '../src/sim/index.ts';
 import { MODES, saveInfo, waveInterval } from '../src/sim/index.ts';
-import { legacyRifts, openRifts, sideName } from '../src/sim/index.ts';
+import { computeFlow, damageMonster, legacyRifts, openRifts, sideName } from '../src/sim/index.ts';
 import type { Tile } from '../src/sim/index.ts';
 import type { Monster, MonsterKind, World } from '../src/sim/index.ts';
 
@@ -325,6 +326,12 @@ describe('fim de onda (Etapa 4)', () => {
 
   it('quem cai entra no relatório com nome', () => {
     const w = createWorld(21);
+    // Sem fuga (2026-11-09), para o aldeão longe do castelo cair mesmo.
+    const flee = CONFIG.flee.radius;
+    CONFIG.flee.radius = 0;
+    onTestFinished(() => {
+      CONFIG.flee.radius = flee;
+    });
     for (const b of [...w.buildings.values()]) if (b.kind === 'fazenda') b.workers = [];
     const u = [...w.units.values()][0]!;
     u.x = 0;
@@ -354,13 +361,48 @@ describe('onde dá para construir', () => {
 });
 
 describe('ondas', () => {
-  it('crescem sem fim e trazem monstros novos', () => {
-    expect(waveSize(1)).toEqual({ esqueleto: 7, lobisomem: 0, orc: 0, bruto: 0, morcego: 0, bruxa: 0, troll: 0, necromante: 0, golem: 0, golemOssos: 0 });
+  it('crescem até o teto e trazem monstros novos', () => {
+    expect(waveSize(1)).toEqual({ esqueleto: 8, esqueletoGuerreiro: 0, lobisomem: 0, orc: 0, acumulador: 0, bruto: 0, morcego: 0, bruxa: 0, troll: 0, necromante: 0, vampiro: 0, golem: 0, golemOssos: 0, golemMusgo: 0 });
     const w8 = waveSize(8);
     expect(w8.bruto).toBe(1);
     expect(w8.orc).toBeGreaterThan(0);
     const total = (n: number) => Object.values(waveSize(n)).reduce((a, b) => a + b, 0);
     expect(total(30)).toBeGreaterThan(total(10));
+  });
+
+  it('da onda 20 em diante crescem mais devagar e da 30 em diante param (2026-11-09)', () => {
+    const W = CONFIG.waves;
+    const total = (n: number) => Object.values(waveSize(n)).reduce((a, b) => a + b, 0);
+    // Até a 20, três a mais por onda; depois, um e meio.
+    expect(total(19) - total(18)).toBe(3);
+    expect(total(26) - total(24)).toBe(3);
+    expect(monsterHpMul(21) / monsterHpMul(20)).toBeCloseTo(W.hpGrowthLate, 6);
+    // Teto: a 31 e a 44 (sem chefe) são iguais à onda do teto na quantidade e na mistura.
+    const cap = waveSize(W.capFrom);
+    expect(waveSize(31)).toEqual({ ...cap, golemOssos: 0 });
+    expect(waveSize(44)).toEqual(waveSize(31));
+    expect(monsterHpMul(80)).toBe(monsterHpMul(W.capFrom));
+    // Os chefes continuam vindo depois do teto, em rodízio (gelo, ossos, musgo), com a vida em linha.
+    expect(waveSize(45).golemMusgo).toBe(1);
+    expect(waveSize(60).golem).toBe(1);
+    expect(waveSize(75).golemOssos).toBe(1);
+    expect(monsterHpMul(15, 'normal', true)).toBeCloseTo(1 + W.bossGrowth * 14, 6);
+    expect(monsterHpMul(60, 'normal', true)).toBe(monsterHpMul(W.capFrom, 'normal', true));
+    expect(monsterHpMul(15, 'normal', true)).toBeLessThan(monsterHpMul(15));
+  });
+
+  it('ao vencer a onda do teto, avisa que a horda não cresce mais', () => {
+    const w = createWorld(12);
+    w.wave = CONFIG.waves.capFrom - 1;
+    w.waveTimer = 0.01;
+    step(w);
+    expect(w.wave).toBe(CONFIG.waves.capFrom);
+    w.spawnQueue = [];
+    w.monsters.clear();
+    w.waveState = 'attack';
+    w.events.length = 0;
+    step(w);
+    expect(w.events.some((e) => e.type === 'toast' && e.text.startsWith('A horda chegou à força máxima'))).toBe(true);
   });
 
   it('o castelo sozinho aguenta a primeira onda', () => {
@@ -725,6 +767,280 @@ describe('arqueiros e torres', () => {
     run(w, 25, () => us.every((u) => u.state === 'tower'));
     expect(us.every((u) => u.state === 'tower')).toBe(true);
     expect(callArchers(w, t.id)).toContain('Nenhum arqueiro no chão');
+  });
+});
+
+describe('aldeões fogem sozinhos (2026-11-09)', () => {
+  function monster(w: World, kind: MonsterKind, x: number, z: number) {
+    const def = MONSTERS[kind];
+    const m: Monster = { id: w.nextId++, kind, x, z, hp: def.hp, maxHp: def.hp, speed: 0, dmg: def.dmg, cd: 0, state: 'walk', facing: 0, deadT: 0, burnT: 99, healT: 0, summonT: 0, owner: -1 };
+    w.monsters.set(m.id, m);
+    return m;
+  }
+
+  it('monstro perto: o aldeão larga o trabalho, se esconde e volta quando passa', () => {
+    const w = createWorld(31);
+    calm(w);
+    castle(w)!.cd = 1e9;
+    run(w, 20);
+    const u = [...w.units.values()].find((x) => x.kind === 'trabalhador' && x.state === 'work')!;
+    expect(u).toBeTruthy();
+    const job = u.job;
+    // Um esqueleto parado a 3 m dele, do lado de fora (longe do castelo).
+    const out = Math.hypot(u.x, u.z) || 1;
+    const m = monster(w, 'esqueleto', u.x + (u.x / out) * 3, u.z + (u.z / out) * 3);
+    run(w, 20, () => u.state === 'shelter');
+    expect(u.state).toBe('shelter');
+    expect(u.hp).toBeGreaterThan(0);
+    const hide = w.buildings.get(u.hideIn!)!;
+    expect(['casa', 'castelo']).toContain(hide.kind);
+    // Escondido, o monstro não o enxerga; sem monstro por perto, ele sai e volta ao mesmo trabalho.
+    m.state = 'dead';
+    w.monsters.delete(m.id);
+    run(w, 20, () => u.state === 'work');
+    expect(u.state).toBe('work');
+    expect(u.job).toBe(job);
+    expect(u.hideIn).toBeUndefined();
+  });
+
+  it('liberar o recolhimento tira da casa quem tinha corrido para ela', () => {
+    const w = createWorld(32);
+    calm(w);
+    const casa = [...w.buildings.values()].find((b) => b.kind === 'casa' && b.built >= 1);
+    const u = [...w.units.values()].find((x) => x.kind === 'trabalhador')!;
+    const at = casa ?? castle(w)!;
+    u.state = 'shelter';
+    u.hideIn = at.id;
+    toggleShelter(w);
+    toggleShelter(w);
+    expect(u.state).toBe('idle');
+    expect(u.hideIn).toBeUndefined();
+    const c = hexToWorld(at.q, at.r);
+    expect(Math.hypot(u.x - c.x, u.z - c.z)).toBeLessThan(2.5);
+  });
+});
+
+describe('horda não empaca (2026-11-09)', () => {
+  it('não persegue quem está dentro de um prédio onde ela não entra', () => {
+    const w = createWorld(41);
+    calm(w);
+    castle(w)!.cd = 1e9;
+    // O soldado fica parado na porta do quartel, sem sair para lutar (como quando o monstro está
+    // num bolsão fora do alcance dele).
+    const engage = CONFIG.soldierEngage;
+    const hold = CONFIG.holdEngage;
+    CONFIG.soldierEngage = 0;
+    CONFIG.holdEngage = 0;
+    onTestFinished(() => {
+      CONFIG.soldierEngage = engage;
+      CONFIG.holdEngage = hold;
+    });
+    // Um quartel com um hexágono livre do lado de fora (mais longe do castelo).
+    let q: ReturnType<typeof addBuilding> | null = null;
+    let out: { x: number; z: number } | null = null;
+    for (const p of freeGrass(w, 40, 3, 6)) {
+      const c = hexToWorld(p.q, p.r);
+      const away = DIRS.map(([dq, dr]) => ({ q: p.q + dq, r: p.r + dr })).find((n) => {
+        const t = tileAt(w, n.q, n.r);
+        const nc = hexToWorld(n.q, n.r);
+        return t && t.terrain === 'grass' && t.b < 0 && Math.hypot(nc.x, nc.z) > Math.hypot(c.x, c.z) + 1;
+      });
+      if (!away) continue;
+      q = addBuilding(w, 'quartel', p.q, p.r, 1);
+      const nc = hexToWorld(away.q, away.r);
+      const d = Math.hypot(nc.x - c.x, nc.z - c.z);
+      out = { x: c.x + ((nc.x - c.x) / d) * 1.1, z: c.z + ((nc.z - c.z) / d) * 1.1 };
+      break;
+    }
+    expect(q && out).toBeTruthy();
+    computeFlow(w);
+    const qc = hexToWorld(q!.q, q!.r);
+    const s = addUnit(w, 'soldado', qc.x, qc.z);
+    s.postX = qc.x;
+    s.postZ = qc.z;
+    s.order = 2;
+    const def = MONSTERS.esqueleto;
+    const m: Monster = { id: w.nextId++, kind: 'esqueleto', x: out!.x, z: out!.z, hp: 1e6, maxHp: 1e6, speed: def.speed, dmg: def.dmg, cd: 0, state: 'walk', facing: 0, deadT: 0, burnT: 99, healT: 0, summonT: 0, owner: -1 };
+    w.monsters.set(m.id, m);
+    const from = { x: m.x, z: m.z };
+    const hp = q!.hp;
+    run(w, 4);
+    // Ou bateu no quartel, ou seguiu o caminho até o castelo; parado na beira, andando, não.
+    const moved = Math.hypot(m.x - from.x, m.z - from.z);
+    expect(moved > 1 || q!.hp < hp).toBe(true);
+  });
+});
+
+describe('inimigos novos (2026-11-09)', () => {
+  function monster(w: World, kind: MonsterKind, x: number, z: number, hp?: number) {
+    const def = MONSTERS[kind];
+    const h = hp ?? def.hp;
+    const m: Monster = { id: w.nextId++, kind, x, z, hp: h, maxHp: h, speed: def.speed, dmg: def.dmg, cd: 0, state: 'walk', facing: 0, deadT: 0, burnT: 99, healT: 1, summonT: 3, owner: -1, homeX: x, homeZ: z - 30 };
+    w.monsters.set(m.id, m);
+    return m;
+  }
+
+  it('entram nas ondas: guerreiro da 6, acumulador da 7, vampiro da 18 e golem de musgo na 45', () => {
+    expect(waveSize(5).esqueletoGuerreiro).toBe(0);
+    expect(waveSize(10).esqueletoGuerreiro).toBeGreaterThan(0);
+    expect(waveSize(10).esqueleto).toBeGreaterThan(0);
+    expect(waveSize(6).acumulador).toBe(0);
+    expect(waveSize(7).acumulador).toBe(1);
+    expect(waveSize(17).vampiro).toBe(0);
+    expect(waveSize(18).vampiro).toBe(1);
+    expect(waveSize(29).vampiro).toBe(2);
+    expect(waveSize(19).acumulador).toBe(2);
+    expect(waveSize(45).golemMusgo).toBe(1);
+  });
+
+  it('o esqueleto guerreiro sente menos a flecha e a espada inteira', () => {
+    const w = createWorld(61);
+    const a = monster(w, 'esqueletoGuerreiro', 30, 30, 100);
+    const b = monster(w, 'esqueletoGuerreiro', 31, 30, 100);
+    damageMonster(w, a, 20, 'arrow');
+    damageMonster(w, b, 20, 'melee');
+    expect(a.hp).toBeCloseTo(100 - 20 * MONSTERS.esqueletoGuerreiro.arrowResist!, 6);
+    expect(b.hp).toBe(80);
+  });
+
+  it('o acumulador rouba no prédio, foge e, derrubado, devolve tudo', () => {
+    const w = createWorld(62);
+    calm(w);
+    castle(w)!.cd = 1e9;
+    w.res.madeira = 500;
+    w.res.ouro = 0;
+    const c = hexToWorld(castle(w)!.q, castle(w)!.r);
+    const m = monster(w, 'acumulador', c.x + 1.3, c.z);
+    run(w, 1, () => !!m.loot);
+    expect(m.loot).toBeTruthy();
+    const n = m.loot!.n;
+    expect(n).toBeGreaterThan(0);
+    expect(m.loot!.res).toBe('madeira');
+    expect(w.res.madeira).toBe(500 - n);
+    // Fugindo: anda para longe do castelo.
+    const d0 = Math.hypot(m.x - c.x, m.z - c.z);
+    run(w, 2);
+    expect(Math.hypot(m.x - c.x, m.z - c.z)).toBeGreaterThan(d0);
+    damageMonster(w, m, 1e6);
+    expect(w.res.madeira).toBe(500);
+  });
+
+  it('o acumulador que chega à fenda some com o roubo', () => {
+    const w = createWorld(63);
+    calm(w);
+    const m = monster(w, 'acumulador', 0, 6);
+    m.loot = { res: 'pedra', n: 40 };
+    m.fleeT = 10;
+    m.homeX = 0;
+    m.homeZ = 6.5;
+    const pedra = w.res.pedra;
+    step(w);
+    expect(w.monsters.has(m.id)).toBe(false);
+    expect(w.res.pedra).toBe(pedra);
+  });
+
+  it('o vampiro chama morcegos e se cura com o golpe', () => {
+    const w = createWorld(64);
+    calm(w);
+    castle(w)!.cd = 1e9;
+    const v = monster(w, 'vampiro', 20, 20, 600);
+    v.summonT = 0.05;
+    step(w);
+    step(w);
+    const bats = [...w.monsters.values()].filter((o) => o.kind === 'morcego' && o.owner === v.id);
+    expect(bats.length).toBe(2);
+    // Um soldado forte colado nele: cada golpe devolve vida.
+    const s = addUnit(w, 'soldado', v.x + 0.4, v.z);
+    s.hp = s.maxHp = 1e6;
+    v.hp = 300;
+    v.cd = 0;
+    const engage = CONFIG.soldierEngage;
+    CONFIG.soldierEngage = 0;
+    onTestFinished(() => {
+      CONFIG.soldierEngage = engage;
+    });
+    step(w);
+    expect(v.hp).toBeGreaterThan(300);
+  });
+});
+
+describe('tropas novas: lanceiro e anão (2026-11-09)', () => {
+  function monster(w: World, kind: MonsterKind, x: number, z: number, hp = 5000) {
+    const m: Monster = { id: w.nextId++, kind, x, z, hp, maxHp: hp, speed: 0, dmg: 0, cd: 99, state: 'walk', facing: 0, deadT: 0, burnT: 99, healT: 99, summonT: 99, owner: -1 };
+    w.monsters.set(m.id, m);
+    return m;
+  }
+  /** Tropa parada num ponto, longe do castelo (ordem do jogador). */
+  function troop(w: World, kind: 'lanceiro' | 'anao' | 'soldado', x: number, z: number) {
+    const u = addUnit(w, kind, x, z);
+    u.postX = x;
+    u.postZ = z;
+    u.order = 2;
+    u.cd = 0;
+    return u;
+  }
+
+  it('acampamento treina lanceiro; torre de pólvora pede castelo nível 2 e treina anão', () => {
+    expect(BUILDINGS.acampamento.recruits).toBe('lanceiro');
+    expect(BUILDINGS.polvora.recruits).toBe('anao');
+    expect(BUILDINGS.polvora.needsLevel).toBe(2);
+  });
+
+  it('o lanceiro bate mais forte no orc bruto que no esqueleto', () => {
+    const w = createWorld(71);
+    calm(w);
+    castle(w)!.cd = 1e9;
+    const a = monster(w, 'bruto', 20.6, 20);
+    troop(w, 'lanceiro', 20, 20);
+    step(w);
+    const big = 5000 - a.hp;
+    const w2 = createWorld(71);
+    calm(w2);
+    castle(w2)!.cd = 1e9;
+    const b = monster(w2, 'esqueleto', 20.6, 20);
+    troop(w2, 'lanceiro', 20, 20);
+    step(w2);
+    const small = 5000 - b.hp;
+    expect(small).toBeGreaterThan(0);
+    expect(big).toBeCloseTo(small * CONFIG.spear.bigMul, 6);
+  });
+
+  it('o anão acerta quem voa, fere o golem de gelo e atravessa o escudo', () => {
+    const w = createWorld(72);
+    calm(w);
+    castle(w)!.cd = 1e9;
+    const g = monster(w, 'golem', 24, 20);
+    troop(w, 'anao', 20, 20);
+    step(w);
+    expect(g.hp).toBeCloseTo(5000 - UNITS.anao.dmg, 6);
+    const w2 = createWorld(72);
+    calm(w2);
+    castle(w2)!.cd = 1e9;
+    const bat = monster(w2, 'morcego', 24, 20);
+    troop(w2, 'anao', 20, 20);
+    step(w2);
+    expect(bat.hp).toBeLessThan(5000);
+    const w3 = createWorld(72);
+    calm(w3);
+    castle(w3)!.cd = 1e9;
+    const sk = monster(w3, 'esqueletoGuerreiro', 24, 20);
+    troop(w3, 'anao', 20, 20);
+    step(w3);
+    expect(sk.hp).toBeCloseTo(5000 - UNITS.anao.dmg, 6);
+  });
+
+  it('o tiro respinga em quem está colado no alvo', () => {
+    const w = createWorld(73);
+    calm(w);
+    castle(w)!.cd = 1e9;
+    const a = monster(w, 'esqueleto', 24, 20);
+    const b = monster(w, 'esqueleto', 24.5, 20);
+    const far = monster(w, 'esqueleto', 27, 20);
+    troop(w, 'anao', 20, 20);
+    step(w);
+    expect(a.hp).toBeCloseTo(5000 - UNITS.anao.dmg, 6);
+    expect(b.hp).toBeCloseTo(5000 - UNITS.anao.dmg * CONFIG.gun.splashMul, 6);
+    expect(far.hp).toBe(5000);
   });
 });
 
@@ -1202,10 +1518,14 @@ describe('modo fácil (Etapa 18)', () => {
     const n = createWorld(91);
     const f = createWorld(91, undefined, 'facil');
     expect(f.mode).toBe('facil');
-    expect(f.res.madeira).toBe(Math.round(n.res.madeira * MODES.facil.start));
+    // Rebalanceamento de 2026-11-09: o fácil guarda o começo de antes; o normal ficou mais curto.
+    expect(f.res).toEqual(MODES.facil.start);
+    expect(n.res).toEqual(MODES.normal.start);
+    expect(f.res.madeira).toBeGreaterThan(n.res.madeira);
     expect(castle(f)!.maxHp).toBe(Math.round(castle(n)!.maxHp * MODES.facil.castleHp));
     expect(castle(f)!.hp).toBe(castle(f)!.maxHp);
-    expect(f.waveTimer).toBe(n.waveTimer + MODES.facil.calm);
+    expect(f.waveTimer).toBe(MODES.facil.first + MODES.facil.calm);
+    expect(f.waveTimer).toBeGreaterThan(n.waveTimer);
     // O mapa é o mesmo (a semente manda).
     expect(f.list.map((t) => t.terrain)).toEqual(n.list.map((t) => t.terrain));
   });
@@ -1226,7 +1546,7 @@ describe('modo fácil (Etapa 18)', () => {
   it('ondas mais leves: menos monstros, chefe a cada 20, modificadores só da 20 em diante', () => {
     const total = (n: number, m: 'normal' | 'facil') => Object.values(waveSize(n, m)).reduce((a, b) => a + b, 0);
     expect(total(10, 'facil')).toBeLessThan(total(10, 'normal'));
-    expect(total(10, 'facil')).toBeCloseTo(total(10, 'normal') * MODES.facil.monsters, -1);
+    expect(total(10, 'facil')).toBeCloseTo((MODES.facil.base + MODES.facil.perWave * 10) * MODES.facil.monsters, -1);
     expect(waveSize(15, 'facil').golem).toBe(0);
     expect(waveSize(20, 'facil').golem).toBe(1);
     expect(waveSize(15, 'normal').golem).toBe(1);
@@ -1301,7 +1621,7 @@ describe('fendas sorteadas (2026-11-07)', () => {
 
   it('a fenda nova avisa de que lado abriu', () => {
     const w = createWorld(11);
-    w.wave = CONFIG.waves.riftOpens[1]! - 1;
+    w.wave = MODES.normal.riftOpens[1]! - 1;
     w.waveTimer = 0.01;
     step(w);
     expect(openRifts(w.wave)).toBe(2);

@@ -47,7 +47,7 @@ export interface VillagePlan {
 
 export const HOUSE_SCALE = 1.15;
 /** Prédios que a rua liga ao castelo: as casas e os de treinar e equipar a tropa. */
-export const LINKED: ReadonlySet<BuildingKind> = new Set<BuildingKind>(['casa', 'quartel', 'campo', 'capela', 'estabulo', 'forja', 'oficina']);
+export const LINKED: ReadonlySet<BuildingKind> = new Set<BuildingKind>(['casa', 'quartel', 'campo', 'capela', 'estabulo', 'forja', 'oficina', 'acampamento', 'polvora']);
 /** Bairro com tantas casas ganha taverna e mercado. */
 export const TAVERN_AT = 5;
 export const MARKET_AT = 8;

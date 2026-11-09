@@ -1579,3 +1579,80 @@ button.chip {
   cursor: pointer;
 }
 
+
+/* O Sábio (2026-11-09): retrato no canto de baixo à esquerda e a dica em figuras ao lado. */
+.guide {
+  position: fixed;
+  left: calc(12px + env(safe-area-inset-left));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 34;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: min(440px, calc(100vw - 150px));
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  animation: guide-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.guide-face {
+  flex: none;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #f6e7c4, #c9a56a);
+  box-shadow: 0 0 0 3px var(--gold), 0 6px 18px rgba(0, 0, 0, 0.5);
+  object-fit: cover;
+}
+.guide-bubble {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 18px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: #fff8ea;
+  color: #2b1f14;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+.guide-bubble::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  bottom: 14px;
+  border: 8px solid transparent;
+  border-right-color: #fff8ea;
+  border-left: 0;
+}
+.guide-icons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.guide-icons .ico {
+  width: 34px;
+  height: 34px;
+  color: #6a3f12;
+}
+.guide-arrow {
+  font-size: 1.3rem;
+  color: #b07a2a;
+}
+.guide-text {
+  font-size: 0.85rem;
+  line-height: 1.25;
+}
+@keyframes guide-in {
+  from {
+    transform: translateY(30px) scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}

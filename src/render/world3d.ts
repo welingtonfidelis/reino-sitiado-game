@@ -5,12 +5,13 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BUILDINGS, CONFIG, CROPS, DIRS, HEX, cropOf, farmStage, hexToWorld, isHero, openRifts, resourceDir, stage, tileAt } from '../sim/index.ts';
-import type { Building, BuildingKind, Crop, MonsterKind, SimEvent, UnitKind, World } from '../sim/index.ts';
+import { BUILDINGS, CONFIG, CROPS, DIRS, HEX, MONSTERS, cropOf, farmStage, hexToWorld, isHero, openRifts, resourceDir, stage, tileAt } from '../sim/index.ts';
+import type { Building, BuildingKind, Crop, MonsterKind, Res, SimEvent, UnitKind, World } from '../sim/index.ts';
 import type { Art, CharKey, StaticKey, StaticModel, StaticPart } from './assets.ts';
 import { CharView } from './chars.ts';
 import { buildGround, paintVillage } from './ground.ts';
 import { Bubbles } from './bubbles.ts';
+import type { BubbleIcon } from './bubbles.ts';
 import { planVillage } from './village.ts';
 import type { Home } from './village.ts';
 import { SEASON_U, SeasonLook, Weather, leafy, snowy, weatherOf } from './season.ts';
@@ -140,6 +141,8 @@ const HOME: Record<BuildingKind, StaticKey> = {
   estabulo: 'estabulo',
   forja: 'forja',
   oficina: 'oficina',
+  acampamento: 'acampamento',
+  polvora: 'polvora',
   catapulta: 'catapulta',
   piche: 'obra',
   estacas: 'obra',
@@ -153,7 +156,7 @@ const HOME: Record<BuildingKind, StaticKey> = {
 function idlePose(kind: UnitKind, id: number, t: number): Pose {
   if (kind === 'trabalhador') return 'sit';
   const phase = (t + id * 3.7) % 18;
-  if (kind === 'soldado' || kind === 'cavaleiro' || kind === 'barbaro' || kind === 'cavaleiroNegro') return phase < 4 ? 'pushups' : 'idle';
+  if (kind === 'soldado' || kind === 'lanceiro' || kind === 'cavaleiro' || kind === 'barbaro' || kind === 'cavaleiroNegro') return phase < 4 ? 'pushups' : 'idle';
   return phase < 2.5 ? 'wave' : 'idle';
 }
 
@@ -171,12 +174,15 @@ function farmAngle(w: World, b: Building): number {
 }
 
 /** Pose de luta por tipo (os heróis usam as de duas mãos). */
-const FIGHT_POSE: Partial<Record<UnitKind, Pose>> = { arqueiro: 'shoot', mago: 'cast', clerigo: 'heal', atiradora: 'shoot2', barbaro: 'chop2', druida: 'cast' };
+const FIGHT_POSE: Partial<Record<UnitKind, Pose>> = { arqueiro: 'shoot', mago: 'cast', clerigo: 'heal', atiradora: 'shoot2', barbaro: 'chop2', druida: 'cast', lanceiro: 'stab', anao: 'shoot2' };
 /**
  * Golpe dos monstros que não brandem arma (revisão de 2026-11-08): a bruxa e o necromante
  * lançam magia, e o lobisomem arranha com as duas garras.
  */
 const MONSTER_ATTACK: Partial<Record<MonsterKind, Pose>> = { bruxa: 'cast', necromante: 'cast', lobisomem: 'claw' };
+
+/** Balão do acumulador: o desenho do recurso que ele leva. */
+const LOOT_ICON: Record<Res, BubbleIcon> = { madeira: 'arvore', pedra: 'pedra', ferro: 'ferro', cristal: 'cristal', comida: 'trigo', ouro: 'ouro' };
 /** Tamanho dos golpes especiais na tela (o giro cobre o raio do golpe). */
 const SPECIAL_SCALE: Record<'giro' | 'chuva' | 'raizes' | 'pisao', number> = { giro: 1.4, chuva: 1.3, raizes: 0.9, pisao: 1.8 };
 
@@ -201,7 +207,7 @@ const PLATFORM: [number, number][] = [
   [0.17, -0.17],
 ];
 
-const TOP: Partial<Record<BuildingKind, number>> = { catapulta: 1.6, piche: 0.3, estacas: 0.6, castelo: 4.1, torre: 2.6, quartel: 1.7, campo: 1.8, muralha: 1.2, portao: 1.4, torreMago: 2.4, capela: 1.9, estabulo: 1.3, forja: 1.4, oficina: 1.3 };
+const TOP: Partial<Record<BuildingKind, number>> = { acampamento: 1.3, polvora: 2.0, catapulta: 1.6, piche: 0.3, estacas: 0.6, castelo: 4.1, torre: 2.6, quartel: 1.7, campo: 1.8, muralha: 1.2, portao: 1.4, torreMago: 2.4, capela: 1.9, estabulo: 1.3, forja: 1.4, oficina: 1.3 };
 
 /** Fosso de piche (Etapa 9): mancha escura e lustrosa no chão. */
 function pitchModel(): StaticModel {
@@ -431,7 +437,7 @@ export class World3D {
     // Etapa 17: toras onde a floresta acabou.
     for (const k of ['toras', 'torasB'] as StaticKey[]) big(k, 300);
     for (const k of ['feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote'] as StaticKey[]) big(k, 120);
-    for (const k of ['castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina'] as StaticKey[]) big(k, 200);
+    for (const k of ['castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'acampamento', 'polvora'] as StaticKey[]) big(k, 200);
     big('casteloOuro', 4);
     big('estandarte', 8);
     this.crystals = new Instanced(scene, crystalModel(), 200, true, false);
@@ -631,7 +637,7 @@ export class World3D {
   syncStatic(w: World): void {
     if (w.ver === this.ver) return;
     this.ver = w.ver;
-    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casteloOuro', 'estandarte', 'casaA', 'casaB', 'fazenda', 'moinho', 'feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'catapulta', 'poco', 'taverna', 'mercado', 'barril', 'caixa', 'balde', 'arvoreE', 'arvoreF', 'toras', 'torasB'];
+    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casteloOuro', 'estandarte', 'casaA', 'casaB', 'fazenda', 'moinho', 'feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'acampamento', 'polvora', 'catapulta', 'poco', 'taverna', 'mercado', 'barril', 'caixa', 'balde', 'arvoreE', 'arvoreF', 'toras', 'torasB'];
     // Etapa 17: o terreno mudou (recurso acabou ou brotou): refaz o chão antes de pintar a vila.
     if (w.land !== this.land) this.rebuildGround(w);
     for (const k of keys) this.sets.get(k)!.begin();
@@ -687,6 +693,8 @@ export class World3D {
     // Vila: casas viradas para a trilha, quintal com enfeites, poço, taverna e mercado.
     const village = planVillage(w);
     for (const v of village.pieces) this.place(v.key, v.x, 0, v.z, v.rot, v.scale, v.id);
+    // Portas das casas: onde os elfos do inverno passeiam.
+    this.doors = [...village.homes.values()].map((h) => ({ x: h.x + Math.sin(h.rot) * 0.95, z: h.z + Math.cos(h.rot) * 0.95 }));
     paintVillage(village.yards, village.trails);
     this.movers.clear();
     this.wallsMoving = false;
@@ -868,12 +876,17 @@ export class World3D {
       for (const [i, t0] of this.sprouting) if (this.time - t0 > SPROUT_TIME + 0.1) this.sprouting.delete(i);
     }
     // Prédio sem recurso: balão com o recurso riscado em cima dele (some na mudança).
-    const dry = new Map<number, { icon: 'semMadeira' | 'semPedra' | 'semFerro' | 'semComida'; x: number; y: number; z: number }>();
+    const dry = new Map<number, { icon: BubbleIcon; x: number; y: number; z: number }>();
     for (const b of w.buildings.values()) {
       if (!b.dry || b.moveTo || b.moved) continue;
       const p = hexToWorld(b.q, b.r);
       const icon = b.kind === 'serraria' ? 'semMadeira' : b.kind === 'pedreira' ? 'semPedra' : b.kind === 'fazenda' ? 'semComida' : 'semFerro';
       dry.set(b.id, { icon, x: p.x, y: b.kind === 'fazenda' ? 0.35 : this.topOf(b) + 0.9, z: p.z });
+    }
+    // Acumulador fugindo: o que ele leva aparece num balão em cima da mochila (2026-11-09).
+    for (const m of w.monsters.values()) {
+      if (m.state === 'dead' || !m.loot || m.loot.n <= 0) continue;
+      dry.set(m.id, { icon: LOOT_ICON[m.loot.res], x: m.x, y: 1.35, z: m.z });
     }
     this.bubbles.sync(dry, this.time);
   }
@@ -1084,6 +1097,12 @@ export class World3D {
         fx.play('poof', p.x, 0.1, p.z, { scale: 1.2 });
       }
       else if (e.type === 'monsterFx') fx.play(e.fx, e.x, 0, e.z);
+      else if (e.type === 'gun') {
+        // Espingarda do anão: fumaça na boca do cano e faísca onde o tiro pega.
+        const d = Math.hypot(e.x2 - e.x1, e.z2 - e.z1) || 1;
+        fx.play('poof', e.x1 + ((e.x2 - e.x1) / d) * 0.55, 0.3, e.z1 + ((e.z2 - e.z1) / d) * 0.55, { scale: 0.18 });
+        fx.play('faisca', e.x2, e.fly ? CONFIG.flyHeight : 0.3, e.z2, { scale: 0.7 });
+      }
       else if (e.type === 'special') {
         fx.play(e.fx, e.x, 0, e.z, { scale: SPECIAL_SCALE[e.fx] });
         if (e.fx === 'giro') this.spinUntil.set(e.id, this.time + 0.9);
@@ -1324,8 +1343,8 @@ export class World3D {
     }
     for (const m of w.monsters.values()) {
       if (m.state === 'dead' || m.hp >= m.maxHp) continue;
-      const big = m.kind === 'golem' || m.kind === 'golemOssos';
-      const h = big ? 2.3 : m.kind === 'troll' ? 1.5 : m.kind === 'bruto' ? 1.35 : m.kind === 'morcego' ? CONFIG.flyHeight + 0.45 : 0.9;
+      const big = !!MONSTERS[m.kind].boss;
+      const h = big ? 2.3 : m.kind === 'troll' ? 1.5 : m.kind === 'bruto' ? 1.35 : m.kind === 'vampiro' ? 1.1 : m.kind === 'morcego' ? CONFIG.flyHeight + 0.45 : 0.9;
       this.bars.add(m.x, h, m.z, big ? 1.4 : 0.5, m.hp / m.maxHp, '#e2675a');
     }
     this.bars.end();
@@ -1385,17 +1404,18 @@ export class World3D {
         this.pitchFire.delete(id);
       }
       // Portais nas fendas abertas.
-      const openNow = openRifts(Math.max(1, w.wave + (w.waveState === 'calm' ? 1 : 0)));
+      const openNow = openRifts(Math.max(1, w.wave + (w.waveState === 'calm' ? 1 : 0)), w.mode);
       while (this.portals.length < Math.min(openNow, w.rifts.length)) {
         const t = w.tiles[w.rifts[this.portals.length]!]!;
         const p = hexToWorld(t.q, t.r);
         this.portals.push(fx.play('portal', p.x, 0, p.z, { loop: true }));
       }
       this.stepLife(w, fxDt);
+      this.stepElves(w, fxDt);
       fx.update(fxDt, this.pxPerMeter);
     }
     // Fendas: só brilham as abertas.
-    const open = openRifts(Math.max(1, w.wave + (w.waveState === 'calm' ? 1 : 0)));
+    const open = openRifts(Math.max(1, w.wave + (w.waveState === 'calm' ? 1 : 0)), w.mode);
     this.rifts.forEach((rim, k) => {
       const mat = rim.material as THREE.MeshBasicMaterial;
       mat.opacity = k < open ? 0.75 + 0.25 * Math.sin(this.time * 3 + k) : 0.25;
@@ -1453,6 +1473,46 @@ export class World3D {
   }
 
   private butterflies = new Map<number, number>();
+  /** Elfos do inverno (2026-11-09): vão de porta em porta entre as ondas e acenam ao chegar. */
+  private doors: { x: number; z: number }[] = [];
+  private elves: { v: CharView; x: number; z: number; to: number; wait: number }[] = [];
+
+  private stepElves(w: World, dt: number): void {
+    const want = this.extras && this.season === 3 && w.waveState === 'calm' && !w.lost && this.doors.length >= 2 ? Math.min(4, 1 + Math.floor(this.doors.length / 2)) : 0;
+    while (this.elves.length > want) {
+      const e = this.elves.pop()!;
+      this.fx?.play('poof', e.x, 0.3, e.z, { scale: 0.6 });
+      this.scene.remove(e.v.root);
+      e.v.dispose();
+    }
+    while (this.elves.length < want) {
+      const k = this.elves.length;
+      const from = this.doors[(k * 3) % this.doors.length]!;
+      const v = new CharView(this.art, k % 2 ? 'elfoB' : 'elfoA');
+      this.scene.add(v.root);
+      this.elves.push({ v, x: from.x, z: from.z, to: (k * 3 + 1) % this.doors.length, wait: 0.5 + k * 0.7 });
+    }
+    for (const e of this.elves) {
+      const d = this.doors[e.to % this.doors.length]!;
+      const dist = Math.hypot(d.x - e.x, d.z - e.z);
+      let pose: Pose = 'walk';
+      if (e.wait > 0) {
+        e.wait -= dt;
+        pose = 'wave';
+        if (e.wait <= 0) e.to = Math.floor(Math.random() * this.doors.length);
+      } else if (dist < 0.1) {
+        e.wait = 1.5 + Math.random() * 2;
+      } else {
+        const s = Math.min(dist, 0.9 * dt);
+        e.x += ((d.x - e.x) / dist) * s;
+        e.z += ((d.z - e.z) / dist) * s;
+        e.v.root.rotation.y = Math.atan2(d.x - e.x, d.z - e.z);
+      }
+      e.v.root.position.set(e.x, 0, e.z);
+      e.v.play(pose);
+      e.v.update(dt);
+    }
+  }
   private birds: { slot: number; x: number; z: number; vx: number; vz: number; y: number }[] = [];
   private fishT = 2;
   private waterSpots: { x: number; z: number }[] = [];
@@ -1623,6 +1683,11 @@ export class World3D {
     }
     this.chars.clear();
     this.flights = [];
+    for (const e of this.elves) {
+      this.scene.remove(e.v.root);
+      e.v.dispose();
+    }
+    this.elves = [];
   }
 }
 

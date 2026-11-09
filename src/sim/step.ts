@@ -3,7 +3,7 @@
  * ondas, horda, tropas e defesas. Os eventos vão para `w.events`; quem chama esvazia.
  */
 import { BUILDINGS, CONFIG, MODES, MONSTERS, UNITS, isHero } from './config.ts';
-import type { BuildingKind, HeroKind, Mode, MonsterKind, UnitKind } from './config.ts';
+import type { BuildingKind, HeroKind, Mode, MonsterDef, MonsterKind, Res, UnitKind } from './config.ts';
 import { hexDist, hexToWorld, worldToHex } from './hex.ts';
 import { allyPath, computeFlow, computeReach } from './path.ts';
 import { BLESSING_EVERY, BLESSING_IDS, emptyStats, epitaph } from './blessings.ts';
@@ -470,24 +470,35 @@ function killUnit(w: World, u: Unit): void {
   if (u.kind !== 'trabalhador') toast(w, `Um ${UNITS[u.kind].name.toLowerCase()} caiu.`, 'bad');
 }
 
-export type DmgSrc = 'arrow' | 'magic' | 'melee' | 'siege' | 'fire';
+export type DmgSrc = 'arrow' | 'magic' | 'melee' | 'siege' | 'fire' | 'tiro';
 
-function damageMonster(w: World, m: Monster, dmg: number, src: DmgSrc = 'melee'): void {
+export function damageMonster(w: World, m: Monster, dmg: number, src: DmgSrc = 'melee'): void {
   if (m.state === 'dead') return;
   const def = MONSTERS[m.kind];
   if ((src === 'arrow' && def.immuneArrows) || (src === 'magic' && def.immuneMagic)) return;
+  if (src === 'arrow' && def.arrowResist) dmg *= def.arrowResist;
   // Magia (e flecha em brasa) queima: o troll para de se curar.
   if (src === 'magic' || src === 'fire' || (src === 'arrow' && w.blessings.includes('brasa'))) m.burnT = 0;
-  // Blindados (modificador de onda): a horda sente menos dano.
-  m.hp -= dmg * (w.waveMods.includes('blindados') ? CONFIG.waveMods.armor : 1);
+  // Blindados (modificador de onda): a horda sente menos dano (o tiro do anão atravessa).
+  m.hp -= dmg * (src !== 'tiro' && w.waveMods.includes('blindados') ? CONFIG.waveMods.armor : 1);
   if (m.hp <= 0) {
     m.state = 'dead';
     m.deadT = 0;
     w.kills++;
     w.stats.kills++;
     w.events.push({ type: 'death', x: m.x, z: m.z, monster: true });
+    // Acumulador derrubado com a mochila cheia: o roubo volta para o reino.
+    if (m.loot && m.loot.n > 0) {
+      w.res[m.loot.res] += m.loot.n;
+      w.events.push({ type: 'monsterFx', fx: 'moedas', x: m.x, z: m.z });
+      toast(w, `Recuperou ${m.loot.n} de ${RES_NAME[m.loot.res]} do acumulador!`, 'good');
+      m.loot = undefined;
+    }
   }
 }
+
+/** Nome do recurso nos avisos do acumulador. */
+const RES_NAME: Record<Res, string> = { comida: 'comida', madeira: 'madeira', pedra: 'pedra', ferro: 'ferro', cristal: 'cristal', ouro: 'ouro' };
 
 function nearestMonster(w: World, x: number, z: number, range: number, needReach: boolean, src: DmgSrc = 'melee'): Monster | null {
   let best: Monster | null = null;
@@ -541,6 +552,28 @@ function unitsStep(w: World): void {
         const p = center(c);
         u.state = walk(w, u, p.x, p.z, def.speed) ? 'shelter' : 'walk';
         continue;
+      }
+      // Fuga sozinho (2026-11-09): monstro perto, o aldeão larga o que faz e corre para se esconder.
+      if (u.state === 'shelter') {
+        hideStep(w, u);
+        continue;
+      }
+      if (u.hideIn === undefined && (w.tick + u.id) % 5 === 0) {
+        const m = threatNear(w, u.x, u.z, CONFIG.flee.radius);
+        if (m) startFlee(w, u, m);
+      }
+      if (u.hideIn !== undefined) {
+        const h = w.buildings.get(u.hideIn);
+        if (h && setGoal(w, u, w.grid.idx(h.q, h.r))) {
+          const p = center(h);
+          if (walk(w, u, p.x, p.z, def.speed * CONFIG.flee.run)) {
+            u.state = 'shelter';
+            u.hideT = 0;
+          } else u.state = 'walk';
+          continue;
+        }
+        // O abrigo caiu ou ficou sem caminho: procura outro na próxima olhada.
+        u.hideIn = undefined;
       }
       const b = u.job >= 0 ? w.buildings.get(u.job) : undefined;
       if (!b) {
@@ -617,6 +650,10 @@ function unitsStep(w: World): void {
       engineerStep(w, u);
       continue;
     }
+    if (u.kind === 'anao') {
+      gunnerStep(w, u);
+      continue;
+    }
     // Soldado e cavaleiro. Com ordem do jogador, segura o ponto: só sai atrás de quem chega perto.
     const engage = u.order === 2 ? CONFIG.holdEngage : u.kind === 'cavaleiro' ? CONFIG.knightEngage : CONFIG.soldierEngage;
     if (!m || m.state === 'dead' || dist(u.postX, u.postZ, m.x, m.z) > engage * 1.3) m = undefined;
@@ -636,7 +673,9 @@ function unitsStep(w: World): void {
       u.facing = Math.atan2(m.x - u.x, m.z - u.z);
       if (u.cd <= 0) {
         w.events.push({ type: 'hit', fx: u.kind === 'cavaleiro' ? 'golpe' : 'espada', x: m.x, z: m.z, dx: m.x - u.x, dz: m.z - u.z });
-        damageMonster(w, m, def.dmg * (1 + CONFIG.forge.step.armas * w.forge.armas));
+        // Lanceiro: a lança pega forte nos grandes.
+        const big = u.kind === 'lanceiro' && CONFIG.spear.big.includes(m.kind) ? CONFIG.spear.bigMul : 1;
+        damageMonster(w, m, def.dmg * big * (1 + CONFIG.forge.step.armas * w.forge.armas));
         u.cd = def.cd;
       }
       continue;
@@ -678,6 +717,31 @@ function mageStep(w: World, u: Unit): void {
   for (const o of w.monsters.values()) {
     if (o.state === 'dead' || dist(o.x, o.z, m.x, m.z) > CONFIG.mage.area) continue;
     damageMonster(w, o, def.dmg * (1 + CONFIG.forge.step.armas * w.forge.armas), 'magic');
+  }
+}
+
+/**
+ * Anão (2026-11-09): espingarda de cano largo. Atira no monstro mais perto (voando ou não), com
+ * respingo em quem estiver colado nele; o tiro atravessa escudo, armadura e o gelo do golem.
+ */
+function gunnerStep(w: World, u: Unit): void {
+  const def = UNITS.anao;
+  const m = nearestMonster(w, u.x, u.z, def.range * rk(w), false, 'tiro');
+  if (!m) {
+    guard(w, u);
+    return;
+  }
+  u.facing = Math.atan2(m.x - u.x, m.z - u.z);
+  u.state = 'fight';
+  if (u.cd > 0) return;
+  u.cd = def.cd;
+  w.events.push({ type: 'gun', x1: u.x, z1: u.z, x2: m.x, z2: m.z, fly: !!MONSTERS[m.kind].flying });
+  const mul = 1 + CONFIG.forge.step.armas * w.forge.armas;
+  for (const o of w.monsters.values()) {
+    if (o.state === 'dead') continue;
+    if (o === m) damageMonster(w, o, def.dmg * mul, 'tiro');
+    else if (dist(o.x, o.z, m.x, m.z) <= CONFIG.gun.splash && !!MONSTERS[o.kind].flying === !!MONSTERS[m.kind].flying)
+      damageMonster(w, o, def.dmg * mul * CONFIG.gun.splashMul, 'tiro');
   }
 }
 
@@ -979,6 +1043,65 @@ function guard(w: World, u: Unit): void {
   u.state = walk(w, u, u.postX, u.postZ, UNITS[u.kind].speed) ? 'idle' : 'walk';
 }
 
+/** Monstro vivo mais perto de (x, z), a menos de r metros (voando ou não). */
+function threatNear(w: World, x: number, z: number, r: number): Monster | null {
+  let best: Monster | null = null;
+  let bd = r;
+  for (const m of w.monsters.values()) {
+    if (m.state === 'dead') continue;
+    const d = dist(x, z, m.x, m.z);
+    if (d < bd) {
+      bd = d;
+      best = m;
+    }
+  }
+  return best;
+}
+
+/** Escolhe onde se esconder: a casa pronta (ou o castelo) mais perto que não esteja ao lado do monstro. */
+function startFlee(w: World, u: Unit, m: Monster): void {
+  let best: Building | undefined;
+  let bd = Infinity;
+  for (const b of w.buildings.values()) {
+    if ((b.kind !== 'casa' && b.kind !== 'castelo') || b.built < 1 || b.moveTo) continue;
+    const c = center(b);
+    if (dist(c.x, c.z, m.x, m.z) < CONFIG.flee.avoid) continue;
+    const d = dist(c.x, c.z, u.x, u.z);
+    if (d < bd) {
+      bd = d;
+      best = b;
+    }
+  }
+  best ??= castle(w);
+  if (!best) return;
+  u.hideIn = best.id;
+  u.hideT = 0;
+  u.path = [];
+  u.goal = -1;
+  if (u.state === 'work') u.state = 'walk';
+}
+
+/** Escondido: conta o tempo sem monstro por perto e sai pela porta quando passa o perigo. */
+function hideStep(w: World, u: Unit): void {
+  const h = u.hideIn !== undefined ? w.buildings.get(u.hideIn) : undefined;
+  if (h) {
+    if ((w.tick + u.id) % 10 === 0) {
+      const c = center(h);
+      u.hideT = threatNear(w, c.x, c.z, CONFIG.flee.calm) ? 0 : (u.hideT ?? 0) + 10 * DT;
+    }
+    if ((u.hideT ?? 0) < CONFIG.flee.wait) return;
+    const p = h.kind === 'castelo' ? castleDoor(w) : { x: center(h).x, z: center(h).z + 0.9 };
+    u.x = p.x;
+    u.z = p.z;
+  }
+  // Sem abrigo (a casa caiu): sai de onde estava.
+  u.hideIn = undefined;
+  u.hideT = undefined;
+  u.state = 'idle';
+  u.path = [];
+  u.goal = -1;
+}
+
 function idle(w: World, u: Unit): void {
   // Sem emprego: espera perto do castelo.
   const c = castle(w);
@@ -993,10 +1116,12 @@ function idle(w: World, u: Unit): void {
 
 // ---------------------------------------------------------------- ondas
 
-export function waveSize(n: number, mode: Mode = 'normal'): Record<MonsterKind, number> {
+export function waveSize(wave: number, mode: Mode = 'normal'): Record<MonsterKind, number> {
   const W = CONFIG.waves;
   const M = MODES[mode];
-  const total = Math.round(W.base + W.perWave * n);
+  // Com teto, a mistura e o tamanho ficam os da onda do teto; o chefe segue a onda de verdade.
+  const n = W.capFrom > 0 ? Math.min(wave, W.capFrom) : wave;
+  const total = Math.round(M.base + M.perWave * Math.min(n, W.lateFrom) + W.perWaveLate * Math.max(0, n - W.lateFrom));
   const at = (k: MonsterKind) => n >= MONSTERS[k].from;
   const bruto = at('bruto') ? Math.floor((n - 4) / 4) : 0;
   const orc = at('orc') ? Math.min(Math.round(total * 0.3), Math.round(total * (0.12 + 0.01 * (n - 4)))) : 0;
@@ -1005,17 +1130,35 @@ export function waveSize(n: number, mode: Mode = 'normal'): Record<MonsterKind, 
   const bruxa = at('bruxa') ? Math.min(4, 1 + Math.floor((n - 9) / 5)) : 0;
   const troll = at('troll') ? Math.floor((n - 8) / 4) : 0;
   const necromante = at('necromante') ? Math.floor((n - 12) / 4) : 0;
-  // Chefes: a cada 15 ondas (20 no fácil), alternando gelo e ossos.
-  const boss = n % M.bossEvery === 0 ? (n / M.bossEvery) % 2 === 1 : null;
-  const golem = boss === true ? 1 : 0;
-  const golemOssos = boss === false ? 1 : 0;
-  const esqueleto = Math.max(0, total - bruto - orc - lobisomem - morcego - bruxa - troll - necromante);
-  const size = { esqueleto, lobisomem, orc, bruto, morcego, bruxa, troll, necromante, golem, golemOssos };
+  // Inimigos novos (2026-11-09): esqueleto de escudo no lugar de parte dos esqueletos, o ladrão
+  // acumulador (um, e dois da onda 19 em diante) e o vampiro (um, e dois da onda 28 em diante).
+  const acumulador = at('acumulador') ? Math.min(2, 1 + Math.floor((n - 7) / 12)) : 0;
+  const vampiro = at('vampiro') ? (n >= 28 ? 2 : 1) : 0;
+  // Chefes: a cada 15 ondas (20 no fácil), em rodízio: gelo, ossos e musgo.
+  const boss = wave % M.bossEvery === 0 ? (wave / M.bossEvery) % 3 : -1;
+  const golem = boss === 1 ? 1 : 0;
+  const golemOssos = boss === 2 ? 1 : 0;
+  const golemMusgo = boss === 0 ? 1 : 0;
+  // O que sobra são esqueletos; do meio da onda 6 em diante parte deles vem de elmo e escudo (até metade).
+  const ossos = Math.max(0, total - bruto - orc - lobisomem - morcego - bruxa - troll - necromante - acumulador - vampiro);
+  const esqueletoGuerreiro = at('esqueletoGuerreiro') ? Math.round(ossos * Math.min(0.35, 0.05 * (n - 5))) : 0;
+  const esqueleto = ossos - esqueletoGuerreiro;
+  const size = { esqueleto, esqueletoGuerreiro, lobisomem, orc, acumulador, bruto, morcego, bruxa, troll, necromante, vampiro, golem, golemOssos, golemMusgo };
   if (M.monsters === 1) return size;
   // Fácil: menos de cada um (os chefes continuam um só; pelo menos um esqueleto).
-  for (const k of Object.keys(size) as MonsterKind[]) if (k !== 'golem' && k !== 'golemOssos') size[k] = Math.round(size[k] * M.monsters);
+  for (const k of Object.keys(size) as MonsterKind[]) if (!MONSTERS[k].boss && k !== 'vampiro') size[k] = Math.round(size[k] * M.monsters);
   size.esqueleto = Math.max(1, size.esqueleto);
   return size;
+}
+
+/** Quanto a vida de um monstro da onda n vale sobre a base (chefe à parte, em linha). */
+export function monsterHpMul(n: number, mode: Mode = 'normal', boss = false): number {
+  const W = CONFIG.waves;
+  const k = Math.max(1, W.capFrom > 0 ? Math.min(n, W.capFrom) : n);
+  if (boss && W.bossGrowth > 0) return (1 + W.bossGrowth * (k - 1)) * MODES[mode].monsterHp;
+  const early = Math.min(k, W.lateFrom) - 1;
+  const late = Math.max(0, k - W.lateFrom);
+  return Math.pow(W.hpGrowth, early) * Math.pow(W.hpGrowthLate, late) * MODES[mode].monsterHp;
 }
 
 export function waveInterval(n: number, mode: Mode = 'normal'): number {
@@ -1024,8 +1167,8 @@ export function waveInterval(n: number, mode: Mode = 'normal'): number {
   return Math.max(M.calmMin, W.interval + M.calm - W.intervalStep * (n - 1));
 }
 
-export function openRifts(n: number): number {
-  return CONFIG.waves.riftOpens.filter((k) => n >= k).length;
+export function openRifts(n: number, mode: Mode = 'normal'): number {
+  return MODES[mode].riftOpens.filter((k) => n >= k).length;
 }
 
 /**
@@ -1066,8 +1209,8 @@ function startWave(w: World): void {
   w.spawnT = 0;
   w.waveState = 'spawning';
   w.events.push({ type: 'waveStart', wave: w.wave });
-  if (CONFIG.waves.riftOpens.includes(w.wave) && w.wave > 1) {
-    const t = w.tiles[w.rifts[openRifts(w.wave) - 1]!];
+  if (MODES[w.mode].riftOpens.includes(w.wave) && w.wave > 1) {
+    const t = w.tiles[w.rifts[openRifts(w.wave, w.mode) - 1]!];
     toast(w, t ? `Uma nova fenda se abriu ${sideName(t.q, t.r)}.` : 'Uma nova fenda se abriu.', 'bad');
   }
 }
@@ -1082,12 +1225,14 @@ export function sideName(q: number, r: number): string {
 }
 
 function spawnMonster(w: World, kind: MonsterKind): void {
-  const n = openRifts(w.wave);
+  const n = openRifts(w.wave, w.mode);
   const rift = w.tiles[w.rifts[Math.floor(w.rand() * n)]!]!;
   const p = hexToWorld(rift.q, rift.r);
   const def = MONSTERS[kind];
-  const hp = def.hp * Math.pow(CONFIG.waves.hpGrowth, w.wave - 1) * MODES[w.mode].monsterHp;
+  const hp = def.hp * monsterHpMul(w.wave, w.mode, !!def.boss);
   const m: Monster = {
+    homeX: p.x,
+    homeZ: p.z,
     id: w.nextId++,
     kind,
     x: p.x + (w.rand() - 0.5) * 1.2,
@@ -1109,16 +1254,81 @@ function spawnMonster(w: World, kind: MonsterKind): void {
   if (def.boss) toast(w, `${def.name} saiu da fenda! ${def.blurb.replace('Chefe. ', '')}`, 'bad');
 }
 
-/** Esqueleto levantado por um necromante, ao lado dele. */
-function summonSkeleton(w: World, owner: Monster): void {
-  const def = MONSTERS.esqueleto;
-  const hp = def.hp * Math.pow(CONFIG.waves.hpGrowth, Math.max(0, w.wave - 1)) * MODES[w.mode].monsterHp;
+/** Morcego chamado por um vampiro, ao lado dele (2026-11-09). */
+function summonBat(w: World, owner: Monster): void {
+  const def = MONSTERS.morcego;
+  const hp = def.hp * monsterHpMul(w.wave, w.mode);
   const a = w.rand() * Math.PI * 2;
   const m: Monster = {
     id: w.nextId++,
+    kind: 'morcego',
+    x: owner.x + Math.cos(a) * 0.8,
+    z: owner.z + Math.sin(a) * 0.8,
+    hp,
+    maxHp: hp,
+    speed: def.speed,
+    dmg: def.dmg,
+    cd: def.cd,
+    state: 'walk',
+    facing: owner.facing,
+    deadT: 0,
+    burnT: 99,
+    healT: 1,
+    summonT: 99,
+    owner: owner.id,
+  };
+  w.monsters.set(m.id, m);
+  w.events.push({ type: 'monsterFx', fx: 'poof', x: m.x, z: m.z });
+}
+
+/** Recurso que o acumulador leva de cada prédio (o resto é ouro do cofre). */
+const LOOT_OF: Partial<Record<BuildingKind, Res>> = { serraria: 'madeira', pedreira: 'pedra', mina: 'ferro', fazenda: 'comida', celeiro: 'comida', casa: 'comida' };
+
+/** O acumulador chegou a um prédio: enche a mochila e começa a fugir. */
+function thiefSteals(w: World, m: Monster, b: Building, T: NonNullable<MonsterDef['thief']>): void {
+  let res: Res = LOOT_OF[b.kind] ?? 'ouro';
+  // Sem nada daquele recurso, leva o que o reino tiver mais.
+  if (w.res[res] < 5) res = (['comida', 'madeira', 'pedra', 'ferro', 'ouro'] as Res[]).reduce((a, k) => (w.res[k] > w.res[a] ? k : a), 'comida' as Res);
+  const n = Math.max(0, Math.floor(Math.min(w.res[res], T.max, T.base + T.perWave * w.wave)));
+  w.res[res] -= n;
+  m.loot = { res, n };
+  m.fleeT = T.flee;
+  m.state = 'walk';
+  w.events.push({ type: 'monsterFx', fx: 'moedas', x: m.x, z: m.z });
+  if (n > 0) toast(w, `Um acumulador roubou ${n} de ${RES_NAME[res]}! Derrube ele antes que fuja para a fenda.`, 'bad');
+}
+
+/** O acumulador chegou à fenda (ou o tempo acabou): some com o que levou. */
+function thiefEscapes(w: World, m: Monster): void {
+  w.monsters.delete(m.id);
+  w.events.push({ type: 'monsterFx', fx: 'poof', x: m.x, z: m.z });
+  if (m.loot && m.loot.n > 0) toast(w, `O acumulador fugiu com ${m.loot.n} de ${RES_NAME[m.loot.res]}.`, 'bad');
+}
+
+/** Esqueleto levantado por um necromante, ao lado dele. */
+function summonSkeleton(w: World, owner: Monster): void {
+  const def = MONSTERS.esqueleto;
+  const hp = def.hp * monsterHpMul(w.wave, w.mode);
+  // Nasce num ladrilho livre ao lado: dentro de rocha ou água ele ficava preso andando contra a
+  // pedra e a onda não acabava (2026-11-09). Sem lugar livre em volta, nasce onde o necromante está.
+  const a0 = w.rand() * Math.PI * 2;
+  let x = owner.x;
+  let z = owner.z;
+  for (let k = 0; k < 6; k++) {
+    const a = a0 + (k * Math.PI) / 3;
+    const nx = owner.x + Math.cos(a) * 0.7;
+    const nz = owner.z + Math.sin(a) * 0.7;
+    if (!blockedFor(w, tileIndexAt(w, nx, nz))) {
+      x = nx;
+      z = nz;
+      break;
+    }
+  }
+  const m: Monster = {
+    id: w.nextId++,
     kind: 'esqueleto',
-    x: owner.x + Math.cos(a) * 0.7,
-    z: owner.z + Math.sin(a) * 0.7,
+    x,
+    z,
     hp,
     maxHp: hp,
     speed: def.speed,
@@ -1147,7 +1357,7 @@ function waves(w: World): void {
   }
   if (w.waveState === 'spawning') {
     w.spawnT -= DT;
-    const every = CONFIG.waves.spawnSpread / Math.max(1, w.spawnQueue.length + 1);
+    const every = CONFIG.waves.spawnSpread / Math.max(1, w.spawnQueue.length + 1) + CONFIG.waves.spawnGap;
     while (w.spawnT <= 0 && w.spawnQueue.length > 0) {
       spawnMonster(w, w.spawnQueue.shift()!);
       w.spawnT += Math.min(0.6, every);
@@ -1164,6 +1374,9 @@ function waves(w: World): void {
     for (const b of w.buildings.values())
       if (b.kind === 'muralha' || b.kind === 'portao') b.hp = Math.min(b.maxHp, b.hp + b.maxHp * w.mods.wallRegen);
   w.events.push({ type: 'waveEnd', wave: w.wave, gold });
+  // Teto da horda (2026-11-09): quem passou da onda do teto sabe que dali em diante ela não cresce.
+  if (CONFIG.waves.capFrom > 0 && w.wave === CONFIG.waves.capFrom)
+    toast(w, 'A horda chegou à força máxima: daqui em diante as ondas não crescem mais. Quem aguentou até aqui pode lutar para sempre.', 'gold');
   // Etapa 17: o que acabou de floresta, rocha e veio nasce de novo em outro lugar.
   if (MODES[w.mode].depletes) regrow(w);
   w.waveState = 'calm';
@@ -1271,6 +1484,13 @@ function monstersStep(w: World): void {
       for (const o of ms) if (o.owner === m.id && o.state !== 'dead') mine++;
       if (mine < def.summon.max) summonSkeleton(w, m);
     }
+    // Vampiro (2026-11-09): chama dois morcegos por vez, até o máximo dele.
+    if (def.bats && (m.summonT -= DT) <= 0) {
+      m.summonT = def.bats.every;
+      let mine = 0;
+      for (const o of ms) if (o.owner === m.id && o.state !== 'dead') mine++;
+      for (let k = mine; k < Math.min(def.bats.max, mine + 2); k++) summonBat(w, m);
+    }
     let tx = m.x;
     let tz = m.z;
     let moving = false;
@@ -1278,16 +1498,36 @@ function monstersStep(w: World): void {
       flyStep(w, m, def);
       continue;
     }
+    // Acumulador com a mochila cheia: volta reto para a fenda; some nela (ou quando o tempo acaba).
+    if (def.thief && m.loot) {
+      m.fleeT = (m.fleeT ?? 0) - DT;
+      const hx = m.homeX ?? m.x;
+      const hz = m.homeZ ?? m.z;
+      if (m.fleeT <= 0 || dist(m.x, m.z, hx, hz) < 1.2) {
+        thiefEscapes(w, m);
+        continue;
+      }
+      stepToward(w, m, hx, hz, ms, def.thief.carrySpeed / Math.max(0.1, m.speed));
+      continue;
+    }
     // 1) Gente do reino perto (fora das torres): ataca ou vai até ela.
     let prey: Unit | null = null;
     let pd = CONFIG.monsterAggro;
-    for (const u of w.units.values()) {
+    const mt = tileIndexAt(w, m.x, m.z);
+    // O acumulador não briga com ninguém: só quer chegar a um prédio.
+    for (const u of def.thief ? [] : w.units.values()) {
       if (u.state === 'dead' || u.state === 'tower' || u.state === 'shelter') continue;
       const d = dist(m.x, m.z, u.x, u.z);
-      if (d < pd) {
-        pd = d;
-        prey = u;
+      if (d >= pd) continue;
+      // Quem está num ladrilho onde o monstro não entra (soldado parado na porta do quartel) e fora
+      // do alcance do golpe não vira presa: antes o golem empacava na beira, andando sem sair do
+      // lugar, e a onda não acabava (2026-11-09).
+      if (d > CONFIG.monsterReach) {
+        const ut = tileIndexAt(w, u.x, u.z);
+        if (ut !== mt && blockedFor(w, ut)) continue;
       }
+      pd = d;
+      prey = u;
     }
     if (prey) {
       m.facing = Math.atan2(prey.x - m.x, prey.z - m.z);
@@ -1296,6 +1536,7 @@ function monstersStep(w: World): void {
         if (m.cd <= 0) {
           w.events.push({ type: 'hit', fx: 'garra', x: prey.x, z: prey.z, dx: prey.x - m.x, dz: prey.z - m.z });
           prey.hp -= m.dmg;
+          if (def.lifesteal) m.hp = Math.min(m.maxHp, m.hp + m.dmg * def.lifesteal);
           m.cd = def.cd;
           if (prey.hp <= 0) killUnit(w, prey);
         }
@@ -1333,6 +1574,10 @@ function monstersStep(w: World): void {
           }
         }
       }
+      if (target && def.thief) {
+        thiefSteals(w, m, target, def.thief);
+        continue;
+      }
       if (target) {
         const p = center(target);
         m.facing = Math.atan2(p.x - m.x, p.z - m.z);
@@ -1343,12 +1588,20 @@ function monstersStep(w: World): void {
           const fz = Math.cos(m.facing);
           w.events.push({ type: 'hit', fx: 'pancada', x: m.x + fx * k, z: m.z + fz * k, dx: fx, dz: fz });
           damageBuilding(w, target, m.dmg * def.structMul);
+          if (def.lifesteal) m.hp = Math.min(m.maxHp, m.hp + m.dmg * def.structMul * def.lifesteal);
           m.cd = def.cd;
         }
         continue;
       }
     }
     if (!moving) continue;
+    stepToward(w, m, tx, tz, ms);
+  }
+}
+
+/** Anda um passo na direção de (tx, tz): piche, separação dos vizinhos e escorregar pela borda. */
+function stepToward(w: World, m: Monster, tx: number, tz: number, ms: Monster[], speedMul = 1): void {
+  {
     m.state = 'walk';
     let vx = tx - m.x;
     let vz = tz - m.z;
@@ -1356,7 +1609,7 @@ function monstersStep(w: World): void {
     // Piche: anda pela metade.
     const ht = tileIndexAt(w, m.x, m.z);
     const hb = ht >= 0 ? w.buildings.get(w.tiles[ht]!.b) : undefined;
-    const sp = m.speed * (hb && hb.kind === 'piche' && hb.built >= 1 ? CONFIG.pitch.slow : 1);
+    const sp = m.speed * speedMul * (hb && hb.kind === 'piche' && hb.built >= 1 ? CONFIG.pitch.slow : 1);
     vx = (vx / d) * sp;
     vz = (vz / d) * sp;
     // Separação: não se empilham.

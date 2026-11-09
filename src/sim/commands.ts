@@ -373,10 +373,15 @@ export function toggleShelter(w: World): string | null {
     for (const u of w.units.values()) {
       if (u.kind !== 'trabalhador' || u.state === 'dead') continue;
       if (u.state === 'shelter') {
-        const p = castleDoor(w);
+        // Quem tinha corrido sozinho para uma casa sai dela; os outros, do castelo.
+        const h = u.hideIn !== undefined ? w.buildings.get(u.hideIn) : undefined;
+        const c = h ? hexToWorld(h.q, h.r) : null;
+        const p = c && h!.kind !== 'castelo' ? { x: c.x, z: c.z + 0.9 } : castleDoor(w);
         u.x = p.x;
         u.z = p.z;
       }
+      u.hideIn = undefined;
+      u.hideT = undefined;
       u.state = 'idle';
       u.path = [];
       u.goal = -1;
@@ -387,6 +392,11 @@ export function toggleShelter(w: World): string | null {
       u.path = [];
       u.goal = -1;
       if (u.state === 'work') u.state = 'walk';
+      // Quem corria sozinho para uma casa passa a ir para o castelo (quem já está escondido fica).
+      if (u.state !== 'shelter') {
+        u.hideIn = undefined;
+        u.hideT = undefined;
+      }
     }
   }
   w.events.push({

@@ -610,13 +610,15 @@ const BUILD_ICON: Record<BuildingKind, string> = {
   quartel: 'espadas',
   campo: 'arco',
   oficina: 'martelo',
+  acampamento: 'lanca',
+  polvora: 'polvora',
   capela: 'capela',
   forja: 'bigorna',
   torreMago: 'estrela',
   estabulo: 'ferradura',
 };
 /** Rótulo curto embaixo do botão (o nome inteiro vai no cartão). */
-const SHORT: Partial<Record<BuildingKind, string>> = { torre: 'Torre', campo: 'Campo', piche: 'Piche', torreMago: 'Mago', fazenda: 'Plantação' };
+const SHORT: Partial<Record<BuildingKind, string>> = { torre: 'Torre', campo: 'Campo', piche: 'Piche', torreMago: 'Mago', fazenda: 'Plantação', acampamento: 'Lanças', polvora: 'Pólvora' };
 
 interface FanEntry {
   id: string;

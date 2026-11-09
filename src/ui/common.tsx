@@ -63,6 +63,9 @@ export const ICONS: Record<string, string> = {
   broto: 'M12 21v-9M12 12C12 8 9 5 5 5c0 4 3 7 7 7zM12 12c0-3.5 2.5-6.5 6.5-6.5 0 3.5-2.5 6.5-6.5 6.5zM7 21h10',
   semMusica: 'M3 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0M14 16a3 3 0 1 0 6 0a3 3 0 1 0-6 0M9 18V5l11-2v13M3 3l18 18',
   album: 'M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5zM5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3M9 7h6v5H9z',
+  // Tropas novas (2026-11-09): lança com a ponta para cima e bomba de pavio aceso.
+  lanca: 'M5 21L15.5 8.5M15.5 8.5L14 4l6-1-1 6zM7 15l3 3',
+  polvora: 'M11 9a6 6 0 1 0 .01 0M14.5 7.5L17 5M18.5 3l1 1M20.5 5.5l-1 .5M18 6.5l.5 1',
   // Etapa 16: estações (a folha já existia) e o álbum de figurinhas.
   flor: 'M10 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0M9 6a3 3 0 1 0 6 0a3 3 0 1 0-6 0M9 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0M3 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0M15 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0',
   sol: 'M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1',

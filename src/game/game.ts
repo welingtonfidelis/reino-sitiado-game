@@ -40,6 +40,8 @@ import type { BlessingId, BuildingKind, ForgeLine, HeroKind, Mode as GameMode, S
 import { Album } from './album.ts';
 import type { Sticker } from './album.ts';
 import { readQuality, writeQuality } from '../render/quality.ts';
+import { markTip, pickTip } from './guide.ts';
+import type { Tip } from './guide.ts';
 import type { Quality } from '../render/quality.ts';
 
 export type Mode = { kind: 'none' } | { kind: 'build'; b: BuildingKind } | { kind: 'move'; id: number } | { kind: 'rally'; id: number };
@@ -110,6 +112,11 @@ export class Game {
   music = readPref('reino.musica', true);
   /** Gráficos normais ou leves (tablet de entrada); guardado no navegador. */
   quality: Quality = readQuality();
+  /** O Sábio (2026-11-09): dicas em figuras; ligado ou não (preferência do navegador). */
+  guide = readPref('reino.guia', true);
+  tip: Tip | null = null;
+  private tipT = 0;
+  private guideAcc = 0;
   /** Velocidade de antes do relatório (o jogo para enquanto ele está aberto). */
   private before = 1;
   private acc = 0;
@@ -159,6 +166,7 @@ export class Game {
     this.reportOpen = false;
     this.season = 0;
     this.seasonCard = 0;
+    this.tip = null;
     this.started = true;
     this.emit();
   }
@@ -211,6 +219,7 @@ export class Game {
       this.emit();
     }
     this.stepSticker(dt);
+    this.stepGuide(dt);
     if (this.seasonCard > 0) {
       this.seasonCard -= Math.min(dt, 0.1);
       if (this.seasonCard <= 0) {
@@ -502,6 +511,37 @@ export class Game {
   toggleShelter(): void {
     this.result(toggleShelter(this.world));
   }
+  /** O Sábio mostra a próxima dica que vale agora (uma por vez, uma vez por partida). */
+  private stepGuide(dt: number): void {
+    if (this.tip) {
+      this.tipT -= Math.min(dt, 0.1);
+      if (this.tipT <= 0) this.dismissTip();
+      return;
+    }
+    if (!this.guide || !this.started || this.world.lost || this.reportOpen || this.reportT >= 0) return;
+    this.guideAcc += dt;
+    if (this.guideAcc < 1) return;
+    this.guideAcc = 0;
+    const t = pickTip(this.world);
+    if (!t) return;
+    markTip(this.world, t.id);
+    this.tip = t;
+    this.tipT = 14;
+    this.emit();
+  }
+
+  dismissTip(): void {
+    this.tip = null;
+    this.emit();
+  }
+
+  setGuide(on: boolean): void {
+    this.guide = on;
+    writePref('reino.guia', on);
+    if (!on) this.tip = null;
+    this.emit();
+  }
+
   setMusic(on: boolean): void {
     this.music = on;
     writePref('reino.musica', on);

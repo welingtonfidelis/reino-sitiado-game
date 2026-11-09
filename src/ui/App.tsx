@@ -4,7 +4,7 @@
  * avisos e as telas de começo e fim.
  */
 import { useEffect, useReducer, useState } from 'preact/hooks';
-import { MODE_NAMES, SEASON_ICON, SEASON_NAME, BUILDINGS, CONFIG, RES_ORDER, castle, castleCap, housing, troops, workers, missing, waveSize, MONSTERS, BLESSINGS, repairAllCost, modsForWave, waveSizeWithMods, WAVE_MODS, tileAt, hexToWorld } from '../sim/index.ts';
+import { MODES, MODE_NAMES, SEASON_ICON, SEASON_NAME, BUILDINGS, RES_ORDER, castle, castleCap, housing, troops, workers, missing, waveSize, MONSTERS, BLESSINGS, repairAllCost, modsForWave, waveSizeWithMods, WAVE_MODS, tileAt, hexToWorld } from '../sim/index.ts';
 import type { BlessingId, Category, Mode, MonsterKind, Res, UnitKind } from '../sim/index.ts';
 import { FALL_TIME, Game, readGameMode } from '../game/game.ts';
 import type { IsoCamera } from '../render/camera.ts';
@@ -199,6 +199,23 @@ function AlbumView({ game, onClose }: { game: Game; onClose: () => void }) {
   );
 }
 
+/** O Sábio (2026-11-09): retrato no canto e a dica em figuras; tocar fecha. */
+function Guide({ game }: { game: Game }) {
+  const t = game.tip;
+  if (!t) return null;
+  return (
+    <button class="guide" key={t.id} onClick={() => game.dismissTip()} aria-label={`Dica do Sábio: ${t.text} Toque para fechar.`}>
+      <img class="guide-face" src={`${import.meta.env.BASE_URL}ui/sabio.png`} alt="" />
+      <span class="guide-bubble">
+        <span class="guide-icons" aria-hidden="true">
+          {t.icons.map((n, i) => (n === 'seta' ? <span key={i} class="guide-arrow">➜</span> : <Icon key={i} name={n} />))}
+        </span>
+        <span class="guide-text">{t.text}</span>
+      </span>
+    </button>
+  );
+}
+
 /** Figurinha nova: a figura grande aparece embaixo, no meio, por uns segundos. */
 function StickerPop({ game }: { game: Game }) {
   const s = game.sticker;
@@ -291,6 +308,10 @@ function MoreMenu({ game, onClose, onAlbum }: { game: Game; onClose: () => void;
         <button class="more-row" onClick={() => game.setSound(!game.sound)}>
           <Icon name={game.sound ? 'som' : 'mudo'} />
           {game.sound ? 'Som ligado' : 'Som desligado'}
+        </button>
+        <button class="more-row" onClick={() => game.setGuide(!game.guide)}>
+          <Icon name={game.guide ? 'pessoa' : 'fechar'} />
+          {game.guide ? 'Dicas do Sábio ligadas' : 'Dicas do Sábio desligadas'}
         </button>
         <button class={`more-row${game.sound ? '' : ' off'}`} disabled={!game.sound} onClick={() => game.setMusic(!game.music)}>
           <Icon name={game.music && game.sound ? 'musica' : 'semMusica'} />
@@ -420,6 +441,10 @@ function SelectionBar({ game, touch }: { game: Game; touch: boolean }) {
 
 const PLURAL: Record<MonsterKind, [string, string]> = {
   esqueleto: ['esqueleto', 'esqueletos'],
+  esqueletoGuerreiro: ['esqueleto guerreiro', 'esqueletos guerreiros'],
+  acumulador: ['acumulador', 'acumuladores'],
+  vampiro: ['vampiro', 'vampiros'],
+  golemMusgo: ['Golem de musgo', 'Golens de musgo'],
   lobisomem: ['lobisomem', 'lobisomens'],
   orc: ['orc saqueador', 'orcs saqueadores'],
   bruto: ['orc bruto', 'orcs brutos'],
@@ -438,6 +463,9 @@ const NEWS: Partial<Record<MonsterKind, string>> = {
   lobisomem: 'Lobisomens chegam nesta onda: rápidos, rodeiam a muralha atrás de brecha.',
   orc: 'Orcs saqueadores chegam nesta onda: batem três vezes mais forte em muralhas e prédios.',
   bruto: 'O orc bruto chega nesta onda: muita vida e golpe pesado.',
+  esqueletoGuerreiro: 'Esqueletos guerreiros chegam nesta onda: de escudo, as flechas pegam bem menos neles.',
+  acumulador: 'O acumulador chega nesta onda: não briga, rouba recursos do primeiro prédio que alcança e foge para a fenda. Derrubado, devolve tudo.',
+  vampiro: 'O vampiro chega nesta onda: chama morcegos e se cura com cada golpe.',
 };
 
 function count(n: number, one: string, many: string): string {
@@ -483,8 +511,8 @@ function Report({ game }: { game: Game }) {
   const nextMods = modsForWave(w.seed, next, w.mode);
   const size = waveSizeWithMods(next, nextMods, w.mode);
   const news = (Object.keys(size) as MonsterKind[]).filter((k) => MONSTERS[k].from === next && size[k] > 0 && NEWS[k]).map((k) => NEWS[k]);
-  for (const k of ['golem', 'golemOssos'] as MonsterKind[]) if (size[k] > 0) news.push(`Chefe nesta onda: ${MONSTERS[k].name}. ${MONSTERS[k].blurb.replace('Chefe. ', '')}`);
-  const rift = CONFIG.waves.riftOpens.includes(next) && next > 1;
+  for (const k of ['golem', 'golemOssos', 'golemMusgo'] as MonsterKind[]) if (size[k] > 0) news.push(`Chefe nesta onda: ${MONSTERS[k].name}. ${MONSTERS[k].blurb.replace('Chefe. ', '')}`);
+  const rift = MODES[w.mode].riftOpens.includes(next) && next > 1;
   const fix = repairAllCost(w);
   const needChoice = r.choices.length > 0;
   const bonus = Math.floor(w.waveTimer / 3);
@@ -731,6 +759,7 @@ export function App({ game, cam, touch }: { game: Game; cam: IsoCamera; touch: b
       <Hud game={game} cam={cam} small={small} />
       {game.seasonCard > 0 ? <SeasonCard key={game.season} season={game.season} /> : null}
       <StickerPop game={game} />
+      <Guide game={game} />
       {small ? null : (
         <div class="toasts">
           {game.toasts.map((t) => (

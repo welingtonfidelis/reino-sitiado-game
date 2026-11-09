@@ -192,6 +192,7 @@ function frame(now: number): void {
   music.update(w.lost ? 'off' : w.waveState === 'calm' || !game.started ? 'calm' : 'battle');
   for (const e of game.frame) {
     if (e.type === 'shot') sound.play('arco');
+    else if (e.type === 'gun') sound.play('tiro');
     else if (e.type === 'hit') sound.play(HIT_SFX[e.fx] ?? 'golpe');
     else if (e.type === 'spell') sound.play('magia');
     else if (e.type === 'death' && e.monster) sound.play('morte');

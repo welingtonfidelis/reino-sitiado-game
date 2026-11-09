@@ -167,16 +167,23 @@ function bot(w: World): void {
   if (count(w, 'serraria') < (wave >= 3 ? 3 : 2) && put(w, 'serraria', 2, 9)) return;
   if (count(w, 'pedreira') < (wave >= 6 ? 2 : 1) && put(w, 'pedreira', 2, 9)) return;
   if (wave >= 2 && count(w, 'mina') < 1 && put(w, 'mina', 2, 9)) return;
-  // Defesa.
+  // Defesa. Rebalanceamento (2026-11-09): o robô só fazia torre e arqueiro e chegava no golem da
+  // onda 15 sem soldado nem castelo melhorado; agora o quartel e os soldados vêm antes da quarta torre.
+  const lvl = castle(w)?.level ?? 1;
+  if ((wave >= 5 && lvl < 2) || (wave >= 12 && lvl < 3) || (wave >= 20 && lvl < 4)) upgradeCastle(w);
   if (count(w, 'campo') < 1 && put(w, 'campo', 2, 4)) return;
-  if (count(w, 'torre') < Math.min(2 + wave, 12) && put(w, 'torre', 2, 4)) return;
+  if (count(w, 'torre') < Math.min(2 + wave, 3) && put(w, 'torre', 2, 4)) return;
   if (units(w, 'arqueiro') < count(w, 'torre') * towerSlots()) trainAt(w, 'campo');
   if (wave >= 2 && count(w, 'quartel') < 1 && put(w, 'quartel', 2, 4)) return;
   if (units(w, 'soldado') < Math.min(4 + wave / 2, 12)) trainAt(w, 'quartel');
+  // Tropas novas (2026-11-09): lanceiros contra os grandes e anões contra o golem de gelo e quem voa.
+  if (wave >= 5 && count(w, 'acampamento') < 1 && put(w, 'acampamento', 2, 4)) return;
+  if (units(w, 'lanceiro') < Math.min(2 + wave / 3, 8)) trainAt(w, 'acampamento');
+  if (wave >= 9 && lvl >= 2 && count(w, 'polvora') < 1 && put(w, 'polvora', 2, 5)) return;
+  if (units(w, 'anao') < Math.min(2 + wave / 4, 8)) trainAt(w, 'polvora');
+  if (count(w, 'torre') < Math.min(2 + wave, 12) && put(w, 'torre', 2, 4)) return;
   if (wave >= 4 && count(w, 'oficina') < 1 && put(w, 'oficina', 2, 4)) return;
   if (units(w, 'engenheiro') < 2) trainAt(w, 'oficina');
-  const lvl = castle(w)?.level ?? 1;
-  if ((wave >= 5 && lvl < 2) || (wave >= 12 && lvl < 3) || (wave >= 20 && lvl < 4)) upgradeCastle(w);
   // Etapa 14: compra heróis assim que der (castelo no nível pedido e ouro sobrando).
   if (HEROES && lvl >= CONFIG.heroes.castleLevel) for (const k of HERO_KINDS) if (!heroOf(w, k) && buyHero(w, k) === null) return;
   if (wave >= 6 && count(w, 'forja') < 1 && put(w, 'forja', 2, 5)) return;
