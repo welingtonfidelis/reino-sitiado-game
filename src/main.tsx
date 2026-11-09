@@ -23,7 +23,7 @@ const touch = matchMedia('(pointer: coarse)').matches;
 
 render(
   <div class="loading">
-    Reino Sitiado
+    Hordas &amp; Hortas
     <div class="bar">
       <div class="fill" id="load-fill" style="width: 0%; background: var(--gold)" />
     </div>

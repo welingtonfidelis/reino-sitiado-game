@@ -642,7 +642,7 @@ function Intro({ game }: { game: Game }) {
       <article class="report-card">
         <header>
           <small>Tower defense sem fim</small>
-          <h2>Reino Sitiado</h2>
+          <h2>Hordas &amp; Hortas</h2>
           <p>As hordas saem das fendas na beira do mapa. Até quando o castelo aguenta?</p>
         </header>
         {saved ? (

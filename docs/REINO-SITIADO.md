@@ -1,8 +1,8 @@
-# Reino Sitiado
+# Hordas & Hortas
 
 Tower defense sem fim em 2.5D isométrico. O jogador ergue um reino em volta do castelo: planta, corta madeira, quebra pedra, minera ferro, constrói casas para ter quem trabalhe, treina soldados e arqueiros e fecha tudo com muralhas e portões. As hordas saem de fendas na beira do mapa (o lugar muda a cada partida), a cada onda maiores, mais fortes e mais variadas. A partida acaba quando o castelo cai.
 
-Nome provisório. Proposta visual (canvas, design system Vigília): https://claude.ai/artifact/E2kdbKNuRkqvb9bmsePrsy
+Nome definitivo desde 2026-11-09, escolhido pelo usuário; até a Etapa 19 o jogo se chamava "Reino Sitiado", nome que ficou no endereço, no repositório, na pasta e neste arquivo (seção 22, "Nome e ícone"). Proposta visual (canvas, design system Vigília): https://claude.ai/artifact/E2kdbKNuRkqvb9bmsePrsy
 
 Repositório: https://github.com/welingtonfidelis/reino-sitiado-game (criado pelo usuário em 2026-11-06). As etapas 1 a 16 estão na `main`; cada etapa tem o seu commit ("Etapa N: …" no `git log`). O jogo é publicado no GitHub Pages a cada push na `main`: https://welingtonfidelis.github.io/reino-sitiado-game/ (`.github/workflows/pages.yml`; a build usa `--base=/reino-sitiado-game/`). Commit e push só quando o usuário pedir.
 
@@ -744,6 +744,19 @@ O KayKit tem um castelo só (em quatro cores), e ele ocupa o hexágono inteiro: 
 
 Jogar no tablet e no iPhone.
 
+### Nome e ícone (2026-11-09)
+
+O usuário achou "Reino Sitiado" genérico demais. Das opções, escolheu **Hordas & Hortas**: o trocadilho junta as duas metades do jogo, plantar e aguentar a horda. Numa busca rápida, nenhum jogo usa esse nome. Hexaforte foi descartado porque já existe um tower defense hexagonal chamado HexaFortress.
+
+- Para o ícone, havia três rascunhos: (A) o castelo dourado numa ilha dentro de um hexágono dourado, (B) o castelo azul com um portal de olhos atrás e (C) o portal, o castelo e uma horta de abóboras. O usuário ficou com o **A**.
+- Ele foi fotografado com a arte do próprio jogo: o castelo do nível 4, os estandartes e a ilha de grama com terra embaixo, na câmera do jogo (yaw π/6, inclinação 0,82). O fundo é marrom-escuro, com o hexágono na cor `--gold`.
+- A cena que monta o ícone fica fora do projeto, porque o ícone muda pouco. Para refazer, monte de novo a cena num módulo carregado na página do jogo e fotografe pelo `/__snap`. Depois corte os tamanhos com `sips -Z`.
+- Os arquivos ficam em `public/icons/`: 16 e 32 (favicon), 180 (`apple-touch-icon.png`) e 192 e 512 (manifesto).
+- O `public/manifest.webmanifest` dá o nome, o ícone e `display: standalone`: na tela inicial, o jogo abre sem a barra do navegador.
+- No iPhone, o jogo salvo na tela inicial guarda a partida e o álbum à parte do Safari. Por isso, quem já jogava no Safari começa do zero ali.
+- O nome entrou no título da aba, na tela de carregar, na tela de começo, no README, no `package.json` e no título deste arquivo.
+- O endereço (`reino-sitiado-game`), o repositório, a pasta, este arquivo e as chaves `reino.*` do armazenamento ficam como estão. Assim, o link e os saves não mudam.
+
 ## 23. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
@@ -792,6 +805,7 @@ Jogar no tablet e no iPhone.
 | 17 | Recursos que acabam e reaparecem longe do castelo, dos portais e das construções; plantação que acaba e se replanta (seção 20) | Pronta em 2026-11-07, na `main`. Vista no navegador do Mac (degraus da floresta e da rocha, toras, cascalho, balões, broto, Replantar no menu); falta jogar no tablet e no iPhone. |
 | 18 | Modo fácil: nada acaba, ondas e mudança mais leves, castelo mais forte; escolhido com figura ao começar (seção 21) | Pronta em 2026-11-07, na `main`. Vista no navegador do Mac (primeira tela no tamanho de celular, Nova partida no ⋯, menu da plantação no fácil); falta jogar no tablet. |
 | 19 | Evolução visual: castelo cresce e doura por nível; elmo, armadura prateada e dourada e rastro das flechas pelas melhorias da forja (seção 22) | Pronta em 2026-11-08. Vista no navegador do Mac (os quatro castelos, a subida de nível, as armaduras, o elmo e o rastro); falta jogar no tablet e no iPhone. |
+| — | Nome Hordas & Hortas e ícone do castelo dourado no hexágono (seção 22, "Nome e ícone") | Pronto em 2026-11-09. Visto no navegador do Mac; falta ver na tela inicial do tablet e do iPhone. |
 
 ## 25. Arte e licenças
 
@@ -809,5 +823,6 @@ Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art`
 | Heróis (Etapa 14) | Barbarian, Rogue_Hooded e Druid (Adventurers) com machado de duas mãos, besta e cajado; BlackKnight (Mystery Monthly 5) com espada e escudo grandes |
 | Revisão das armas | machado grande do orc bruto, machado do golem de ossos e a textura do orc saqueador |
 | Evolução visual (Etapa 19) | castelo de telhado dourado e estandarte (Medieval); Paladin sem elmo (Mystery Monthly 4); armadura prateada do Knight (Adventurers) |
+| Ícone (2026-11-09) | castelo de telhado dourado e estandartes (Medieval), fotografados para o ícone |
 
 Os efeitos vêm do pixelfx (MIT); detalhes na seção 6 e em `LICENSES.md`.
