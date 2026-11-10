@@ -5,7 +5,7 @@
  */
 import { useEffect, useReducer, useState } from 'preact/hooks';
 import { MODES, MODE_NAMES, SEASON_ICON, SEASON_NAME, BUILDINGS, RES_ORDER, castle, castleCap, housing, troops, workers, missing, waveSize, MONSTERS, BLESSINGS, repairAllCost, modsForWave, waveSizeWithMods, WAVE_MODS, WAVE_THEMES, themeForWave, tileAt, hexToWorld } from '../sim/index.ts';
-import type { BlessingId, Category, Mode, MonsterKind, Res, UnitKind } from '../sim/index.ts';
+import type { BlessingId, Category, Mode, MonsterKind, Res } from '../sim/index.ts';
 import { FALL_TIME, Game, readGameMode } from '../game/game.ts';
 import type { IsoCamera } from '../render/camera.ts';
 import { QUALITY_NAME, QUALITY_ORDER } from '../render/quality.ts';
@@ -527,31 +527,17 @@ function PlaceBar({ game, touch }: { game: Game; touch: boolean }) {
   );
 }
 
-function SelectionBar({ game, touch }: { game: Game; touch: boolean }) {
-  const w = game.world;
-  const NAMES: Partial<Record<UnitKind, [string, string]>> = {
-    soldado: ['soldado', 'soldados'],
-    arqueiro: ['arqueiro', 'arqueiros'],
-    mago: ['mago', 'magos'],
-    clerigo: ['clérigo', 'clérigos'],
-    cavaleiro: ['cavaleiro', 'cavaleiros'],
-    engenheiro: ['engenheiro', 'engenheiros'],
-    barbaro: ['Bárbaro', 'Bárbaros'],
-    atiradora: ['Atiradora', 'Atiradoras'],
-    druida: ['Druida', 'Druidas'],
-    cavaleiroNegro: ['Cavaleiro Negro', 'Cavaleiros Negros'],
-  };
-  const tally = new Map<UnitKind, number>();
-  for (const id of game.units) {
-    const u = w.units.get(id);
-    if (u && u.kind !== 'trabalhador') tally.set(u.kind, (tally.get(u.kind) ?? 0) + 1);
-  }
-  const list = [...tally].map(([k, n]) => `${n} ${NAMES[k]![n === 1 ? 0 : 1]}`);
-  const parts = list.length > 1 ? [list.slice(0, -1).join(', '), list[list.length - 1]!] : list;
+/**
+ * Barra da escolha de tropas: só quantas foram escolhidas e o Limpar (pedido do usuário em
+ * 2026-11-10; antes listava o nome de cada tropa e a explicação de como mandar).
+ */
+function SelectionBar({ game }: { game: Game }) {
+  const n = game.units.length;
   return (
-    <div class="placebar">
-      <span>
-        {parts.join(' e ')} {game.units.length === 1 ? 'escolhido' : 'escolhidos'}. {touch ? 'Toque' : 'Clique'} no mapa para mandar; numa torre, os arqueiros sobem; numa tropa, põe ou tira da escolha.
+    <div class="placebar selbar">
+      <span class="selbar-count" aria-label={`${n} ${n === 1 ? 'tropa escolhida' : 'tropas escolhidas'}`}>
+        <Icon name="espadas" />
+        <strong>{n}</strong>
       </span>
       <button class="btn ghost small" onClick={() => game.clearUnits()}>
         Limpar
@@ -936,7 +922,7 @@ export function App({ game, cam, touch }: { game: Game; cam: IsoCamera; touch: b
           </button>
         </div>
       ) : null}
-      {game.units.length > 0 && game.mode.kind === 'none' ? <SelectionBar game={game} touch={touch} /> : null}
+      {game.units.length > 0 && game.mode.kind === 'none' ? <SelectionBar game={game} /> : null}
       <PlaceBar game={game} touch={touch} />
       {sel && game.mode.kind === 'none' ? <RadialMenu key={sel.id} game={game} cam={cam} b={sel} touch={touch} /> : null}
       {w.report && !w.lost && game.reportOpen ? <Report key={w.report.wave} game={game} /> : null}

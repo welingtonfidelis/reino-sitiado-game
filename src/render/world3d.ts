@@ -1827,7 +1827,8 @@ export class World3D {
     // Chão vivo: o vento corre e as flores seguem a estação (somem no inverno).
     MEADOW_U.uTime.value = this.time;
     const fk = [1, 0.85, 0.35, 0][this.season] ?? 1;
-    this.flowerK += (fk - this.flowerK) * Math.min(1, fxDt * 0.6);
+    // Com o jogo parado (o relatório aberto ao carregar um salvo no inverno) as flores também somem.
+    this.flowerK += (fk - this.flowerK) * Math.min(1, Math.max(fxDt, 1 / 60) * 0.6);
     MEADOW_U.uFlowers.value = this.flowerK;
     const sky = weatherOf(this.season, w.wave, w.waveState !== 'calm', w.seed);
     this.rain += ((sky === 'chuva' ? 1 : 0) - this.rain) * Math.min(1, fxDt * 0.8);

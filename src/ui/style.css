@@ -1882,3 +1882,23 @@ button.chip {
   color: #1d1914;
   font-weight: 600;
 }
+
+/* Barra da escolha de tropas (2026-11-10): só a quantidade e o Limpar, do tamanho do conteúdo. */
+.placebar.selbar {
+  width: auto;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  gap: 14px;
+  padding: 6px 8px 6px 14px;
+}
+.selbar-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1.05rem;
+}
+.selbar-count .ico {
+  width: 20px;
+  height: 20px;
+  color: var(--gold);
+}
