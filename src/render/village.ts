@@ -10,8 +10,9 @@
  * - Quartel, campo de tiro, capela, estábulo, forja e oficina também entram nas ruas, com
  *   quintal e porta virada para a trilha. Prédios de trabalho, torres, muralhas e armadilhas, não.
  * - Três casas encostadas fazem uma pracinha com poço no canto em comum. Um bairro de 5 casas
- *   ganha uma taverna e um de 8, um mercado (a casa do meio troca de modelo; as vagas são as
- *   mesmas). Tudo é só desenho: a simulação não muda.
+ *   ganha uma taverna (a casa do meio troca de modelo; as vagas são as mesmas). Tudo é só
+ *   desenho: a simulação não muda. O mercado do bairro de 8 casas saiu em 2026-11-10, quando o
+ *   mercado virou prédio de verdade (ele entra nas ruas como os prédios de tropa).
  */
 import { BUILDINGS, DIRS, castle, hexToWorld, tileAt } from '../sim/index.ts';
 import type { Building, BuildingKind, Tile, World } from '../sim/index.ts';
@@ -47,10 +48,9 @@ export interface VillagePlan {
 
 export const HOUSE_SCALE = 1.15;
 /** Prédios que a rua liga ao castelo: as casas e os de treinar e equipar a tropa. */
-export const LINKED: ReadonlySet<BuildingKind> = new Set<BuildingKind>(['casa', 'quartel', 'campo', 'capela', 'estabulo', 'forja', 'oficina', 'acampamento', 'polvora']);
-/** Bairro com tantas casas ganha taverna e mercado. */
+export const LINKED: ReadonlySet<BuildingKind> = new Set<BuildingKind>(['casa', 'quartel', 'campo', 'capela', 'estabulo', 'forja', 'oficina', 'acampamento', 'polvora', 'mercado']);
+/** Bairro com tantas casas ganha taverna. */
 export const TAVERN_AT = 5;
-export const MARKET_AT = 8;
 
 /** Vetor unitário do centro do hexágono para a borda que dá no vizinho k. */
 function edge(k: number): { x: number; z: number } {
@@ -225,7 +225,8 @@ export function planVillage(w: World): VillagePlan {
       .map((b) => ({ b, n: neighborsOf(b).filter(Boolean).length }))
       .sort((a, z) => z.n - a.n || a.b.id - z.b.id);
     special.set(ranked[0]!.b.id, 'taverna');
-    if (group.length >= MARKET_AT && ranked[1]) special.set(ranked[1].b.id, 'mercado');
+    // O mercado da vila virou prédio de verdade (2026-11-10): casa nenhuma troca mais para ele,
+    // senão a criança tocava no "mercado" e abria o menu da casa.
   }
 
   // Pracinhas: o canto em comum de três casas encostadas ganha um poço (um a cada 3,5 m).

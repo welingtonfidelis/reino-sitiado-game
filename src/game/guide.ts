@@ -95,6 +95,18 @@ const TIPS: TipDef[] = [
     when: (w) => w.waveState === 'calm' && (w.wave + 1) % MODES[w.mode].bossEvery === 0,
   },
   {
+    id: 'torreNivel',
+    icons: ['torre', 'seta', 'melhorar', 'arco'],
+    text: 'Toque na torre e melhore: de pedra, ela alcança mais e atira mais forte.',
+    when: (w) => w.wave >= 6 && w.waveState === 'calm' && w.res.pedra >= 80 && [...w.buildings.values()].some((b) => b.kind === 'torre' && b.built >= 1 && b.level === 1),
+  },
+  {
+    id: 'mercado',
+    icons: ['ouro', 'seta', 'mercado', 'seta', 'ferro'],
+    text: 'Ouro sobrando e ferro faltando? O mercado troca um pelo outro.',
+    when: (w) => w.wave >= 8 && w.res.ouro >= 200 && w.res.ferro < 30 && !has(w, 'mercado'),
+  },
+  {
     id: 'vampiro',
     icons: ['caveira', 'seta', 'flecha'],
     text: 'O vampiro chama morcegos. Flechas e o castelo derrubam quem voa.',

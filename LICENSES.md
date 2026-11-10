@@ -96,7 +96,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-Os cristais dos veios azuis, a plantação, as texturas de grama e solo, a água, o fosso de piche e as estacas são feitos no próprio projeto.
+Os cristais dos veios azuis, a plantação, as texturas de grama e solo, a água, o fosso de piche, as estacas, a paliçada, a tora que o aldeão leva no ombro, a fumaça dos prédios feridos e as luzes da noite são feitos no próprio projeto. Os retratos do Livro do Sábio (`public/ui/bestiario/`) são fotos dos personagens do KayKit tiradas no próprio jogo; o do morcego é um quadro do sprite do pixelfx.
 
 O código, a interface e as regras são do próprio projeto. A interface usa os tokens e
 componentes do design system do Vigília, outro projeto do mesmo autor.

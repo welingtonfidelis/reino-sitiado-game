@@ -4,13 +4,14 @@
  * avisos e as telas de começo e fim.
  */
 import { useEffect, useReducer, useState } from 'preact/hooks';
-import { MODES, MODE_NAMES, SEASON_ICON, SEASON_NAME, BUILDINGS, RES_ORDER, castle, castleCap, housing, troops, workers, missing, waveSize, MONSTERS, BLESSINGS, repairAllCost, modsForWave, waveSizeWithMods, WAVE_MODS, tileAt, hexToWorld } from '../sim/index.ts';
+import { MODES, MODE_NAMES, SEASON_ICON, SEASON_NAME, BUILDINGS, RES_ORDER, castle, castleCap, housing, troops, workers, missing, waveSize, MONSTERS, BLESSINGS, repairAllCost, modsForWave, waveSizeWithMods, WAVE_MODS, WAVE_THEMES, themeForWave, tileAt, hexToWorld } from '../sim/index.ts';
 import type { BlessingId, Category, Mode, MonsterKind, Res, UnitKind } from '../sim/index.ts';
 import { FALL_TIME, Game, readGameMode } from '../game/game.ts';
 import type { IsoCamera } from '../render/camera.ts';
 import { Icon, RES_LABEL, costText, short } from './common.tsx';
 import { BuildFan, RadialMenu } from './Radial.tsx';
 import { STICKERS } from '../game/album.ts';
+import { BOOK_ORDER, COUNTERS, TRAITS } from '../game/bestiary.ts';
 
 
 function clock(s: number): string {
@@ -42,6 +43,7 @@ const SMALL = '(max-width: 599px), (max-height: 499px)';
 function Hud({ game, cam, small }: { game: Game; cam: IsoCamera; small: boolean }) {
   const [more, setMore] = useState(false);
   const [album, setAlbum] = useState(false);
+  const [book, setBook] = useState(false);
   const w = game.world;
   const pop = workers(w);
   const room = Math.min(housing(w), castleCap(w));
@@ -49,8 +51,9 @@ function Hud({ game, cam, small }: { game: Game; cam: IsoCamera; small: boolean 
   const calm = w.waveState === 'calm';
   const left = calm ? 0 : [...w.monsters.values()].filter((m) => m.state !== 'dead').length + w.spawnQueue.length;
   const boss = [...w.monsters.values()].find((m) => m.state !== 'dead' && MONSTERS[m.kind].boss);
-  const nextMods = modsForWave(w.seed, w.wave + 1, w.mode).map((k) => WAVE_MODS[k].name);
-  const nowMods = w.waveMods.map((k) => WAVE_MODS[k].name);
+  const nextTheme = themeForWave(w.seed, w.wave + 1, w.mode);
+  const nextMods = [...(nextTheme ? [WAVE_THEMES[nextTheme].name] : []), ...modsForWave(w.seed, w.wave + 1, w.mode).map((k) => WAVE_MODS[k].name)];
+  const nowMods = [...(w.waveTheme ? [WAVE_THEMES[w.waveTheme].name] : []), ...w.waveMods.map((k) => WAVE_MODS[k].name)];
   // Cristal só aparece quando já conta: com estoque ou com uma mina no veio de cristal.
   const crystal = w.res.cristal >= 1 || [...w.buildings.values()].some((b) => b.kind === 'mina' && tileAt(w, b.q, b.r)?.terrain === 'crystal');
   const speed = game.speed || game.resumeSpeed;
@@ -125,7 +128,7 @@ function Hud({ game, cam, small }: { game: Game; cam: IsoCamera; small: boolean 
           }}
         >
           <Icon name="mais" />
-          {(small && game.unread) || game.album.fresh.size ? <span class="dot" /> : null}
+          {(small && game.unread) || game.album.fresh.size || game.book.fresh.size ? <span class="dot" /> : null}
         </button>
       </div>
       {boss ? (
@@ -147,9 +150,14 @@ function Hud({ game, cam, small }: { game: Game; cam: IsoCamera; small: boolean 
             setMore(false);
             setAlbum(true);
           }}
+          onBook={() => {
+            setMore(false);
+            setBook(true);
+          }}
         />
       ) : null}
       {album ? <AlbumView game={game} onClose={() => setAlbum(false)} /> : null}
+      {book ? <BookView game={game} onClose={() => setBook(false)} /> : null}
     </div>
   );
 }
@@ -191,6 +199,93 @@ function AlbumView({ game, onClose }: { game: Game; onClose: () => void }) {
                 <strong>{s.name}</strong>
                 <small>{s.hint}</small>
               </div>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/**
+ * Livro do Sábio (2026-11-10): um cartão por monstro, com a figura dele. Quem ainda não apareceu
+ * fica de sombra com "?". Tocar num visto abre a página dele: o que faz e o que funciona contra,
+ * em ícones grandes, com a frase embaixo para quem lê.
+ */
+function BookView({ game, onClose }: { game: Game; onClose: () => void }) {
+  const [open, setOpen] = useState<MonsterKind | null>(null);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    addEventListener('keydown', key);
+    return () => {
+      removeEventListener('keydown', key);
+      game.bookRead();
+    };
+  }, []);
+  const pic = (k: MonsterKind) => `${import.meta.env.BASE_URL}ui/bestiario/${k}.jpg`;
+  const seen = BOOK_ORDER.filter((k) => game.book.seen.has(k)).length;
+  const m = open ? MONSTERS[open] : null;
+  return (
+    <div class="album-backdrop" onPointerDown={onClose}>
+      <section class="panel album book" role="dialog" aria-label="Livro do Sábio" onPointerDown={(e) => e.stopPropagation()}>
+        <header>
+          <img class="book-sage" src={`${import.meta.env.BASE_URL}ui/sabio.png`} alt="" />
+          <h2>Livro do Sábio</h2>
+          <span class="album-count">
+            {seen}/{BOOK_ORDER.length}
+          </span>
+          <button class="round" aria-label="Fechar o livro" onClick={onClose}>
+            <Icon name="fechar" />
+          </button>
+        </header>
+        {open && m ? (
+          <article class="book-page">
+            <img class="book-pic" src={pic(open)} alt={m.name} />
+            <div class="book-info">
+              <h3>{m.name}</h3>
+              <div class="book-row" aria-label="O que faz">
+                {TRAITS[open].map((n) => (
+                  <span class="book-chip bad">
+                    <Icon name={n} />
+                  </span>
+                ))}
+              </div>
+              <p>{m.blurb}</p>
+              <div class="book-row" aria-label="O que funciona contra">
+                <span class="book-vs">
+                  <Icon name="check" />
+                </span>
+                {COUNTERS[open].icons.map((n) => (
+                  <span class="book-chip good">
+                    <Icon name={n} />
+                  </span>
+                ))}
+              </div>
+              <p>{COUNTERS[open].text}</p>
+              <small>Aparece da onda {m.from} em diante{m.boss ? ', a cada tantas ondas, como chefe' : ''}.</small>
+            </div>
+            <button class="round book-back" aria-label="Voltar para a lista" onClick={() => setOpen(null)}>
+              <Icon name="voltar" />
+            </button>
+          </article>
+        ) : null}
+        <div class="album-grid book-grid">
+          {BOOK_ORDER.map((k) => {
+            const got = game.book.seen.has(k);
+            return (
+              <button
+                key={k}
+                class={`book-card${got ? ' got' : ''}${game.book.fresh.has(k) ? ' fresh' : ''}${open === k ? ' on' : ''}${MONSTERS[k].boss ? ' boss' : ''}`}
+                disabled={!got}
+                aria-label={got ? MONSTERS[k].name : 'Ainda não apareceu'}
+                onClick={() => setOpen(k)}
+              >
+                <span class="book-face">
+                  <img src={pic(k)} alt="" />
+                  {got ? null : <b>?</b>}
+                </span>
+                <strong>{got ? MONSTERS[k].name : '???'}</strong>
+              </button>
             );
           })}
         </div>
@@ -278,7 +373,7 @@ function ModePick({ current, onPick }: { current: Mode; onPick: (m: Mode) => voi
 
 const newSeed = () => Math.floor(Math.random() * 1e9);
 
-function MoreMenu({ game, onClose, onAlbum }: { game: Game; onClose: () => void; onAlbum: () => void }) {
+function MoreMenu({ game, onClose, onAlbum, onBook }: { game: Game; onClose: () => void; onAlbum: () => void; onBook: () => void }) {
   const [confirmNew, setConfirmNew] = useState(false);
   useEffect(() => {
     game.markRead();
@@ -304,6 +399,14 @@ function MoreMenu({ game, onClose, onAlbum }: { game: Game; onClose: () => void;
             {game.album.count}/{STICKERS.length}
           </span>
           {game.album.fresh.size ? <span class="fresh-dot" aria-label={`${game.album.fresh.size} novas`} /> : null}
+        </button>
+        <button class="more-row album-row" onClick={onBook}>
+          <Icon name="livro" />
+          <span>Livro do Sábio</span>
+          <span class="album-count">
+            {BOOK_ORDER.filter((k) => game.book.seen.has(k)).length}/{BOOK_ORDER.length}
+          </span>
+          {game.book.fresh.size ? <span class="fresh-dot" aria-label={`${game.book.fresh.size} monstros novos`} /> : null}
         </button>
         <button class="more-row" onClick={() => game.setSound(!game.sound)}>
           <Icon name={game.sound ? 'som' : 'mudo'} />
@@ -509,7 +612,8 @@ function Report({ game }: { game: Game }) {
   const works = (['madeira', 'pedra', 'ferro'] as Res[]).filter((k) => r.prod[k] >= 1).map((k) => `+${Math.floor(r.prod[k])} de ${RES_LABEL[k]}`).join(' · ') || 'Nada';
   const next = w.wave + 1;
   const nextMods = modsForWave(w.seed, next, w.mode);
-  const size = waveSizeWithMods(next, nextMods, w.mode);
+  const theme = themeForWave(w.seed, next, w.mode);
+  const size = waveSizeWithMods(next, nextMods, w.mode, theme);
   const news = (Object.keys(size) as MonsterKind[]).filter((k) => MONSTERS[k].from === next && size[k] > 0 && NEWS[k]).map((k) => NEWS[k]);
   for (const k of ['golem', 'golemOssos', 'golemMusgo'] as MonsterKind[]) if (size[k] > 0) news.push(`Chefe nesta onda: ${MONSTERS[k].name}. ${MONSTERS[k].blurb.replace('Chefe. ', '')}`);
   const rift = MODES[w.mode].riftOpens.includes(next) && next > 1;
@@ -619,6 +723,14 @@ function Report({ game }: { game: Game }) {
         {news.map((n) => (
           <p class="sub" style="color: var(--warn)">{n}</p>
         ))}
+        {theme ? (
+          <p class="theme-note">
+            <Icon name={WAVE_THEMES[theme].icon} />
+            <span>
+              <b>{WAVE_THEMES[theme].name}!</b> {WAVE_THEMES[theme].text}
+            </span>
+          </p>
+        ) : null}
         {rift ? <p class="sub" style="color: var(--bad)">Uma nova fenda se abre nesta onda.</p> : null}
         {nextMods.map((k) => (
           <p class="sub" style="color: var(--warn)">
@@ -758,6 +870,14 @@ export function App({ game, cam, touch }: { game: Game; cam: IsoCamera; touch: b
     <>
       <Hud game={game} cam={cam} small={small} />
       {game.seasonCard > 0 ? <SeasonCard key={game.season} season={game.season} /> : null}
+      {game.themeCard > 0 && game.world.waveTheme ? (
+        <div key={`tema${game.world.wave}`} class="season-card theme-card" role="status" aria-label={`${WAVE_THEMES[game.world.waveTheme].name}: ${WAVE_THEMES[game.world.waveTheme].text}`}>
+          <span class="season-big">
+            <Icon name={WAVE_THEMES[game.world.waveTheme].icon} />
+          </span>
+          <strong>{WAVE_THEMES[game.world.waveTheme].name}!</strong>
+        </div>
+      ) : null}
       <StickerPop game={game} />
       <Guide game={game} />
       {small ? null : (

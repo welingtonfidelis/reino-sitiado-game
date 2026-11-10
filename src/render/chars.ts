@@ -4,7 +4,8 @@
  */
 import * as THREE from 'three';
 import { LARGE, cloneChar, findBone } from './assets.ts';
-import type { Art, CharKey, WeaponKey } from './assets.ts';
+import type { Art, CharKey, StaticKey, WeaponKey } from './assets.ts';
+import type { Res } from '../sim/index.ts';
 
 export type Pose = 'idle' | 'walk' | 'run' | 'attack' | 'shoot' | 'aim' | 'dig' | 'chop' | 'pick' | 'cast' | 'heal' | 'repair' | 'death' | 'shoot2' | 'chop2' | 'spin' | 'cheer' | 'wave' | 'sit' | 'pushups' | 'claw' | 'stab';
 
@@ -98,6 +99,56 @@ const GEAR: Partial<Record<CharKey, { r?: WeaponKey; l?: WeaponKey }>> = {
 const CREST_GEO = new THREE.CylinderGeometry(0.42, 0.42, 0.09, 20, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2);
 const CREST_MAT = new THREE.MeshLambertMaterial({ color: '#c0392b', flatShading: true });
 
+/**
+ * Levar o trabalho (2026-11-10): o que o aldeão leva ao castelo ou ao celeiro. Tora no ombro
+ * (feita aqui: a do KayKit é uma pilha), saco nas costas e carrinho de mão com pedra ou minério
+ * na frente. Medidas do mundo, com o boneco de pé na origem, de frente para +z.
+ */
+const LOG_BARK = new THREE.MeshLambertMaterial({ color: '#7a4e2c', flatShading: true });
+const LOG_END = new THREE.MeshLambertMaterial({ color: '#d8b07a', flatShading: true });
+const PROPS = new WeakMap<Art, Map<Res, THREE.Group>>();
+
+function staticMesh(art: Art, k: StaticKey, scale: number): THREE.Group {
+  const g = new THREE.Group();
+  for (const part of art.statics[k].parts) {
+    const m = new THREE.Mesh(part.geometry, part.material);
+    m.castShadow = true;
+    g.add(m);
+  }
+  g.scale.setScalar(scale);
+  return g;
+}
+
+function carryProp(art: Art, res: Res): THREE.Group {
+  let all = PROPS.get(art);
+  if (!all) PROPS.set(art, (all = new Map()));
+  let g = all.get(res);
+  if (g) return g;
+  g = new THREE.Group();
+  if (res === 'madeira') {
+    const log = new THREE.Group();
+    log.add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.044, 0.42, 7).rotateX(Math.PI / 2), LOG_BARK));
+    for (const z of [-0.212, 0.212]) log.add(new THREE.Mesh(new THREE.CircleGeometry(0.039, 7).rotateY(z > 0 ? 0 : Math.PI).translate(0, 0, z), LOG_END));
+    log.position.set(0.12, 0.41, -0.03);
+    log.rotation.x = -0.32;
+    g.add(log);
+  } else if (res === 'comida') {
+    const sack = staticMesh(art, 'saco', 2.3);
+    sack.position.set(0, 0.33, -0.13);
+    sack.rotation.set(-0.5, 0, 0);
+    g.add(sack);
+  } else {
+    const cart = staticMesh(art, 'carrinho', 1.15);
+    cart.position.set(0, 0, 0.3);
+    g.add(cart);
+    const load = staticMesh(art, res === 'pedra' ? 'lascasB' : 'minerio', res === 'pedra' ? 0.055 : 0.07);
+    load.position.set(0, 0.13, 0.36);
+    g.add(load);
+  }
+  all.set(res, g);
+  return g;
+}
+
 /** Etapa 19: material com a armadura trocada, um por material original e por textura. */
 const SKIN_MATS = new Map<string, THREE.Material>();
 function skinMat(base: THREE.Material, t: THREE.Texture): THREE.Material {
@@ -187,6 +238,18 @@ export class CharView {
       this.skinned = list;
     }
     for (const s of this.skinned) s.mesh.material = t ? skinMat(s.base, t) : s.base;
+  }
+
+  private carried: THREE.Object3D | null = null;
+  private carriedRes: Res | null = null;
+
+  /** O que vai nos braços (2026-11-10); null = nada. */
+  setCarry(res: Res | null): void {
+    if (res === this.carriedRes) return;
+    if (this.carried) this.root.remove(this.carried);
+    this.carried = res ? carryProp(this.art, res).clone(true) : null;
+    if (this.carried) this.root.add(this.carried);
+    this.carriedRes = res;
   }
 
   /** Ferramenta na mão direita, trocada conforme o trabalho (null = mãos vazias). */

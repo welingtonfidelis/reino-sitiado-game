@@ -35,11 +35,15 @@ import {
   heroOf,
   towerSlots,
   upgradeCastle,
+  upgradeTower,
+  trade,
   workers,
 } from '../src/sim/index.ts';
 import type { BuildingKind, Mode, UnitKind, World } from '../src/sim/index.ts';
 
 const SEEDS = Number(process.argv[2] ?? 6);
+const LEVELS = process.env.ROBO_NIVEIS !== '0';
+const MARKET = process.env.ROBO_MERCADO !== '0';
 // HEROIS=0 roda sem heróis, para comparar.
 const HEROES = process.env.HEROIS !== '0';
 // RAIO=13 roda no mapa antigo, para comparar.
@@ -203,6 +207,16 @@ function bot(w: World): void {
   if (units(w, 'mago') < 4 && w.res.cristal > 8) trainAt(w, 'torreMago');
   if (wave >= 10 && count(w, 'estabulo') < 1 && put(w, 'estabulo', 2, 5)) return;
   if (units(w, 'cavaleiro') < 3) trainAt(w, 'estabulo');
+  // Torres de pedra e de fogo e o mercado (2026-11-10). ROBO_NIVEIS=0 e ROBO_MERCADO=0 desligam.
+  if (MARKET && wave >= 10 && count(w, 'mercado') < 1 && put(w, 'mercado', 2, 5)) return;
+  if (MARKET && count(w, 'mercado') > 0) {
+    // Ouro que sobra (heróis já comprados, ou muito ouro) vira ferro; comida no fim, se faltar.
+    const spare = !HEROES || HERO_KINDS.every((k) => heroOf(w, k)) || w.res.ouro > 900;
+    if (spare && w.res.ferro < 80 && w.res.ouro > 200) trade(w, 'ferro', 'comprar');
+    if (w.res.comida < 40 && w.res.ouro > 60) trade(w, 'comida', 'comprar');
+  }
+  if (LEVELS && wave >= 8)
+    for (const b of w.buildings.values()) if (b.kind === 'torre' && b.level < 3 && w.res.pedra > 160 && upgradeTower(w, b.id) === null) break;
 }
 
 const VERBOSE = process.env.VERBOSE === '1';

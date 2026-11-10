@@ -45,8 +45,17 @@ import {
   upgradeCost,
   upgradeProblem,
   workers,
+  towerUpgradeCost,
+  towerUpgradeProblem,
+  towerRange,
+  wallUpgradeProblem,
+  wallsToUpgrade,
+  allWallsProblem,
+  TRADE_RES,
+  tradeDeal,
+  tradeProblem,
 } from '../sim/index.ts';
-import type { Building, BuildingKind, Category, Cost, ForgeLine, HeroKind } from '../sim/index.ts';
+import type { Building, BuildingKind, Category, Cost, ForgeLine, HeroKind, TradeSide } from '../sim/index.ts';
 import type { Game } from '../game/game.ts';
 import type { IsoCamera } from '../render/camera.ts';
 import { Icon, costText } from './common.tsx';
@@ -86,7 +95,7 @@ const FORGE: [ForgeLine, string, string, string][] = [
   ['flechas', 'Pontas', 'flecha', '+15% de dano das flechas'],
 ];
 
-function mainActs(game: Game, b: Building, openForge: () => void, openHeroes: () => void): Act[] {
+function mainActs(game: Game, b: Building, openForge: () => void, openHeroes: () => void, openMarket: (side: TradeSide) => void): Act[] {
   const w = game.world;
   const def = BUILDINGS[b.kind];
   const name = def.name.toLowerCase();
@@ -174,6 +183,73 @@ function mainActs(game: Game, b: Building, openForge: () => void, openHeroes: ()
       hint: `Chamar os arqueiros no chão mais perto (${free} ${free === 1 ? 'vaga' : 'vagas'}).`,
       why: callArchersProblem(w, b.id),
       run: () => game.callArchers(b.id),
+    });
+    // Níveis da torre (2026-11-10).
+    const up = towerUpgradeCost(w, b);
+    const next = CONFIG.towerLevels[b.level];
+    acts.push({
+      id: 'melhorarTorre',
+      slot: 1,
+      icon: 'melhorar',
+      label: 'Melhorar',
+      tone: '',
+      badge: String(b.level),
+      hint:
+        up && next
+          ? `Torre nível ${b.level + 1} · ${costText(up)}. ${b.level === 1 ? 'Vira de pedra: ' : 'Mais alta, de tochas: '}alcance ${String(next.range).replace('.', ',')} m, flechas ${Math.round((next.dmg - 1) * 100)}% mais fortes${next.fire ? ' e de fogo (troll e golem de musgo param de se curar)' : ''}, vida ${next.hp}.`
+          : 'A torre já está no nível máximo: flechas de fogo.',
+      why: towerUpgradeProblem(w, b),
+      run: () => game.upgradeTower(b.id),
+    });
+  }
+  if (b.kind === 'muralha') {
+    // Paliçada vira pedra (2026-11-10): este trecho ou todos.
+    const stone = CONFIG.wallLevels[1]!;
+    const all = wallsToUpgrade(w);
+    acts.push({
+      id: 'pedra',
+      slot: 0,
+      icon: 'muralha',
+      label: 'Pedra',
+      tone: b.level >= 2 ? 'on' : 'primary',
+      hint: b.level >= 2 ? 'Este trecho já é de pedra.' : `Este trecho vira pedra · ${costText(stone.cost)}. Vida ${stone.hp} (a paliçada tem ${CONFIG.wallLevels[0]!.hp}).`,
+      why: b.level >= 2 ? 'Já é de pedra' : wallUpgradeProblem(w, b),
+      run: () => game.upgradeWall(b.id),
+    });
+    acts.push({
+      id: 'pedraTodas',
+      slot: 1,
+      icon: 'melhorar',
+      label: 'Todas',
+      tone: '',
+      badge: all.n ? String(all.n) : undefined,
+      hint: all.n
+        ? `Toda paliçada pronta vira pedra (${all.n} ${all.n === 1 ? 'trecho' : 'trechos'}) · ${costText(all.cost)}. Sem pedra para todas, começa pelas mais perto deste trecho.`
+        : 'Nenhuma paliçada pronta para virar pedra.',
+      why: allWallsProblem(w),
+      run: () => game.upgradeAllWalls(b.id),
+    });
+  }
+  if (b.kind === 'mercado') {
+    acts.push({
+      id: 'comprar',
+      slot: 0,
+      icon: 'comprar',
+      label: 'Comprar',
+      tone: 'primary',
+      hint: 'Comprar comida, madeira, pedra, ferro ou cristal com ouro.',
+      why: b.built < 1 ? 'Ainda em obra' : null,
+      run: () => openMarket('comprar'),
+    });
+    acts.push({
+      id: 'vender',
+      slot: 1,
+      icon: 'vender',
+      label: 'Vender',
+      tone: '',
+      hint: `Vender o que sobra por ouro (a metade do preço de compra).`,
+      why: b.built < 1 ? 'Ainda em obra' : null,
+      run: () => openMarket('vender'),
     });
   }
   if (b.kind === 'fazenda' && MODES[w.mode].depletes) {
@@ -302,6 +378,28 @@ function heroActs(game: Game): Act[] {
   });
 }
 
+/** Mercado (2026-11-10): um botão por recurso, com o lote e o ouro no rótulo. */
+function marketActs(game: Game, side: TradeSide): Act[] {
+  const w = game.world;
+  return TRADE_RES.map((res, i) => {
+    const d = tradeDeal(res, side);
+    return {
+      id: `${side}-${res}`,
+      slot: i,
+      icon: res,
+      label: side === 'comprar' ? `+${d.n}` : `−${d.n}`,
+      tone: '' as Tone,
+      badge: String(d.ouro),
+      hint:
+        side === 'comprar'
+          ? `Comprar ${d.n} de ${res} por ${d.ouro} de ouro.`
+          : `Vender ${d.n} de ${res} por ${d.ouro} de ouro.`,
+      why: tradeProblem(w, res, side),
+      run: () => game.trade(res, side),
+    };
+  });
+}
+
 function forgeActs(game: Game): Act[] {
   const w = game.world;
   return FORGE.map(([line, name, icon, text], i) => {
@@ -320,6 +418,16 @@ function forgeActs(game: Game): Act[] {
   });
 }
 
+/** Título do cartão: nível do castelo e da torre, paliçada ou pedra, a plantação, o lado do mercado. */
+function titleOf(w: Game['world'], b: Building, sub: string | null): string {
+  if (b.kind === 'castelo') return `Castelo · nível ${b.level}`;
+  if (b.kind === 'torre') return `Torre de arqueiros · nível ${b.level}`;
+  if (b.kind === 'muralha') return b.level >= 2 ? 'Muralha de pedra' : 'Paliçada';
+  if (b.kind === 'fazenda') return `Plantação de ${CROP_NAME[cropOf(w, b)]}`;
+  if (b.kind === 'mercado' && (sub === 'comprar' || sub === 'vender')) return sub === 'comprar' ? 'Mercado · comprar' : 'Mercado · vender';
+  return BUILDINGS[b.kind].name;
+}
+
 /** Linha de informação do prédio (sem ação em foco). */
 function noteFor(game: Game, b: Building): string | null {
   const w = game.world;
@@ -330,7 +438,9 @@ function noteFor(game: Game, b: Building): string | null {
       return `Vagas nas casas ${housing(w)} · teto do castelo ${castleCap(w)} · tropas ${troops(w)}, sem teto.${bl}`;
     }
     case 'torre':
-      return 'Arqueiros do campo de tiro sobem sozinhos; os que você mandou para um lugar sobem com "Chamar" ou tocando na torre.';
+      return `Alcance ${String(towerRange(b)).replace('.', ',')} m. Arqueiros do campo de tiro sobem sozinhos; os que você mandou para um lugar sobem com "Chamar" ou tocando na torre.`;
+    case 'mercado':
+      return `Ouro agora: ${Math.floor(w.res.ouro)}. Cada troca é um lote; vender rende a metade do preço de compra.`;
     case 'catapulta':
       return 'Atira sozinha a cada 4 s no monstro com mais vida entre 3 e 12 m. Não acerta quem voa.';
     case 'estacas':
@@ -417,7 +527,7 @@ export const clamp = (v: number, lo: number, hi: number) => (lo > hi ? (lo + hi)
 export function RadialMenu({ game, cam, b, touch }: { game: Game; cam: IsoCamera; b: Building; touch: boolean }) {
   // Redesenha a cada quadro enquanto aberto: o anel acompanha o prédio ao arrastar e dar zoom.
   const [, frame] = useReducer((n: number) => n + 1, 0);
-  const [sub, setSub] = useState<'forja' | 'herois' | null>(null);
+  const [sub, setSub] = useState<'forja' | 'herois' | TradeSide | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
   const press = useRef<{ id: string; long: boolean; timer: number } | null>(null);
@@ -451,12 +561,15 @@ export function RadialMenu({ game, cam, b, touch }: { game: Game; cam: IsoCamera
       ? forgeActs(game)
       : sub === 'herois'
         ? heroActs(game)
-        : mainActs(
-            game,
-            b,
-            () => (setSub('forja'), setFocus(null)),
-            () => (setSub('herois'), setFocus(null)),
-          );
+        : sub === 'comprar' || sub === 'vender'
+          ? marketActs(game, sub)
+          : mainActs(
+              game,
+              b,
+              () => (setSub('forja'), setFocus(null)),
+              () => (setSub('herois'), setFocus(null)),
+              (side) => (setSub(side), setFocus(null)),
+            );
 
   // Onde fica: em volta do prédio, sem sair da tela.
   const vw = window.innerWidth;
@@ -487,7 +600,7 @@ export function RadialMenu({ game, cam, b, touch }: { game: Game; cam: IsoCamera
   const above = fan || roomAbove >= cardH || (roomBelow < cardH && roomAbove > roomBelow);
   const cardLeft = clamp(cx - cardW / 2, 8, vw - cardW - 8);
 
-  const angles = sub === 'herois' ? (fan ? HERO_FAN : HERO_RING) : sub ? (fan ? SUB_FAN : SUB_RING) : fan ? FAN : RING;
+  const angles = sub === 'herois' ? (fan ? HERO_FAN : HERO_RING) : sub === 'forja' ? (fan ? SUB_FAN : SUB_RING) : fan ? FAN : RING;
   const shownId = focus ?? (confirm ? 'destruir' : (acts.find((a) => a.slot === 0)?.id ?? null));
   const shown = acts.find((a) => a.id === shownId) ?? null;
 
@@ -558,7 +671,7 @@ export function RadialMenu({ game, cam, b, touch }: { game: Game; cam: IsoCamera
         aria-live="polite"
       >
         <header>
-          <strong>{b.kind === 'castelo' ? `Castelo · nível ${b.level}` : b.kind === 'fazenda' ? `Plantação de ${CROP_NAME[cropOf(w, b)]}` : def.name}</strong>
+          <strong>{titleOf(w, b, sub)}</strong>
           <button class="rcard-x" aria-label="Fechar" onClick={close}>
             <Icon name="fechar" />
           </button>
@@ -605,6 +718,7 @@ const BUILD_ICON: Record<BuildingKind, string> = {
   portao: 'portao',
   torre: 'torre',
   catapulta: 'catapulta',
+  mercado: 'mercado',
   piche: 'fogo',
   estacas: 'estacas',
   quartel: 'espadas',

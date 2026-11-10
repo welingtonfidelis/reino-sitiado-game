@@ -12,7 +12,7 @@ import { CharView } from './chars.ts';
 import { buildGround, paintVillage } from './ground.ts';
 import { Bubbles } from './bubbles.ts';
 import type { BubbleIcon } from './bubbles.ts';
-import { planVillage } from './village.ts';
+import { LINKED, planVillage } from './village.ts';
 import type { Home } from './village.ts';
 import { SEASON_U, SeasonLook, Weather, leafy, snowy, weatherOf } from './season.ts';
 import type { QualityLook } from './quality.ts';
@@ -121,6 +121,8 @@ interface Flight {
   z2: number;
   t: number;
   dur: number;
+  /** Flecha de fogo da torre de nível 3 (2026-11-10): rastro laranja. */
+  fire?: boolean;
 }
 
 const HOME: Record<BuildingKind, StaticKey> = {
@@ -144,6 +146,7 @@ const HOME: Record<BuildingKind, StaticKey> = {
   acampamento: 'acampamento',
   polvora: 'polvora',
   catapulta: 'catapulta',
+  mercado: 'mercado',
   piche: 'obra',
   estacas: 'obra',
 };
@@ -210,18 +213,124 @@ const CASTLE_SCALE = [0.86, 0.96, 1.06, 1.14];
 const CASTLE_FLAG = [1.1, 1.3, 1.6, 2.0];
 const CASTLE_GROW = 1.2;
 
-/** Torre dos arqueiros: a torre de vigia aberta do KayKit, maior, com os arqueiros na plataforma. */
-const TOWER_SCALE = 1.8;
-/** Piso da plataforma e os quatro cantos (em medidas do modelo, antes da escala). */
-const PLATFORM_Y = 0.79;
-const PLATFORM: [number, number][] = [
-  [-0.17, -0.17],
-  [0.17, 0.17],
-  [-0.17, 0.17],
-  [0.17, -0.17],
+/**
+ * Torre dos arqueiros por nível (2026-11-10): 1, a vigia de madeira (menor que a de antes, 1,8×,
+ * para a vila não sumir atrás de tantas torres); 2, a torre de pedra de topo aberto; 3, a mesma
+ * maior, com tochas no alto e estandartes na porta. `floor` é o piso dos arqueiros e `corner`,
+ * o canto deles, em medidas do modelo (antes da escala); `top`, onde vão as barras.
+ */
+const TOWER_LOOK: { key: StaticKey; scale: number; floor: number; corner: number; top: number }[] = [
+  { key: 'torre', scale: 1.4, floor: 0.79, corner: 0.17, top: 1.9 },
+  { key: 'poste', scale: 1.05, floor: 1.4, corner: 0.19, top: 2.0 },
+  { key: 'poste', scale: 1.28, floor: 1.4, corner: 0.19, top: 2.4 },
+];
+const TRAIL_FIRE = new THREE.Color('#ff7a2a');
+const SMOKE_LIGHT = new THREE.Color('#bdb6ad');
+/**
+ * Dia e noite (2026-11-10): um dia inteiro a cada DAY s de partida (a partida começa de manhã).
+ * `night` 0 a 1, `glow` o tanto de luz de fim de tarde ou de amanhecer e `dawn` qual dos dois.
+ * A noite de lua escurece MOON_NIGHT do que escurece a Noite sem lua.
+ */
+const DAY = 300;
+const MOON_NIGHT = 0.75;
+const MOON = new THREE.Color('#8fa6ff');
+const DUSK = new THREE.Color('#ff9a52');
+const DAWN = new THREE.Color('#ffb4a0');
+function dayLight(time: number): { night: number; glow: number; dawn: boolean } {
+  const ph = (time / DAY + 0.2) % 1;
+  const ramp = (a: number, b: number) => Math.min(1, Math.max(0, (ph - a) / (b - a)));
+  const night = ph < 0.6 ? 0 : ph < 0.68 ? ramp(0.6, 0.68) : ph < 0.9 ? 1 : 1 - ramp(0.9, 0.97);
+  const glow = ph < 0.52 ? 0 : ph < 0.62 ? ramp(0.52, 0.6) : ph < 0.7 ? 1 - ramp(0.62, 0.7) : ph < 0.88 ? 0 : ph < 0.94 ? ramp(0.88, 0.93) : 1 - ramp(0.94, 1);
+  return { night, glow, dawn: ph > 0.8 };
+}
+
+/** Bolinha de luz macia (janela e tocha à noite). */
+function glowTexture(): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.25, 'rgba(255,240,200,0.75)');
+  grad.addColorStop(1, 'rgba(255,200,120,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const SMOKE_MID = new THREE.Color('#7d756d');
+const SMOKE_DARK = new THREE.Color('#3f3a36');
+const towerLook = (b: Building) => TOWER_LOOK[Math.max(1, Math.min(b.level, TOWER_LOOK.length)) - 1]!;
+const CORNERS: [number, number][] = [
+  [-1, -1],
+  [1, 1],
+  [-1, 1],
+  [1, -1],
 ];
 
-const TOP: Partial<Record<BuildingKind, number>> = { acampamento: 1.3, polvora: 2.0, catapulta: 1.6, piche: 0.3, estacas: 0.6, castelo: 4.1, torre: 2.6, quartel: 1.7, campo: 1.8, muralha: 1.2, portao: 1.4, torreMago: 2.4, capela: 1.9, estabulo: 1.3, forja: 1.4, oficina: 1.3 };
+/**
+ * Paliçada (muralha de nível 1, 2026-11-10): meio trecho de troncos de ponta lascada, do centro
+ * do hexágono até a borda (x de -0,5 a 0,5), com duas travessas; e o poste das quinas.
+ */
+function palisadeModel(): StaticModel {
+  const bark: THREE.BufferGeometry[] = [];
+  const tip: THREE.BufferGeometry[] = [];
+  const rail: THREE.BufferGeometry[] = [];
+  // Duas fileiras desencontradas de troncos grossos em cima de um barranco de terra: vista de
+  // cima ou de ponta, a paliçada tem corpo (uma fileira só sumia de ponta).
+  const n = 5;
+  for (const [row, z0] of [[0, -0.1], [1, 0.1]] as const) {
+    for (let i = 0; i < n; i++) {
+      const x = -0.5 + (i + 0.5 + (row ? 0.5 : 0)) / n;
+      if (x > 0.52) continue;
+      const h = (row ? 0.82 : 0.92) + ((i * 7 + row) % 3) * 0.06;
+      const r = 0.095;
+      bark.push(new THREE.CylinderGeometry(r, r * 1.08, h * 0.82, 7).translate(x, h * 0.41, z0));
+      tip.push(new THREE.ConeGeometry(r, h * 0.2, 7).translate(x, h * 0.92, z0));
+    }
+  }
+  for (const y of [0.3, 0.6]) rail.push(new THREE.BoxGeometry(1.02, 0.08, 0.06).translate(0, y, 0.2));
+  const berm = new THREE.BoxGeometry(1.04, 0.14, 0.64).translate(0, 0.07, 0);
+  return {
+    parts: [
+      { geometry: merge(bark), material: lambert('#7a4e2c') },
+      { geometry: merge(tip), material: lambert('#d8b07a') },
+      { geometry: merge(rail), material: lambert('#5e3b20') },
+      { geometry: berm, material: lambert('#6e5236') },
+    ],
+    box: new THREE.Box3(new THREE.Vector3(-0.55, 0, -0.27), new THREE.Vector3(0.55, 1.1, 0.27)),
+  };
+}
+
+function palisadePostModel(): StaticModel {
+  const bark: THREE.BufferGeometry[] = [];
+  const tip: THREE.BufferGeometry[] = [];
+  const band: THREE.BufferGeometry[] = [];
+  const logs: [number, number, number, number][] = [
+    [0, 0, 0.15, 1.15],
+    [0.17, 0.08, 0.1, 0.92],
+    [-0.13, 0.13, 0.1, 0.96],
+    [0.02, -0.17, 0.1, 0.88],
+  ];
+  for (const [x, z, r, h] of logs) {
+    bark.push(new THREE.CylinderGeometry(r, r * 1.08, h * 0.82, 8).translate(x, h * 0.41, z));
+    tip.push(new THREE.ConeGeometry(r, h * 0.2, 8).translate(x, h * 0.92, z));
+  }
+  for (const y of [0.3, 0.62]) band.push(new THREE.CylinderGeometry(0.165, 0.165, 0.05, 8).translate(0, y, 0));
+
+  return {
+    parts: [
+      { geometry: merge(bark), material: lambert('#74492a') },
+      { geometry: merge(tip), material: lambert('#d8b07a') },
+      { geometry: merge(band), material: lambert('#c9a25a') },
+      { geometry: new THREE.CylinderGeometry(0.34, 0.38, 0.12, 8).translate(0, 0.06, 0), material: lambert('#6e5236') },
+    ],
+    box: new THREE.Box3(new THREE.Vector3(-0.38, 0, -0.38), new THREE.Vector3(0.38, 1.2, 0.38)),
+  };
+}
+
+const TOP: Partial<Record<BuildingKind, number>> = { acampamento: 1.3, polvora: 2.0, catapulta: 1.6, piche: 0.3, estacas: 0.6, castelo: 4.1, torre: 1.9, quartel: 1.7, campo: 1.8, muralha: 1.2, portao: 1.4, torreMago: 2.4, capela: 1.9, estabulo: 1.3, forja: 1.4, oficina: 1.3 };
 
 /**
  * Fosso de piche (proposta P2, 2026-11-09): poça grande e irregular com borda de terra escura,
@@ -474,6 +583,12 @@ export class World3D {
   pxPerMeter = 30;
   camYaw = Math.PI / 6;
   private burning = new Map<number, number>();
+  private burningBig = new Map<number, number>();
+  /** Fumaça dos prédios feridos (2026-11-10): bolotas que sobem, crescem e somem. */
+  private smoke: { x: number; y: number; z: number; t: number; life: number; s: number; dark: number; drift: number }[] = [];
+  private smokeT = new Map<number, number>();
+  private smokeMesh!: THREE.InstancedMesh;
+  private glows!: THREE.Points;
   private portals: number[] = [];
   private ground: THREE.Mesh | null = null;
   private grid: THREE.LineSegments | null = null;
@@ -482,6 +597,9 @@ export class World3D {
   private farms = new Map<Crop, Instanced>();
   private pitch!: Instanced;
   private spikes!: Instanced;
+  private palisade!: Instanced;
+  private readonly trailLv = new THREE.Color();
+  private palisadePost!: Instanced;
   private rocksInFlight: Flight[] = [];
   private pitchFire = new Map<number, number[]>();
   private hemi!: THREE.HemisphereLight;
@@ -515,7 +633,7 @@ export class World3D {
     for (const k of ['feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote'] as StaticKey[]) big(k, 120);
     for (const k of ['castelo', 'casaA', 'casaB', 'fazenda', 'moinho', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'acampamento', 'polvora'] as StaticKey[]) big(k, 200);
     big('casteloOuro', 4);
-    big('estandarte', 8);
+    big('estandarte', 160);
     this.crystals = new Instanced(scene, crystalModel(), 200, true, false);
     for (const c of CROPS) this.farms.set(c, new Instanced(scene, cropModel(c), 60, true, true));
     this.pitch = new Instanced(scene, pitchModel(art), 120, true, true);
@@ -554,9 +672,33 @@ export class World3D {
     );
     this.trail.count = 0;
     this.trail.frustumCulled = false;
+    this.smokeMesh = new THREE.InstancedMesh(
+      new THREE.IcosahedronGeometry(0.22, 0),
+      new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true, transparent: true, opacity: 0.82, depthWrite: false }),
+      360,
+    );
+    this.smokeMesh.count = 0;
+    this.smokeMesh.frustumCulled = false;
+    this.smokeMesh.setColorAt(0, new THREE.Color('#ffffff'));
+    scene.add(this.smokeMesh);
+    this.glows = new THREE.Points(
+      new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(600 * 3), 3)),
+      new THREE.PointsMaterial({ map: glowTexture(), color: '#ffb24a', size: 30, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }),
+    );
+    this.glows.geometry.setDrawRange(0, 0);
+    this.glows.frustumCulled = false;
+    this.glows.renderOrder = 7;
+    scene.add(this.glows);
+    // Cor por ponto (2026-11-10): o rastro da forja e o das flechas de fogo na mesma malha.
+    this.trail.setColorAt(0, new THREE.Color('#ffffff'));
     scene.add(this.trail);
     big('muro', 1400);
     big('poste', 700);
+    // Torre de nível 3 e paliçada (2026-11-10).
+    big('tocha', 120);
+    this.palisade = new Instanced(scene, palisadeModel(), 1400, true, false);
+    this.palisadePost = new Instanced(scene, palisadePostModel(), 700, true, false);
+    for (const set of [this.palisade, this.palisadePost]) for (const m of set.meshes) snowy(m.material as THREE.Material);
     big('flecha', 400, false);
     this.bars = new Bars(scene);
 
@@ -721,13 +863,15 @@ export class World3D {
   syncStatic(w: World): void {
     if (w.ver === this.ver) return;
     this.ver = w.ver;
-    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casteloOuro', 'estandarte', 'casaA', 'casaB', 'fazenda', 'moinho', 'feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'acampamento', 'polvora', 'catapulta', 'poco', 'taverna', 'mercado', 'barril', 'caixa', 'balde', 'arvoreE', 'arvoreF', 'toras', 'torasB'];
+    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casteloOuro', 'estandarte', 'casaA', 'casaB', 'fazenda', 'moinho', 'feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'acampamento', 'polvora', 'catapulta', 'poco', 'taverna', 'mercado', 'barril', 'caixa', 'balde', 'arvoreE', 'arvoreF', 'toras', 'torasB', 'tocha'];
     // Etapa 17: o terreno mudou (recurso acabou ou brotou): refaz o chão antes de pintar a vila.
     if (w.land !== this.land) this.rebuildGround(w);
     for (const k of keys) this.sets.get(k)!.begin();
     this.crystals.begin();
     this.pitch.begin();
     this.spikes.begin();
+    this.palisade.begin();
+    this.palisadePost.begin();
     for (const f of this.farms.values()) f.begin();
     const sixth = Math.PI / 3;
     for (const t of w.list) {
@@ -779,6 +923,7 @@ export class World3D {
     for (const v of village.pieces) this.place(v.key, v.x, 0, v.z, v.rot, v.scale, v.id);
     // Portas das casas: onde os elfos do inverno passeiam.
     this.doors = [...village.homes.values()].map((h) => ({ x: h.x + Math.sin(h.rot) * 0.95, z: h.z + Math.cos(h.rot) * 0.95 }));
+    this.placeGlows(w, village);
     paintVillage(village.yards, village.trails);
     this.movers.clear();
     this.wallsMoving = false;
@@ -852,7 +997,11 @@ export class World3D {
         if (lv >= 2) for (const sx of [-1, 1]) this.place('estandarte', p.x + sx * 0.47 * s, 0, p.z + 1.06 * s, 0, 1.5, b.id);
         continue;
       }
-      this.place(key, p.x, 0, p.z, rot, b.kind === 'torre' ? TOWER_SCALE : 1, b.id);
+      if (b.kind === 'torre') {
+        this.tower(b, p.x, p.z, rot);
+        continue;
+      }
+      this.place(key, p.x, 0, p.z, rot, 1, b.id);
       if (b.kind === 'mina') {
         // O minério ao lado da mina diminui com o veio (some quando ele acaba).
         const vein = tileAt(w, b.q, b.r)!;
@@ -872,6 +1021,8 @@ export class World3D {
     for (const f of this.farms.values()) f.end();
     this.pitch.end();
     this.spikes.end();
+    this.palisade.end();
+    this.palisadePost.end();
   }
 
   /**
@@ -975,6 +1126,76 @@ export class World3D {
     this.bubbles.sync(dry, this.time);
   }
 
+  /**
+   * Luzes da noite (2026-11-10): janela acesa na frente de cada casa e de cada prédio da vila,
+   * quatro no castelo e as tochas da torre de nível 3 e do piche.
+   */
+  private placeGlows(w: World, village: ReturnType<typeof planVillage>): void {
+    const pos = this.glows.geometry.getAttribute('position') as THREE.BufferAttribute;
+    let n = 0;
+    const put = (x: number, y: number, z: number) => {
+      if (n < pos.count) pos.setXYZ(n++, x, y, z);
+    };
+    for (const h of village.homes.values()) put(h.x + Math.sin(h.rot) * 0.42, 0.42, h.z + Math.cos(h.rot) * 0.42);
+    for (const b of w.buildings.values()) {
+      if (b.built < 1 || b.moveTo) continue;
+      const p = hexToWorld(b.q, b.r);
+      if (b.kind === 'castelo') {
+        const s = this.castleDrawn.scale;
+        for (const [ox, oy, oz] of [[0, 1.1, 1.05], [-0.62, 1.7, 0.75], [0.62, 1.7, 0.75], [0, 2.6, 0.55]] as const) put(p.x + ox * s, oy * s, p.z + oz * s);
+      } else if (b.kind === 'torre' && b.level >= 3) {
+        const L = towerLook(b);
+        const rot = village.turns.get(b.id) ?? ((b.id * 7) % 6) * (Math.PI / 3);
+        for (const k of [0, 2]) {
+          const a = rot + Math.PI / 4 + (k * Math.PI) / 2;
+          put(p.x + Math.sin(a) * 0.36 * L.scale, (L.floor + 0.3) * L.scale, p.z + Math.cos(a) * 0.36 * L.scale);
+        }
+      } else if (b.kind === 'piche') {
+        put(p.x - 0.75, 0.55, p.z - 0.45);
+      } else if (LINKED.has(b.kind) && b.kind !== 'casa') {
+        const rot = village.turns.get(b.id) ?? 0;
+        put(p.x + Math.sin(rot) * 0.6, 0.45, p.z + Math.cos(rot) * 0.6);
+      }
+    }
+    this.glows.geometry.setDrawRange(0, n);
+    pos.needsUpdate = true;
+  }
+
+  /** Solta fumaça do prédio ferido no ritmo do estrago (0 leve, 1 metade, 2 quase caindo). */
+  private smokeFrom(id: number, x: number, y: number, z: number, stage: number, dt: number): void {
+    if (dt <= 0) return;
+    let t = (this.smokeT.get(id) ?? Math.random() * 0.3) - dt;
+    while (t <= 0) {
+      t += [0.55, 0.32, 0.18][stage]!;
+      if (this.smoke.length >= this.smokeMesh.instanceMatrix.count) break;
+      this.smoke.push({ x: x + (Math.random() - 0.5) * 0.25, y, z: z + (Math.random() - 0.5) * 0.25, t: 0, life: 2.6 + Math.random() * 1.2 + stage * 0.6, s: 0.6 + stage * 0.25 + Math.random() * 0.3, dark: stage, drift: Math.random() * Math.PI * 2 });
+    }
+    this.smokeT.set(id, t);
+  }
+
+  private stepSmoke(dt: number): void {
+    const SHADES = [SMOKE_LIGHT, SMOKE_MID, SMOKE_DARK];
+    let n = 0;
+    this.smoke = this.smoke.filter((p) => {
+      p.t += dt;
+      if (p.t >= p.life) return false;
+      const k = p.t / p.life;
+      // Sobe e o vento leva um pouco para o lado; cresce e no fim encolhe até sumir.
+      const y = p.y + p.t * 0.75;
+      const x = p.x + Math.cos(p.drift) * p.t * 0.12 + p.t * 0.1;
+      const z = p.z + Math.sin(p.drift) * p.t * 0.12;
+      const sc = p.s * (0.45 + k * 1.3) * Math.min(1, (1 - k) * 3);
+      this.tmp.makeScale(sc, sc, sc).setPosition(x, y, z);
+      this.smokeMesh.setMatrixAt(n, this.tmp);
+      this.smokeMesh.setColorAt(n, SHADES[p.dark]!);
+      n++;
+      return true;
+    });
+    this.smokeMesh.count = n;
+    this.smokeMesh.instanceMatrix.needsUpdate = true;
+    if (this.smokeMesh.instanceColor) this.smokeMesh.instanceColor.needsUpdate = true;
+  }
+
   /** O que desenhar de um prédio de mudança: o modelo principal, sem os enfeites em volta. */
   private moverLook(w: World, b: Building, home: Home | undefined): { parts: StaticPart[]; x: number; z: number; rot: number; scale: number } {
     const p = hexToWorld(b.q, b.r);
@@ -985,7 +1206,8 @@ export class World3D {
     const rot = ((b.id * 7) % 6) * (Math.PI / 3);
     if (b.kind === 'celeiro') return { parts: this.art.statics.moinho.parts, x: p.x, z: p.z, rot, scale: 1 };
     if (b.kind === 'pedreira') return { parts: this.art.statics.pedreira.parts, x: p.x, z: p.z, rot, scale: 1.4 };
-    return { parts: this.art.statics[HOME[b.kind]].parts, x: p.x, z: p.z, rot, scale: b.kind === 'torre' ? TOWER_SCALE : 1 };
+    if (b.kind === 'torre') return { parts: this.art.statics[towerLook(b).key].parts, x: p.x, z: p.z, rot, scale: towerLook(b).scale };
+    return { parts: this.art.statics[HOME[b.kind]].parts, x: p.x, z: p.z, rot, scale: 1 };
   }
 
   /**
@@ -1065,13 +1287,42 @@ export class World3D {
       this.place(b.built < 1 ? 'obra' : 'portao', x, 0, z, -a, b.built < 1 ? 0.6 : 1, b.id);
       return;
     }
+    // Paliçada (nível 1) ou pedra (nível 2), 2026-11-10.
+    const wood = b.level < 2;
     for (const k of dirs) {
       const a = ang(k);
       // Meio muro do centro até a borda: dois meios formam um muro inteiro.
-      this.place('muro', x + Math.cos(a) * 0.5, 0, z + Math.sin(a) * 0.5, -a, grow, b.id, 0.5);
+      if (wood) {
+        this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -a);
+        this.tmp.compose(this.p.set(x + Math.cos(a) * 0.5, 0, z + Math.sin(a) * 0.5), this.q, this.s.set(1, grow, 1));
+        this.palisade.push(this.tmp, b.id);
+      } else this.place('muro', x + Math.cos(a) * 0.5, 0, z + Math.sin(a) * 0.5, -a, grow, b.id, 0.5);
     }
     const straight = dirs.length === 2 && (dirs[0]! + 3) % 6 === dirs[1];
-    if (!straight) this.place('poste', x, 0, z, 0, 0.85 * grow, b.id);
+    if (straight) return;
+    if (wood) {
+      this.tmp.compose(this.p.set(x, 0, z), this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), (b.id % 6) * 1.1), this.s.setScalar(grow));
+      this.palisadePost.push(this.tmp, b.id);
+    } else this.place('poste', x, 0, z, 0, 0.85 * grow, b.id);
+  }
+
+  /** Torre dos arqueiros no nível dela (2026-11-10); no 3, tochas no alto e estandartes na porta. */
+  private tower(b: Building, x: number, z: number, rot: number): void {
+    const L = towerLook(b);
+    this.place(L.key, x, 0, z, rot, L.scale, b.id);
+    if (b.level < 3) return;
+    const top = (L.floor + 0.02) * L.scale;
+    const r = 0.36 * L.scale;
+    for (const k of [0, 2]) {
+      const a = rot + Math.PI / 4 + (k * Math.PI) / 2;
+      this.place('tocha', x + Math.sin(a) * r, top, z + Math.cos(a) * r, a + Math.PI, 0.55, b.id);
+    }
+    // Estandartes dos dois lados da porta (a porta olha para +z do modelo).
+    for (const sx of [-1, 1]) {
+      const ox = sx * 0.42 * L.scale;
+      const oz = 0.5 * L.scale;
+      this.place('estandarte', x + ox * Math.cos(rot) + oz * Math.sin(rot), 0, z - ox * Math.sin(rot) + oz * Math.cos(rot), rot, 1.15, b.id);
+    }
   }
 
   /** Fantasma do que vai ser construído (verde pode, vermelho não). */
@@ -1090,7 +1341,7 @@ export class World3D {
     this.ghost.position.set(p.x, 0.01, p.z);
     this.ghostMat.color.set(ok ? '#8cc56a' : '#e2675a');
     this.ghost.visible = true;
-    this.showRing(q, r, ok ? '#8cc56a' : '#e2675a', kind === 'torre' ? CONFIG.tower.range : 0);
+    this.showRing(q, r, ok ? '#8cc56a' : '#e2675a', kind === 'torre' ? CONFIG.towerLevels[0]!.range : 0);
   }
 
   showRing(q: number, r: number, color: string, range: number): void {
@@ -1142,6 +1393,7 @@ export class World3D {
   topOf(b: Building): number {
     // Etapa 19: o castelo muda de tamanho com o nível.
     if (b.kind === 'castelo') return (TOP.castelo ?? 1.2) * this.castleDrawn.scale;
+    if (b.kind === 'torre') return towerLook(b).top;
     return TOP[b.kind] ?? 1.2;
   }
 
@@ -1200,6 +1452,17 @@ export class World3D {
         const p = castleAt();
         if (p) fx.play('moedas', p.x, 4.3, p.z);
         if (p) this.startParty(p.x, p.z, e.wave % CONFIG.bossEvery === 0);
+      } else if (e.type === 'haul') {
+        // Entregou: o ícone do recurso pula em cima de onde entregou.
+        this.bubbles.flash(LOOT_ICON[e.res], e.x, e.res === 'comida' ? 1.9 : 3.2, e.z, this.time, 1.4);
+      } else if (e.type === 'buildingUp') {
+        // Torre ou muralha subiu de nível (2026-11-10): poeira e brilho.
+        const b = w.buildings.get(e.id);
+        if (b) {
+          const p = hexToWorld(b.q, b.r);
+          fx.play('poof', p.x, 0.1, p.z, { scale: b.kind === 'torre' ? 1.3 : 0.6 });
+          if (b.kind === 'torre') fx.play('nivel', p.x, 0, p.z + 0.6, { scale: 0.8 });
+        }
       } else if (e.type === 'upgrade') {
         const p = castleAt();
         if (p) fx.play('nivel', p.x, 0, p.z + 0.9);
@@ -1235,11 +1498,14 @@ export class World3D {
         const t = w.buildings.get(u.tower);
         if (t) {
           const c = hexToWorld(t.q, t.r);
-          const [ox, oz] = PLATFORM[Math.max(0, t.archers.indexOf(u.id)) % PLATFORM.length]!;
+          const L = towerLook(t);
+          const [cx, cz] = CORNERS[Math.max(0, t.archers.indexOf(u.id)) % CORNERS.length]!;
+          const ox = cx * L.corner;
+          const oz = cz * L.corner;
           const rot = ((t.id * 7) % 6) * (Math.PI / 3);
-          x = c.x + (ox * Math.cos(rot) + oz * Math.sin(rot)) * TOWER_SCALE;
-          z = c.z + (-ox * Math.sin(rot) + oz * Math.cos(rot)) * TOWER_SCALE;
-          y = PLATFORM_Y * TOWER_SCALE;
+          x = c.x + (ox * Math.cos(rot) + oz * Math.sin(rot)) * L.scale;
+          z = c.z + (-ox * Math.sin(rot) + oz * Math.cos(rot)) * L.scale;
+          y = L.floor * L.scale;
           if (u.cd <= 0) facing = Math.atan2(x - c.x, z - c.z);
         }
         pose = this.partying ? 'cheer' : u.cd > 0 ? 'shoot' : 'idle';
@@ -1261,7 +1527,11 @@ export class World3D {
         // A ferramenta do trabalho vai na mão desde que ele sai para o serviço (marreta na mudança).
         const jb = w.buildings.get(u.job);
         const jk = jb?.kind;
-        if (jb && (jb.moveTo || (jb.moved && jb.built < 1))) v.setTool('marreta');
+        // Levando o trabalho (2026-11-10): a ferramenta sai da mão e vai o que ele leva.
+        const carry = u.trip === 'ida' ? (u.carry ?? null) : null;
+        v.setCarry(carry);
+        if (carry) v.setTool(null);
+        else if (jb && (jb.moveTo || (jb.moved && jb.built < 1))) v.setTool('marreta');
         else v.setTool(jk === 'fazenda' ? 'pa' : jk === 'serraria' ? 'machadoLenha' : jk === 'pedreira' || jk === 'mina' ? 'picareta' : null);
       }
       v.root.visible = true;
@@ -1341,11 +1611,13 @@ export class World3D {
       return false;
     });
     const arrowLv = Math.min(3, w.forge.flechas);
-    const dots = [0, 2, 4, 5][arrowLv]!;
     // Mistura aditiva: cor mais escura = brilho mais fraco.
-    (this.trail.material as THREE.MeshBasicMaterial).color.set(['#000000', '#8c887c', '#7fc4ff', '#ffcc55'][arrowLv]!);
+    (this.trail.material as THREE.MeshBasicMaterial).color.set('#ffffff');
+    this.trailLv.set(['#000000', '#8c887c', '#7fc4ff', '#ffcc55'][arrowLv]!);
     let tn = 0;
     for (const f of this.flights) {
+      const dots = f.fire ? 5 : [0, 2, 4, 5][arrowLv]!;
+      const col = f.fire ? TRAIL_FIRE : this.trailLv;
       const k = f.t / f.dur;
       const d = Math.hypot(f.x2 - f.x1, f.z2 - f.z1);
       const arc = d * 0.12;
@@ -1357,8 +1629,9 @@ export class World3D {
           const kk = k - (0.4 + j * 0.2) / Math.max(1, d);
           if (kk < 0) break;
           const q = at(kk);
-          const sc = (1 - j * 0.18) * (arrowLv >= 3 ? 1.25 : 1);
+          const sc = (1 - j * 0.18) * (arrowLv >= 3 || f.fire ? 1.25 : 1);
           this.tmp.makeScale(sc, sc, sc).setPosition(q.x, q.y, q.z);
+          this.trail.setColorAt(tn, col);
           this.trail.setMatrixAt(tn++, this.tmp);
         }
       }
@@ -1374,6 +1647,7 @@ export class World3D {
     arrows.end();
     this.trail.count = tn;
     this.trail.instanceMatrix.needsUpdate = true;
+    if (this.trail.instanceColor) this.trail.instanceColor.needsUpdate = true;
     // Pedras da catapulta: arco alto e explosão de terra onde caem.
     const rocks = this.sets.get('pedraCerco')!;
     rocks.begin();
@@ -1433,8 +1707,11 @@ export class World3D {
     }
     this.bars.end();
     if (this.water) (this.water.material as THREE.ShaderMaterial).uniforms.uTime!.value = this.time;
-    // Noite sem lua (modificador de onda): a luz cai devagar e volta no fim da onda.
-    const nightGoal = w.waveState !== 'calm' && w.waveMods.includes('noite') ? 1 : 0;
+    // Noite sem lua (modificador de onda): a luz cai devagar e volta no fim da onda. Dia e noite
+    // (2026-11-10): um dia a cada DAY s da partida, com noite de lua (mais clara que a sem lua),
+    // fim de tarde laranja e amanhecer rosado.
+    const day = dayLight(w.time);
+    const nightGoal = Math.max(w.waveState !== 'calm' && w.waveMods.includes('noite') ? 1 : 0, day.night * MOON_NIGHT);
     this.night += (nightGoal - this.night) * Math.min(1, dt * 1.5);
     // Estação (Etapa 16): cores andando devagar para a nova, o tempo caindo e a chuva escurecendo.
     this.look.update(this.season, fxDt);
@@ -1444,23 +1721,40 @@ export class World3D {
     this.weather.update(sky, fxDt, this.focus.x, this.focus.z, this.pxPerMeter * this.dpr);
     const dim = (1 - 0.65 * this.night) * (1 - 0.3 * this.rain);
     this.sun.intensity = 1.9 * this.look.sunK * dim;
-    this.sun.color.copy(this.look.sun);
+    this.sun.color.copy(this.look.sun).lerp(day.dawn ? DAWN : DUSK, day.glow * 0.55).lerp(MOON, this.night * 0.55);
+    // Janelas e tochas acesas: brilham com a noite (o tamanho acompanha o zoom).
+    const gm = this.glows.material as THREE.PointsMaterial;
+    gm.opacity = Math.min(1, Math.max(0, (this.night - 0.12) / 0.45));
+    gm.size = 1.1 * this.pxPerMeter * this.dpr;
+    this.glows.visible = gm.opacity > 0.01;
     this.hemi.intensity = 1.35 * (1 - 0.45 * this.night) * (1 - 0.15 * this.rain);
     this.hemi.color.setRGB(0.96 - 0.4 * this.night, 0.97 - 0.32 * this.night, 1);
     if (fx) {
-      // Fogo nos prédios com menos da metade da vida.
+      // Prédio ferido (2026-11-10): fumaça a partir de 3/4 da vida, fogo na metade e mais fogo e
+      // fumaça escura num quarto. A coluna de fumaça sobe alto: dá para ver de longe onde a horda bate.
       const alive = new Set<number>();
       for (const b of w.buildings.values()) {
-        if (b.kind === 'muralha' || b.kind === 'portao') continue;
-        const hot = b.built >= 1 && b.hp < b.maxHp * 0.5;
+        if (b.kind === 'muralha' || b.kind === 'portao' || BUILDINGS[b.kind].trap || b.built < 1) continue;
+        const f = b.hp / b.maxHp;
+        if (f >= 0.75) continue;
+        const p = hexToWorld(b.q, b.r);
+        const top = this.topOf(b);
+        this.smokeFrom(b.id, p.x + 0.1, top * 0.8, p.z + 0.2, f < 0.25 ? 2 : f < 0.5 ? 1 : 0, dt);
+        const stage = f < 0.25 ? 2 : f < 0.5 ? 1 : 0;
+        if (stage === 0) continue;
+        alive.add(b.id);
         const slot = this.burning.get(b.id);
-        if (hot) {
-          alive.add(b.id);
-          const p = hexToWorld(b.q, b.r);
-          if (slot === undefined) {
-            const i = fx.play('fogo', p.x + 0.1, this.topOf(b) * 0.5, p.z + 0.25, { loop: true, flip: b.id % 2 === 0 });
-            if (i >= 0) this.burning.set(b.id, i);
-          }
+        if (slot === undefined) {
+          const i = fx.play('fogo', p.x + 0.1, top * 0.5, p.z + 0.25, { loop: true, flip: b.id % 2 === 0 });
+          if (i >= 0) this.burning.set(b.id, i);
+        }
+        const big = this.burningBig.get(b.id);
+        if (stage === 2 && big === undefined) {
+          const i = fx.play('fogo', p.x - 0.35, top * 0.3, p.z - 0.1, { loop: true, scale: 1.3, flip: b.id % 2 === 1 });
+          if (i >= 0) this.burningBig.set(b.id, i);
+        } else if (stage < 2 && big !== undefined) {
+          fx.stop('fogo', big);
+          this.burningBig.delete(b.id);
         }
       }
       for (const [id, i] of this.burning) {
@@ -1468,6 +1762,12 @@ export class World3D {
         fx.stop('fogo', i);
         this.burning.delete(id);
       }
+      for (const [id, i] of this.burningBig) {
+        if (alive.has(id)) continue;
+        fx.stop('fogo', i);
+        this.burningBig.delete(id);
+      }
+      this.stepSmoke(dt);
       // Piche aceso: três chamas no fosso enquanto queima.
       for (const b of w.buildings.values()) {
         if (b.kind !== 'piche') continue;
@@ -1748,6 +2048,9 @@ export class World3D {
     this.endFall();
     if (!this.fx) return;
     for (const i of this.burning.values()) this.fx.stop('fogo', i);
+    for (const i of this.burningBig.values()) this.fx.stop('fogo', i);
+    this.burningBig.clear();
+    this.smoke = [];
     for (const i of this.portals) this.fx.stop('portal', i);
     for (const i of this.batSlots.values()) if (i >= 0) this.fx.stop('morcego', i);
     this.batSlots.clear();

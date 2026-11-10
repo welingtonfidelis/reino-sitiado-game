@@ -3,6 +3,10 @@
  * fazendo (construir, mover, prédio selecionado) e transforma eventos em avisos.
  */
 import {
+  upgradeTower,
+  upgradeWall,
+  upgradeAllWalls,
+  trade,
   BUILDINGS,
   CONFIG,
   build,
@@ -36,8 +40,9 @@ import {
   buyHero,
   seasonOf,
 } from '../sim/index.ts';
-import type { BlessingId, BuildingKind, ForgeLine, HeroKind, Mode as GameMode, SaveInfo, SimEvent, World } from '../sim/index.ts';
+import type { BlessingId, BuildingKind, ForgeLine, HeroKind, Mode as GameMode, Res, SaveInfo, SimEvent, TradeSide, World } from '../sim/index.ts';
 import { Album } from './album.ts';
+import { Bestiary } from './bestiary.ts';
 import type { Sticker } from './album.ts';
 import { readQuality, writeQuality } from '../render/quality.ts';
 import { markTip, pickTip } from './guide.ts';
@@ -93,8 +98,14 @@ export class Game {
   season = 0;
   /** Segundos que faltam do cartão grande da estação nova (0: escondido). */
   seasonCard = 0;
+  /** Cartão grande da onda com cara própria (2026-11-10): segundos que faltam e a onda dele. */
+  themeCard = 0;
+  private themeWave = -1;
   /** Etapa 16: álbum de figurinhas (fica entre partidas) e a figurinha nova na tela. */
   album = new Album();
+  /** Livro do Sábio (2026-11-10): monstros já vistos. */
+  book = new Bestiary();
+  private bookT = 0;
   sticker: Sticker | null = null;
   stickerT = 0;
   /** Chamado a cada figurinha nova (o main toca o som). */
@@ -220,6 +231,24 @@ export class Game {
     }
     this.stepSticker(dt);
     this.stepGuide(dt);
+    const wv = this.world;
+    // Livro do Sábio: anota quem apareceu (duas vezes por segundo).
+    if ((this.bookT -= dt) <= 0) {
+      this.bookT = 0.5;
+      if (this.book.note(wv)) this.emit();
+    }
+    if (wv.waveTheme && wv.waveState !== 'calm' && wv.wave !== this.themeWave) {
+      this.themeWave = wv.wave;
+      this.themeCard = SEASON_CARD;
+      this.emit();
+    }
+    if (this.themeCard > 0) {
+      this.themeCard -= Math.min(dt, 0.1);
+      if (this.themeCard <= 0) {
+        this.themeCard = 0;
+        this.emit();
+      }
+    }
     if (this.seasonCard > 0) {
       this.seasonCard -= Math.min(dt, 0.1);
       if (this.seasonCard <= 0) {
@@ -602,6 +631,10 @@ export class Game {
     this.album.seen();
     this.emit();
   }
+  bookRead(): void {
+    this.book.read();
+    this.emit();
+  }
 
   private openReport(): void {
     this.reportT = -1;
@@ -636,6 +669,21 @@ export class Game {
   }
   forge(line: ForgeLine): void {
     this.result(forgeUpgrade(this.world, line));
+  }
+  /** Torre e muralha (2026-11-10). */
+  upgradeTower(id: number): void {
+    this.result(upgradeTower(this.world, id));
+  }
+  upgradeWall(id: number): void {
+    this.result(upgradeWall(this.world, id));
+  }
+  upgradeAllWalls(from: number): void {
+    upgradeAllWalls(this.world, from);
+    this.emit();
+  }
+  /** Mercado (2026-11-10). */
+  trade(res: Res, side: TradeSide): void {
+    this.result(trade(this.world, res, side));
   }
   repairAll(): void {
     this.result(repairAll(this.world));

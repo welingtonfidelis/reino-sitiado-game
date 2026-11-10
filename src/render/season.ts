@@ -132,7 +132,11 @@ float gNoise(vec2 p) {
   // Inverno: neve em manchas por cima da grama (o chão batido aparece mais).
   if (uSnow > 0.001) {
     float sn = uSnow * smoothstep(0.35, 0.6, gNoise(vGround * 0.45) * 0.6 + (1.0 - s) * 0.5);
+    // Trilhas e quintais pisados (2026-11-10): a neve fica só na beira e a terra aparece molhada,
+    // mais escura que a neve em volta: o caminho da vila não some no inverno.
+    sn *= 1.0 - 0.9 * smoothstep(0.25, 0.7, vil);
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.88, 0.95), sn);
+    diffuseColor.rgb *= 1.0 - 0.14 * uSnow * vil;
   }
   // Sombra das nuvens passando devagar.
   if (uClouds > 0.5) {

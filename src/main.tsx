@@ -3,7 +3,7 @@ import './ui/vigilia.css';
 import './ui/style.css';
 import * as THREE from 'three';
 import { render } from 'preact';
-import { CONFIG, hexToWorld, worldToHex } from './sim/index.ts';
+import { CONFIG, hexToWorld, towerRange, worldToHex } from './sim/index.ts';
 import { FALL_TIME, Game } from './game/game.ts';
 import { loadArt } from './render/assets.ts';
 import { IsoCamera } from './render/camera.ts';
@@ -198,8 +198,9 @@ function frame(now: number): void {
     else if (e.type === 'death' && e.monster) sound.play('morte');
     else if (e.type === 'built') sound.play('pronto');
     else if (e.type === 'waveStart') sound.play('onda');
+    else if (e.type === 'boss') sound.play('chefe');
     else if (e.type === 'waveEnd') sound.play('vitoria');
-    else if (e.type === 'upgrade') sound.play('nivel');
+    else if (e.type === 'upgrade' || e.type === 'buildingUp') sound.play('nivel');
     else if (e.type === 'destroyed') sound.play(e.kind === 'castelo' ? 'queda' : 'castelo');
   }
   view.syncStatic(w);
@@ -220,7 +221,7 @@ function frame(now: number): void {
     const b = game.selected >= 0 ? w.buildings.get(game.selected) : undefined;
     const rb = m.kind === 'rally' ? w.buildings.get(m.id) : b;
     view.showRally(rb?.rally ?? null);
-    if (b) view.showRing(b.q, b.r, '#e9b949', b.kind === 'torre' ? CONFIG.tower.range : b.kind === 'castelo' ? CONFIG.castle.range : 0);
+    if (b) view.showRing(b.q, b.r, '#e9b949', b.kind === 'torre' ? towerRange(b) : b.kind === 'castelo' ? CONFIG.castle.range : 0);
     else view.hideRing();
   }
   renderer.render(scene, cam.camera);

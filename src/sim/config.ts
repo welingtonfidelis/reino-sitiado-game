@@ -27,6 +27,7 @@ export type BuildingKind =
   | 'acampamento'
   | 'polvora'
   | 'catapulta'
+  | 'mercado'
   | 'piche'
   | 'estacas';
 
@@ -78,6 +79,8 @@ export interface BuildingDef {
   needsBuilding?: BuildingKind;
   /** Armadilha no chão: não bloqueia ninguém e a horda não para para bater nela. */
   trap?: boolean;
+  /** Um só no reino (o mercado). */
+  unique?: boolean;
 }
 
 export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
@@ -90,9 +93,11 @@ export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
   serraria: { name: 'Serraria', category: 'economia', blurb: 'Madeira. Precisa de floresta ao lado.', cost: { madeira: 25, pedra: 10 }, hp: 200, build: 8, site: 'nearForest', workers: 2, produces: 'madeira', rate: 16, breakCost: 6 },
   pedreira: { name: 'Pedreira', category: 'economia', blurb: 'Pedra. Precisa de rocha ao lado.', cost: { madeira: 40 }, hp: 200, build: 8, site: 'nearRock', workers: 2, produces: 'pedra', rate: 10, breakCost: 6 },
   mina: { name: 'Mina', category: 'economia', blurb: 'Ferro. Só em cima de um veio de minério.', cost: { madeira: 50, pedra: 20 }, hp: 220, build: 10, site: 'ore', workers: 2, produces: 'ferro', rate: 8, breakCost: 6 },
-  muralha: { name: 'Muralha', category: 'defesa', blurb: 'Segura e desvia a horda. Orcs derrubam.', cost: { pedra: 5 }, hp: 250, build: 2, site: 'grass', breakCost: 14 },
+  // Muralha em dois níveis (2026-11-10): sai paliçada de troncos, barata, e vira pedra depois
+  // (CONFIG.wallLevels). Até então era só de pedra (5 de pedra, 250 de vida).
+  muralha: { name: 'Muralha', category: 'defesa', blurb: 'Paliçada de troncos: segura e desvia a horda. Depois vira pedra. Orcs derrubam.', cost: { madeira: 5 }, hp: 160, build: 2, site: 'grass', breakCost: 14 },
   portao: { name: 'Portão', category: 'defesa', blurb: 'Vira um trecho de muralha. Sua gente passa, a horda não.', cost: { madeira: 30, ferro: 10 }, hp: 320, build: 4, site: 'wall', breakCost: 14 },
-  torre: { name: 'Torre de arqueiros', category: 'defesa', blurb: 'Só atira com arqueiros dentro. Cabem 4.', cost: { madeira: 60, pedra: 20 }, hp: 300, build: 10, site: 'grass', slots: 4, breakCost: 10 },
+  torre: { name: 'Torre de arqueiros', category: 'defesa', blurb: 'Só atira com arqueiros dentro. Cabem 4. Melhora até a torre de pedra com tochas.', cost: { madeira: 60, pedra: 20 }, hp: 300, build: 10, site: 'grass', slots: 4, breakCost: 10 },
   quartel: { name: 'Quartel', category: 'militar', blurb: 'Treina soldados.', cost: { madeira: 60, pedra: 30 }, hp: 400, build: 12, site: 'grass', recruits: 'soldado', breakCost: 6 },
   campo: { name: 'Campo de tiro', category: 'militar', blurb: 'Treina arqueiros.', cost: { madeira: 50 }, hp: 300, build: 10, site: 'grass', recruits: 'arqueiro', breakCost: 6 },
   torreMago: { name: 'Torre do mago', category: 'militar', blurb: 'Treina magos. Cada feitiço gasta cristal.', cost: { pedra: 60, cristal: 10 }, hp: 300, build: 12, site: 'grass', recruits: 'mago', breakCost: 6, needsLevel: 2 },
@@ -102,6 +107,8 @@ export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
   catapulta: { name: 'Catapulta', category: 'defesa', blurb: 'Pedra pesada que cai em área, de 3 a 12 m. A resposta para trolls e golens; não acerta quem voa.', cost: { madeira: 50, ferro: 25 }, hp: 280, build: 10, site: 'grass', breakCost: 10, needsBuilding: 'forja' },
   piche: { name: 'Fosso de piche', category: 'defesa', blurb: 'Quem passa anda pela metade. Aceso, queima quem estiver em cima.', cost: { pedra: 30 }, hp: 1, build: 4, site: 'grass', breakCost: 0, trap: true },
   estacas: { name: 'Estacas', category: 'defesa', blurb: 'Ferem quem cruza e quebram depois de 20 golpes.', cost: { madeira: 15 }, hp: 20, build: 3, site: 'grass', breakCost: 0, trap: true },
+  // Mercado (2026-11-10): troca ouro por recurso e recurso por ouro (CONFIG.market).
+  mercado: { name: 'Mercado', category: 'economia', blurb: 'Compra o que falta com ouro e vende o que sobra.', cost: { madeira: 60, pedra: 20 }, hp: 250, build: 8, site: 'grass', breakCost: 6, unique: true },
   oficina: { name: 'Oficina', category: 'militar', blurb: 'Treina engenheiros, que consertam até no meio da onda.', cost: { madeira: 40, pedra: 20 }, hp: 250, build: 8, site: 'grass', recruits: 'engenheiro', breakCost: 6 },
   // Tropas novas (2026-11-09): o lanceiro espartano e o anão de espingarda.
   acampamento: { name: 'Acampamento', category: 'militar', blurb: 'Treina lanceiros: a lança alcança por trás dos soldados e bate forte nos grandes.', cost: { madeira: 60, pedra: 30, ferro: 10 }, hp: 350, build: 10, site: 'grass', recruits: 'lanceiro', breakCost: 6 },
@@ -109,7 +116,7 @@ export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
 };
 
 /** O que aparece no menu Construir, em ordem. O portão vira de uma muralha. */
-export const BUILD_MENU: BuildingKind[] = ['casa', 'celeiro', 'fazenda', 'serraria', 'pedreira', 'mina', 'muralha', 'portao', 'torre', 'catapulta', 'piche', 'estacas', 'quartel', 'campo', 'acampamento', 'oficina', 'capela', 'forja', 'torreMago', 'polvora', 'estabulo'];
+export const BUILD_MENU: BuildingKind[] = ['casa', 'celeiro', 'fazenda', 'serraria', 'pedreira', 'mina', 'mercado', 'muralha', 'portao', 'torre', 'catapulta', 'piche', 'estacas', 'quartel', 'campo', 'acampamento', 'oficina', 'capela', 'forja', 'torreMago', 'polvora', 'estabulo'];
 
 export interface UnitDef {
   name: string;
@@ -218,6 +225,33 @@ export const CONFIG = {
   /** Vida que o castelo recupera por segundo entre as ondas. */
   castleRegen: 5,
   tower: { range: 10 },
+  /**
+   * Níveis da torre (2026-11-10). Nível 1: a vigia de madeira (menor que a de antes, para a vila
+   * não sumir atrás de tantas torres); 2: a torre de pedra de topo aberto; 3: a mesma maior, com tochas e
+   * flechas de fogo (troll e golem de musgo param de se curar e o piche aceso pega fogo).
+   * `hp`, `range` (m) e `dmg` (fator do dano das flechas) valem no nível; `cost` é o preço de
+   * subir para ele, e `castle`, o nível do castelo que ele pede.
+   */
+  towerLevels: [
+    { hp: 300, range: 10, dmg: 1, cost: {} as Cost, castle: 1, fire: false },
+    { hp: 500, range: 11.5, dmg: 1.25, cost: { madeira: 40, pedra: 80 } as Cost, castle: 1, fire: false },
+    { hp: 700, range: 13, dmg: 1.5, cost: { pedra: 120, ferro: 40, ouro: 60 } as Cost, castle: 2, fire: true },
+  ],
+  /** Muralha (2026-11-10): nível 1 paliçada de troncos, nível 2 de pedra (`cost` é por trecho). */
+  wallLevels: [
+    { hp: 160, cost: {} as Cost },
+    { hp: 320, cost: { pedra: 6 } as Cost },
+  ],
+  /**
+   * Mercado (2026-11-10): compra `lot` (cristal: `crystalLot`) pelo `price` em ouro de cada um e
+   * vende pela fração `sell` desse preço.
+   */
+  market: {
+    lot: 20,
+    crystalLot: 5,
+    price: { comida: 0.5, madeira: 0.5, pedra: 0.7, ferro: 1.5, cristal: 6 } as Partial<Record<Res, number>>,
+    sell: 0.5,
+  },
   recruitQueue: 3,
   refund: 0.5,
   /**
@@ -327,6 +361,12 @@ export const CONFIG = {
   catapult: { range: 12, min: 3, cd: 4, dmg: 60, radius: 1.4 },
   pitch: { slow: 0.5, burn: 8, dps: 15, igniteCost: { madeira: 5 } as Cost },
   spikes: { dmg: 10, every: 1 },
+  /**
+   * Ondas com cara própria (2026-11-10): a onda `at` e uma a cada `every` dali em diante (a partir
+   * de `from`; no fácil, de `fromEasy`) vem de uma família só. A Matilha traz no máximo `maxMul`
+   * vezes os monstros de uma onda comum.
+   */
+  waveThemes: { from: 8, fromEasy: 13, every: 5, at: 3, maxMul: 1.6 },
   /** Modificadores de onda: um a cada 5 ondas, dois a partir da 30. */
   waveMods: { every: 5, doubleFrom: 30, nightRange: 0.8, armor: 0.75, swarm: 1.6, fury: 1.3 },
   /** Cristal por trabalhador por minuto numa mina em veio azul. */
@@ -364,6 +404,13 @@ export const CONFIG = {
    * do monstro; sai depois de `wait` s sem monstro a menos de `calm` m de onde se escondeu.
    */
   flee: { radius: 6, avoid: 3, calm: 8, wait: 3, run: 1.35 },
+  /**
+   * Levar o trabalho (2026-11-10): a cada `every` s de serviço (mais um pouco pelo id), um dos
+   * trabalhadores da serraria, pedreira, mina ou plantação leva o que tirou ao castelo (a comida,
+   * ao celeiro mais perto) e volta, se o destino estiver a até `maxHex` hexágonos. Só um por prédio
+   * de cada vez. A produção conta a viagem como serviço: só muda o que se vê.
+   */
+  haul: { every: 22, maxHex: 9 },
 };
 
 /**

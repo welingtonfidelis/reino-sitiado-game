@@ -3,9 +3,9 @@
  * mínimo, para cem flechas por segundo não virarem um chiado. O áudio só liga depois do
  * primeiro toque (exigência do iPhone).
  */
-export type Sfx = 'arco' | 'tiro' | 'golpe' | 'morte' | 'pronto' | 'onda' | 'vitoria' | 'castelo' | 'magia' | 'cura' | 'nivel' | 'queda' | 'fogos' | 'figurinha';
+export type Sfx = 'arco' | 'tiro' | 'golpe' | 'morte' | 'pronto' | 'onda' | 'vitoria' | 'castelo' | 'magia' | 'cura' | 'nivel' | 'queda' | 'fogos' | 'figurinha' | 'chefe';
 
-const GAP: Record<Sfx, number> = { arco: 0.07, tiro: 0.12, golpe: 0.09, morte: 0.08, pronto: 0.2, onda: 1, vitoria: 1, castelo: 0.4, magia: 0.12, cura: 0.3, nivel: 1, queda: 3, fogos: 0.12, figurinha: 0.8 };
+const GAP: Record<Sfx, number> = { arco: 0.07, tiro: 0.12, golpe: 0.09, morte: 0.08, pronto: 0.2, onda: 1, vitoria: 1, castelo: 0.4, magia: 0.12, cura: 0.3, nivel: 1, queda: 3, fogos: 0.12, figurinha: 0.8, chefe: 4 };
 
 export class Sound {
   private ctx: AudioContext | null = null;
@@ -144,6 +144,15 @@ export class Sound {
         // Figurinha nova: arpejo brilhante subindo e um brilho no fim.
         [784, 988, 1175, 1568].forEach((f, i) => this.tone('triangle', f, f, 0.22, 0.1, i * 0.07));
         this.tone('sine', 2093, 2637, 0.4, 0.05, 0.28);
+        break;
+      case 'chefe':
+        // Chefe saindo da fenda (2026-11-10): trompa grave e comprida e dois tambores.
+        this.tone('sawtooth', 73, 69, 1.7, 0.15);
+        this.tone('sawtooth', 110, 104, 1.7, 0.1, 0.03);
+        this.tone('square', 55, 52, 1.5, 0.05, 0.06);
+        this.tone('sine', 95, 40, 0.35, 0.5);
+        this.tone('sine', 95, 40, 0.35, 0.5, 0.5);
+        this.noise(0.25, 0.2, 'lowpass', 600, 120, 0.5);
         break;
       case 'nivel':
         [392, 523, 659, 784].forEach((f, i) => this.tone('triangle', f, f, 0.3, 0.12, i * 0.1));

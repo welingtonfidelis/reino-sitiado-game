@@ -10,6 +10,8 @@ import { createWorld, fullStock, legacyRifts } from './world.ts';
 import type { Building, Monster, Terrain, Unit, World } from './world.ts';
 
 const VERSION = 1;
+/** Formato dentro da versão: 2 desde a muralha em dois níveis (2026-11-10). */
+const FORMAT = 2;
 const TERRAINS: Terrain[] = ['grass', 'forest', 'rock', 'ore', 'crystal', 'rift', 'water'];
 
 /** Campos simples copiados como estão. */
@@ -18,6 +20,7 @@ const PLAIN = [
   'hungry', 'shelter', 'lost', 'kills', 'flags', 'blessings', 'mods', 'stats', 'report', 'forge', 'waveMods',
   'regrow',
   'mode',
+  'waveTheme',
 ] as const;
 
 export interface SaveInfo {
@@ -31,6 +34,7 @@ export function saveWorld(w: World): string {
   for (const k of PLAIN) plain[k] = w[k];
   return JSON.stringify({
     v: VERSION,
+    fmt: FORMAT,
     seed: w.seed,
     R: w.grid.R,
     rng: w.rand.state.a,
@@ -81,6 +85,8 @@ export function loadWorld(json: string): World | null {
     b.moved ??= false;
     b.dry ??= false;
     b.harvest ??= b.kind === 'fazenda' ? CONFIG.farm.harvest : 0;
+    // Salvo de antes da paliçada (2026-11-10): a muralha que já estava de pé era de pedra.
+    if (((d as { fmt?: number }).fmt ?? 1) < 2 && b.kind === 'muralha') b.level = 2;
   }
   w.buildings = new Map(d.buildings.map((b) => [b.id, b]));
   w.units = new Map(d.units.map((u) => [u.id, u]));

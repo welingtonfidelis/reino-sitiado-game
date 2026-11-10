@@ -38,6 +38,7 @@ import { demolish, moveBuilding, moveProblem, packTime, recruitProblem, tileAt }
 import { allyPath, fullStock, regrow, replant, replantProblem, sourceOf, stage, worldToHex } from '../src/sim/index.ts';
 import { MODES, saveInfo, waveInterval } from '../src/sim/index.ts';
 import { computeFlow, damageMonster, legacyRifts, openRifts, sideName } from '../src/sim/index.ts';
+import { allWallsProblem, themeForWave, towerRange, towerUpgradeProblem, trade, tradeDeal, tradeProblem, upgradeAllWalls, upgradeTower, upgradeWall } from '../src/sim/index.ts';
 import type { Tile } from '../src/sim/index.ts';
 import { TIP_IDS, pickTip } from '../src/game/guide.ts';
 import type { Monster, MonsterKind, World } from '../src/sim/index.ts';
@@ -138,6 +139,8 @@ describe('trabalhadores e moradia', () => {
       const terrain = b.kind === 'serraria' ? 'forest' : 'rock';
       for (const id of b.workers) {
         const u = w.units.get(id)!;
+        // Quem saiu para levar a madeira ou a pedra ao castelo (2026-11-10) não conta aqui.
+        if (u.trip) continue;
         expect(u.state).toBe('work');
         // Um passo à frente cai num ladrilho do recurso.
         const ahead = { x: u.x + Math.sin(u.facing) * 1.1, z: u.z + Math.cos(u.facing) * 1.1 };
@@ -149,9 +152,9 @@ describe('trabalhadores e moradia', () => {
         n++;
       }
       const [a, c] = b.workers.map((id) => w.units.get(id)!);
-      expect(Math.hypot(a!.x - c!.x, a!.z - c!.z)).toBeGreaterThan(0.5);
+      if (!a!.trip && !c!.trip) expect(Math.hypot(a!.x - c!.x, a!.z - c!.z)).toBeGreaterThan(0.5);
     }
-    expect(n).toBe(4);
+    expect(n).toBeGreaterThanOrEqual(2);
   });
 
   it('cada casa nova custa 10% a mais', () => {
@@ -1724,3 +1727,173 @@ describe('fendas sorteadas (2026-11-07)', () => {
   });
 });
 
+
+describe('torre e muralha com níveis, mercado (2026-11-10)', () => {
+  it('a torre sobe ao nível 2 e ao 3 (este pede o castelo nível 2): mais vida, alcance e flecha de fogo', () => {
+    const w = createWorld(61);
+    calm(w);
+    const [p] = freeGrass(w, 1);
+    const t = addBuilding(w, 'torre', p!.q, p!.r, 1);
+    for (const k of Object.keys(w.res) as (keyof typeof w.res)[]) w.res[k] = 5000;
+    expect(towerRange(t)).toBe(CONFIG.towerLevels[0]!.range);
+    expect(upgradeTower(w, t.id)).toBeNull();
+    expect(t.level).toBe(2);
+    expect(t.maxHp).toBe(CONFIG.towerLevels[1]!.hp);
+    expect(towerRange(t)).toBeGreaterThan(CONFIG.towerLevels[0]!.range);
+    expect(towerUpgradeProblem(w, t)).toBe('Precisa do castelo nível 2');
+    castle(w)!.level = 2;
+    expect(upgradeTower(w, t.id)).toBeNull();
+    expect(t.level).toBe(3);
+    expect(towerUpgradeProblem(w, t)).toBe('Nível máximo');
+    // Flecha de fogo: o troll atingido para de se curar.
+    const a = addUnit(w, 'arqueiro', 0, 0);
+    a.tower = t.id;
+    a.state = 'tower';
+    t.archers.push(a.id);
+    const c = hexToWorld(t.q, t.r);
+    const m: Monster = { id: w.nextId++, kind: 'troll', x: c.x + 3, z: c.z, hp: 5000, maxHp: 5000, speed: 0, dmg: 0, cd: 99, state: 'walk', facing: 0, deadT: 0, burnT: 99, healT: 1, summonT: 99, owner: -1 };
+    w.monsters.set(m.id, m);
+    w.waveState = 'attack';
+    for (let i = 0; i < 10; i++) step(w);
+    expect(m.hp).toBeLessThan(5000);
+    expect(m.burnT).toBeLessThan(3);
+  });
+
+  it('a muralha sai paliçada de madeira e vira pedra (uma ou todas, até onde der a pedra)', () => {
+    const w = createWorld(62);
+    calm(w);
+    const spots = freeGrass(w, 4, 3, 8);
+    w.res.madeira = 1000;
+    for (const s of spots) expect(build(w, 'muralha', s.q, s.r)).toBeNull();
+    expect(w.res.madeira).toBe(1000 - 4 * BUILDINGS.muralha.cost.madeira!);
+    const walls = [...w.buildings.values()].filter((b) => b.kind === 'muralha');
+    for (const b of walls) b.built = 1;
+    expect(walls[0]!.maxHp).toBe(CONFIG.wallLevels[0]!.hp);
+    w.res.pedra = 6;
+    expect(upgradeWall(w, walls[0]!.id)).toBeNull();
+    expect(walls[0]!.level).toBe(2);
+    expect(walls[0]!.maxHp).toBe(CONFIG.wallLevels[1]!.hp);
+    expect(w.res.pedra).toBe(0);
+    // Pedra para dois dos três que faltam: viram dois.
+    w.res.pedra = 12;
+    expect(upgradeAllWalls(w, walls[0]!.id)).toBe(2);
+    expect(walls.filter((b) => b.level === 2).length).toBe(3);
+    expect(allWallsProblem(w)).toBe('Falta pedra');
+  });
+
+  it('o salvo de antes da paliçada fica com a muralha de pedra', () => {
+    const w = createWorld(63);
+    const [s] = freeGrass(w, 1);
+    addBuilding(w, 'muralha', s!.q, s!.r, 1);
+    const json = JSON.parse(saveWorld(w)) as Record<string, unknown>;
+    delete json.fmt;
+    const old = loadWorld(JSON.stringify(json))!;
+    expect([...old.buildings.values()].find((b) => b.kind === 'muralha')!.level).toBe(2);
+    expect([...loadWorld(saveWorld(w))!.buildings.values()].find((b) => b.kind === 'muralha')!.level).toBe(1);
+  });
+
+  it('o mercado compra com ouro e vende por ouro; um só no reino', () => {
+    const w = createWorld(64);
+    calm(w);
+    expect(tradeProblem(w, 'ferro', 'comprar')).toBe('Precisa de um mercado pronto');
+    const [a, b] = freeGrass(w, 2);
+    addBuilding(w, 'mercado', a!.q, a!.r, 1);
+    expect(placeProblem(w, 'mercado', b!.q, b!.r)).toBe('Já tem mercado no reino');
+    w.res.ouro = 100;
+    const ferro = w.res.ferro;
+    const d = tradeDeal('ferro', 'comprar');
+    expect(trade(w, 'ferro', 'comprar')).toBeNull();
+    expect(w.res.ouro).toBe(100 - d.ouro);
+    expect(w.res.ferro).toBe(ferro + d.n);
+    const v = tradeDeal('madeira', 'vender');
+    w.res.madeira = v.n;
+    expect(trade(w, 'madeira', 'vender')).toBeNull();
+    expect(w.res.madeira).toBe(0);
+    expect(trade(w, 'madeira', 'vender')).toBe('Falta madeira');
+    expect(v.ouro).toBeLessThan(tradeDeal('madeira', 'comprar').ouro);
+  });
+});
+
+describe('ondas com cara própria e aviso do chefe (2026-11-10)', () => {
+  it('da onda 8 em diante, uma a cada cinco vem de uma família só, com a vida somada parecida', () => {
+    const themed = [8, 13, 18, 23, 28, 33].map((n) => themeForWave(7, n));
+    expect(themed.every((t) => t !== null)).toBe(true);
+    for (const n of [3, 7, 9, 10, 15, 20]) expect(themeForWave(7, n)).toBeNull();
+    expect(themeForWave(7, 8, 'facil')).toBeNull();
+    const hp = (s: Record<MonsterKind, number>) => (Object.keys(s) as MonsterKind[]).reduce((a, k) => a + (MONSTERS[k].boss ? 0 : s[k] * MONSTERS[k].hp), 0);
+    for (const theme of ['matilha', 'ossos', 'orcs'] as const) {
+      const s = waveSizeWithMods(18, [], 'normal', theme);
+      const fam = theme === 'matilha' ? ['lobisomem', 'morcego'] : theme === 'orcs' ? ['orc', 'bruto', 'troll'] : ['esqueleto', 'esqueletoGuerreiro', 'necromante', 'vampiro'];
+      for (const k of Object.keys(s) as MonsterKind[]) if (s[k] > 0) expect(fam).toContain(k);
+      const base = hp(waveSize(18));
+      // A Matilha tem teto de quantidade; as outras ficam perto da vida da onda comum.
+      if (theme !== 'matilha') expect(Math.abs(hp(s) - base) / base).toBeLessThan(0.15);
+      else expect(hp(s)).toBeLessThanOrEqual(base * 1.05);
+    }
+  });
+
+  it('a onda da família avisa na saída; o chefe avisa e toca a trompa quando sai da fenda', () => {
+    const w = createWorld(65);
+    let n = 1;
+    while (!themeForWave(w.seed, n)) n++;
+    w.wave = n - 1;
+    w.waveTimer = 0.01;
+    step(w);
+    expect(w.waveTheme).not.toBeNull();
+    expect(w.events.some((e) => e.type === 'toast' && e.text.startsWith(`Onda ${n}:`))).toBe(true);
+    const b = createWorld(66);
+    b.wave = CONFIG.bossEvery - 1;
+    b.waveTimer = 0.01;
+    const seen: string[] = [];
+    let horn = false;
+    for (let i = 0; i < 20 * 60 && !horn; i++) {
+      step(b);
+      for (const e of b.events) {
+        if (e.type === 'toast') seen.push(e.text);
+        if (e.type === 'boss') horn = true;
+      }
+      b.events.length = 0;
+    }
+    expect(seen.some((t) => t.startsWith('Chefe nesta onda'))).toBe(true);
+    expect(horn).toBe(true);
+  });
+});
+
+describe('aldeões levam o trabalho (2026-11-10)', () => {
+  it('um da serraria leva a madeira até o castelo e volta; a produção não muda', () => {
+    const w = createWorld(5);
+    calm(w);
+    const t = w.list.find((t) => t.terrain === 'grass' && t.b < 0 && hexDist(t.q, t.r, 0, 0) <= 5 && hexDist(t.q, t.r, 0, 0) >= 3 && DIRS.some(([dq, dr]) => tileAt(w, t.q + dq, t.r + dr)?.terrain === 'forest'))!;
+    const b = addBuilding(w, 'serraria', t.q, t.r, 1);
+    for (let i = 0; i < 2; i++) addUnit(w, 'trabalhador', 0, 1);
+    let delivered = 0;
+    let carried = false;
+    for (let i = 0; i < 20 * 90; i++) {
+      step(w);
+      for (const e of w.events) if (e.type === 'haul' && e.res === 'madeira') delivered++;
+      w.events.length = 0;
+      if (b.workers.some((id) => w.units.get(id)?.carry === 'madeira')) carried = true;
+    }
+    expect(carried).toBe(true);
+    expect(delivered).toBeGreaterThan(0);
+    // Nunca os dois de uma vez.
+    expect(b.workers.filter((id) => w.units.get(id)?.trip).length).toBeLessThanOrEqual(1);
+  });
+
+  it('recolher funciona mesmo com o castelo cercado de casas', () => {
+    const w = createWorld(67);
+    calm(w);
+    const c = castle(w)!;
+    for (const [dq, dr] of DIRS) {
+      const n = tileAt(w, c.q + dq, c.r + dr);
+      if (n && n.b < 0 && n.terrain === 'grass') addBuilding(w, 'casa', n.q, n.r, 1);
+    }
+    const far = freeGrass(w, 1, 5, 8)[0]!;
+    const p = hexToWorld(far.q, far.r);
+    const u = addUnit(w, 'trabalhador', p.x, p.z);
+    run(w, 1);
+    toggleShelter(w);
+    run(w, 40);
+    expect(u.state).toBe('shelter');
+  });
+});

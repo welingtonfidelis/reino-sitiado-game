@@ -919,14 +919,82 @@ O que mudou (`CONFIG.horde`):
 - **Robô** (12 sementes, até a onda 80): média 25,8 (antes, 27,6). A horda espalhada é um pouco mais difícil de segurar só com torres juntas. Em 12 partidas até a onda 50, nenhuma luta passou de 4 minutos.
 - Fotos de antes e depois em `reports/horda-antes.png` e `reports/horda-depois.png` (fora do git).
 
-## 25. Arquitetura
+## 25. Melhorias de 2026-11-10
+
+Pedidas depois da análise do jogo (arte, jogabilidade e modelos). O que ficou de fora da lista: setas na borda da tela para ataque fora da vista, testar no tablet e no iPhone, mapas diferentes, cor do reino, prévia da próxima onda em figuras, dois salvos e o esqueleto mago (adiado).
+
+### Torre em três níveis
+
+A torre era uma só, a vigia de madeira a 1,8×, e doze delas escondiam a vila e o castelo. Agora ela começa menor e cresce com o que o jogador investe; o nível também se lê de longe:
+
+| Nível | Visual | Alcance | Flechas | Vida | Preço para subir |
+| --- | --- | --- | --- | --- | --- |
+| 1 | vigia de madeira a 1,4× | 10 m | ×1 | 300 | (construir: 60 de madeira, 20 de pedra) |
+| 2 | torre de pedra de topo aberto (a base do KayKit), os arqueiros no alto | 11,5 m | ×1,25 | 500 | 40 de madeira, 80 de pedra |
+| 3 | a mesma maior, com tochas no alto e estandartes na porta; flecha de fogo | 13 m | ×1,5 | 700 | 120 de pedra, 40 de ferro, 60 de ouro; castelo nível 2 |
+
+A flecha de fogo faz o que a bênção Flechas em brasa faz: o troll e o golem de musgo param de se curar e o piche aceso pega fogo. O rastro dela é laranja. No menu da torre, Melhorar fica à direita do Chamar, com o nível no selo.
+
+### Muralha: paliçada e pedra
+
+A muralha sai paliçada de troncos (5 de madeira, 160 de vida, feita no código: duas fileiras de troncos de ponta lascada num barranco de terra, e o poste das quinas de quatro troncos). No menu dela, Pedra vira o trecho tocado em pedra (6 de pedra, 320 de vida, o modelo de antes) e Todas vira toda paliçada pronta, a começar pela mais perto do trecho tocado, até a pedra acabar. A pedra se conserta com pedra; a paliçada, com madeira. O salvo de antes (sem `fmt`) fica com a muralha de pedra.
+
+### Mercado
+
+Prédio novo da economia (60 de madeira, 20 de pedra, um só no reino), o mercado de toldo do KayKit, na rua como os prédios de tropa (a casa do bairro de 8 casas não vira mais mercado, para a criança não tocar num "mercado" e abrir o menu da casa). Comprar e Vender abrem cinco botões, um por recurso, com o lote no rótulo e o ouro no selo. Lote de 20 (cristal, 5); preço em ouro de cada um: comida e madeira 0,5, pedra 0,7, ferro 1,5, cristal 6. Vender rende a metade.
+
+### Ondas com cara própria e o aviso do chefe
+
+Das ondas 8, 13, 18... (no fácil, da 13) a onda vem de uma família só: Matilha (lobisomens e uns morcegos), Noite dos ossos (esqueletos, os de escudo, necromantes e o vampiro, se for a vez dele) ou Bando de orcs (orc, bruto e troll). A família é sorteada pela semente entre as que já apareceram, e a onda tem a mesma vida somada de uma onda comum (a Matilha, no máximo 1,6× os monstros). Avisos: um cartão grande com o ícone da família no meio da tela quando ela começa, o nome no relógio da onda e a linha no relatório, com o ícone.
+
+O chefe ganhou só aviso, como pedido: a frase "Chefe nesta onda" quando a onda sai e, quando ele sai da fenda, a trompa grave com tambores além da frase de antes.
+
+### Prédio ferido
+
+O fogo dos prédios abaixo da metade da vida já existia. Agora a fumaça começa em 3/4 da vida, cinza clara; na metade vem o fogo e a fumaça fica mais escura; abaixo de 1/4 entra uma segunda chama e a fumaça fica preta e mais cheia. A coluna sobe uns 3 m e é levada pelo vento, para ver de longe onde a horda bate.
+
+### Aldeões levam o trabalho
+
+A cada 22 s de serviço (mais um pouco pelo id), um dos trabalhadores da serraria, da pedreira, da mina ou da plantação leva o que tirou: tora no ombro, saco nas costas, ou carrinho de mão com pedra ou minério. A madeira, a pedra, o ferro e o cristal vão ao castelo; a comida, ao celeiro mais perto. Na entrega, o ícone do recurso pula em cima do castelo ou do celeiro. Só um por prédio de cada vez, e só se o destino estiver a até 9 hexágonos; perto da horda, ninguém sai. A produção conta a viagem como serviço: o que muda é o que se vê (e que o aldeão na estrada pode precisar fugir).
+
+O castelo cercado de casas não tinha caminho a pé até o hexágono dele, e nisso o Recolher também falhava: o aldeão ficava parado onde estava. Agora quem leva ou se recolhe vai até a porta, o próprio castelo ou o vizinho dele que tiver caminho (casa encostada também serve).
+
+### Neve, dia e noite
+
+No inverno a neve deixa as trilhas e os quintais da vila à vista, com a terra pisada mais escura e molhada. O dia dura 300 s de partida (a partida começa de manhã): fim de tarde alaranjado, noite de lua azulada (75% do escuro da Noite sem lua, que continua mais escura) e amanhecer rosado. À noite acendem as janelas das casas e dos prédios da vila, quatro no castelo, as tochas da torre de nível 3 e a do piche.
+
+### Figurinhas novas e o Livro do Sábio
+
+Doze figurinhas: Caça-vampiro, Pega-ladrão (recuperar o roubo do acumulador), os três golens, Lanceiro, Anão, Torre de fogo, Muralha de pedra (10 trechos), Mercador e Onda de uma cara só.
+
+O Livro do Sábio fica no ⋯, embaixo do álbum. Um cartão por monstro com a figura dele (retratos feitos com a arte e as armas do próprio jogo, `reports/bestiary-harness.js`; o morcego é um quadro do sprite). Quem ainda não apareceu em nenhuma partida fica escuro e borrado, com "?". Tocar num visto abre a página: o que ele faz e o que funciona contra, em ícones grandes, com a frase embaixo. O que já foi visto fica no navegador (`reino.livro`), e o monstro novo brilha até abrir o livro.
+
+### `step.ts` em partes
+
+O passo da simulação tinha 1.900 linhas e foi separado sem mudar nada (o robô caiu nas mesmas ondas, semente por semente): `common.ts` (passo, avisos, distâncias, andar, monstro mais perto), `buildings.ts`, `economy.ts`, `people.ts` (empregos, recrutas, fuga e agora a entrega), `troops.ts`, `heroes.ts`, `combat.ts`, `waves.ts`, `horde.ts` e `defenses.ts`. O `step.ts` ficou só com a ordem do passo e reexporta o que os outros usavam.
+
+### Robô
+
+O robô aprendeu a subir as torres (da onda 8, com pedra sobrando) e a usar o mercado (da onda 10: ouro sobrando vira ferro; comida, se faltar). `ROBO_NIVEIS=0` e `ROBO_MERCADO=0` desligam isso. 12 sementes, até a onda 60:
+
+| Rodada | Média | Não caíram até a 60 |
+| --- | --- | --- |
+| Antes de hoje | 25,8 | 1 |
+| Regras novas, robô antigo (sem níveis nem mercado) | 23,3 | 0 |
+| Regras novas, robô novo | 41,4 | 6 |
+| Robô novo, sem as ondas de uma família | 35,9 | 4 |
+| Robô novo, sem as entregas | 32,3 | 4 |
+
+As duas últimas mostram mais o sorteio do que a regra: tirar a família ou as entregas muda a ordem dos sorteios e as quedas mudam de lugar. O que pesa mesmo são as torres de pedra e de fogo: com elas, metade das partidas segura a horda depois do teto da onda 30, que é o que o usuário queria ("quem jogar bem luta para sempre"). Quem cai, cai na onda 15 (primeiro chefe) ou na 19 (vampiros).
+
+## 26. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
   - `world.ts`: estado e geração do mapa.
   - `path.ts`: campo de fluxo da horda e caminho das pessoas.
   - `deposits.ts`: estoque de floresta, rocha, veio e plantação, o que acontece quando acaba e onde o recurso novo nasce (Etapa 17).
-  - `step.ts`: obras, economia, chegadas, recrutas, ondas, horda, tropas e defesas.
+  - `step.ts`: a ordem de um passo (obras, economia, chegadas, recrutas, ondas, horda, tropas e defesas); cada parte no seu arquivo (seção 25, "`step.ts` em partes").
   - `commands.ts`: ordens do jogador, cada uma com o motivo de não poder.
 - **Campo de fluxo:** Dijkstra a partir do castelo. Prédios e muralhas custam mais para atravessar (`breakCost`). Com o reino todo cercado, o caminho mais barato passa por uma muralha, e o monstro para e bate nela.
 - **Gente do reino:** anda por busca em largura. Rocha e prédios bloqueiam; portão e fazenda deixam passar. Os soldados só lutam onde alcançam a pé (`reach`).
@@ -938,13 +1006,13 @@ O que mudou (`CONFIG.horde`):
   - `season.ts`: estações (tom da grama e das copas, neve, sombras de nuvem) e o tempo que cai do céu (Etapa 16).
   - `quality.ts`: gráficos normais ou leves (o que cada um liga e desliga, e o palpite pelo aparelho).
   - `bubbles.ts`: balões de ícone no mundo (prédio sem recurso, recurso novo), desenhados em canvas (Etapa 17).
-  - `village.ts`: a vila (casas e prédios de tropa virados para a rua, ruas até o castelo, quintais, poço, taverna e mercado); o chão dela é pintado em `ground.ts`.
+  - `village.ts`: a vila (casas, prédios de tropa e o mercado virados para a rua, ruas até o castelo, quintais, poço e taverna); o chão dela é pintado em `ground.ts`.
 - `src/audio/`: `sound.ts` com os efeitos sonoros e `music.ts` com a música ambiente, tudo feito na hora pelo Web Audio.
-- **Muralha:** cada trecho desenha meio muro até cada vizinho que também é muralha e um poste nas curvas e pontas. O portão segue a linha dos dois vizinhos opostos.
-- `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. `album.ts`: as figurinhas e o que guarda no navegador. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
+- **Muralha:** cada trecho desenha meio muro (ou meia paliçada) até cada vizinho que também é muralha e um poste nas curvas e pontas. O portão segue a linha dos dois vizinhos opostos.
+- `src/game/game.ts`: ritmo (pausa, 1×, 2×, 3×), modo de construir ou mover, seleção e avisos. `album.ts`: as figurinhas e o que guarda no navegador; `bestiary.ts`: o Livro do Sábio; `guide.ts`: as dicas do Sábio. No toque, o primeiro toque mostra o fantasma e o segundo confirma; no mouse, o clique confirma.
 - `src/ui/App.tsx`: HUD, ⋯, botões flutuantes, avisos e telas de começo e fim. O menu do prédio e o leque do Construir ficam em `src/ui/Radial.tsx` (seções 14 e 15).
 
-## 26. Etapas
+## 27. Etapas
 
 | Etapa | O que | Situação |
 | --- | --- | --- |
@@ -975,8 +1043,9 @@ O que mudou (`CONFIG.horde`):
 | — | Socorro das tropas sem ordem, tropa que não empaca sem caminho e a dica do portão (seção 24) | Pronto em 2026-11-09. Medido com o robô e nos testes; falta jogar no tablet e no iPhone. |
 | — | Arte nova do piche (poça, caldeirão e tocha) e das estacas (três fileiras viradas para a horda) (seção 24) | Pronto em 2026-11-09. Visto no navegador do Mac (piche apagado e aceso, estacas no caminho da fenda); falta jogar no tablet e no iPhone. |
 | — | Horda sem fila: faixa própria, caminhos paralelos, bandos e o monstro que não empaca na quina (seção 24) | Pronto em 2026-11-09. Visto no navegador do Mac (antes e depois na mesma onda); falta jogar no tablet e no iPhone. |
+| — | Torre em três níveis, paliçada e muralha de pedra, mercado, ondas de uma família, aviso do chefe, prédio ferido com fumaça, aldeões levando o trabalho, neve sem cobrir as trilhas, dia e noite, figurinhas novas, Livro do Sábio e o `step.ts` em partes (seção 25) | Pronto em 2026-11-10. Medido com o robô e visto no navegador do Mac; falta jogar no tablet e no iPhone e ouvir a trompa. |
 
-## 27. Arte e licenças
+## 28. Arte e licenças
 
 Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art` (lista em `tools/art-manifest.ts`). Detalhes em `LICENSES.md`.
 
@@ -995,5 +1064,6 @@ Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art`
 | Ícone (2026-11-09) | castelo de telhado dourado e estandartes (Medieval), fotografados para o ícone |
 | Inimigos novos (2026-11-09) | Skeleton_Warrior, Skeleton_Axe e Skeleton_Shield_Small_A (Skeletons); Vampire e a espada (Mystery Monthly 5); Hoarder e 4GTN_Forgotten (Mystery Monthly 6); Helper_A, Helper_B e a bengala doce (Mystery Monthly 5, Helpers); o retrato do Sábio sai do Lorekeeper (Mystery Monthly 6) |
 | Tropas novas (2026-11-09) | tenda azul e torre de canhão, elmo de chifres (Medieval); spear_A (Fantasy Weapons); shotgun (Adventurers); o lanceiro é o Knight em bronze e o anão o Engineer |
+| Melhorias de 2026-11-10 | torre de pedra (a base de torre) com tochas e estandartes, mercado de toldo, saco e carrinho de mão (Medieval); pedras e minério no carrinho (Resource Bits); retratos do Livro do Sábio feitos com os personagens do jogo |
 
 Os efeitos vêm do pixelfx (MIT); detalhes na seção 6 e em `LICENSES.md`.

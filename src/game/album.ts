@@ -4,7 +4,7 @@
  * de apoio para quem lê junto.
  */
 import { MODES, barnOf, castle, cropOf, isHero, troops } from '../sim/index.ts';
-import type { SimEvent, World } from '../sim/index.ts';
+import type { MonsterKind, SimEvent, UnitKind, World } from '../sim/index.ts';
 
 export interface Sticker {
   id: string;
@@ -26,6 +26,8 @@ interface Rule extends Sticker {
 
 const built = (w: World, kind: string) => [...w.buildings.values()].filter((b) => b.kind === kind && b.built >= 1).length;
 const wonWave = (c: AlbumCtx, n: number) => c.events.some((e) => e.type === 'waveEnd' && e.wave >= n);
+const killed = (events: SimEvent[], kind: MonsterKind) => events.some((e) => e.type === 'death' && e.monster && e.kind === kind);
+const has = (w: World, kind: UnitKind) => [...w.units.values()].some((u) => u.kind === kind && u.state !== 'dead');
 
 const RULES: Rule[] = [
   { id: 'casas4', icon: 'casa', color: '#c98a4b', name: 'Vila', hint: 'Ter 4 casas prontas.', check: ({ w }) => built(w, 'casa') >= 4 },
@@ -101,6 +103,25 @@ const RULES: Rule[] = [
     check: ({ w, events }) => events.some((e) => e.type === 'waveEnd' && e.wave >= 3) && !!w.report && w.report.fallen.length === 0,
   },
   { id: 'inverno', icon: 'neve', color: '#8fb8e0', name: 'Primeiro inverno', hint: 'Chegar ao inverno (onda 16).', check: ({ w }) => w.wave >= 16 },
+  // Figurinhas novas (2026-11-10): os inimigos e as tropas novas e o que entrou junto.
+  { id: 'vampiro', icon: 'morcego', color: '#8a2a4a', name: 'Caça-vampiro', hint: 'Derrubar um vampiro.', check: ({ events }) => killed(events, 'vampiro') },
+  { id: 'ladrao', icon: 'ouro', color: '#c99a2e', name: 'Pega-ladrão', hint: 'Derrubar um acumulador e pegar o roubo de volta.', check: ({ events }) => events.some((e) => e.type === 'recovered') },
+  { id: 'golemGelo', icon: 'neve', color: '#6fa8d8', name: 'Golem de gelo', hint: 'Vencer o golem de gelo.', check: ({ events }) => killed(events, 'golem') },
+  { id: 'golemOssos', icon: 'caveira', color: '#b8a888', name: 'Golem de ossos', hint: 'Vencer o golem de ossos.', check: ({ events }) => killed(events, 'golemOssos') },
+  { id: 'golemMusgo', icon: 'folha', color: '#4f8f3a', name: 'Golem de musgo', hint: 'Vencer o golem de musgo.', check: ({ events }) => killed(events, 'golemMusgo') },
+  { id: 'lanceiro', icon: 'lanca', color: '#b8743a', name: 'Lanceiro', hint: 'Treinar um lanceiro no acampamento.', check: ({ w }) => has(w, 'lanceiro') },
+  { id: 'anao', icon: 'polvora', color: '#7a5a3a', name: 'Anão', hint: 'Treinar um anão na torre de pólvora.', check: ({ w }) => has(w, 'anao') },
+  { id: 'torre3', icon: 'fogo', color: '#e0662e', name: 'Torre de fogo', hint: 'Levar uma torre ao nível 3.', check: ({ w }) => [...w.buildings.values()].some((b) => b.kind === 'torre' && b.level >= 3) },
+  { id: 'pedra10', icon: 'muralha', color: '#7d8590', name: 'Muralha de pedra', hint: 'Ter 10 trechos de muralha de pedra.', check: ({ w }) => [...w.buildings.values()].filter((b) => b.kind === 'muralha' && b.level >= 2 && b.built >= 1).length >= 10 },
+  { id: 'mercado', icon: 'mercado', color: '#3f86c8', name: 'Mercador', hint: 'Fazer uma troca no mercado.', check: ({ w }) => !!w.flags.negociou },
+  {
+    id: 'tema',
+    icon: 'lobo',
+    color: '#b8483a',
+    name: 'Onda de uma cara só',
+    hint: 'Vencer uma onda de uma família só (matilha, ossos ou orcs).',
+    check: ({ w, events }) => !!w.waveTheme && events.some((e) => e.type === 'waveEnd'),
+  },
   { id: 'monstros100', icon: 'caveira', color: '#6a7a8a', name: 'Caçador', hint: 'Vencer 100 monstros numa partida.', check: ({ w }) => w.kills >= 100 },
   { id: 'monstros1000', icon: 'caveira', color: '#3a4a5a', name: 'Grande caçador', hint: 'Vencer 1000 monstros numa partida.', check: ({ w }) => w.kills >= 1000 },
 ];

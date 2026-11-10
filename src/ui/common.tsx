@@ -66,6 +66,17 @@ export const ICONS: Record<string, string> = {
   // Tropas novas (2026-11-09): lança com a ponta para cima e bomba de pavio aceso.
   lanca: 'M5 21L15.5 8.5M15.5 8.5L14 4l6-1-1 6zM7 15l3 3',
   polvora: 'M11 9a6 6 0 1 0 .01 0M14.5 7.5L17 5M18.5 3l1 1M20.5 5.5l-1 .5M18 6.5l.5 1',
+  // Livro do Sábio e figurinha do vampiro (2026-11-10): livro aberto e morcego de asas abertas.
+  livro: 'M12 6.5C10 5 7 4.5 3 5v13c4-.5 7 0 9 1.5 2-1.5 5-2 9-1.5V5c-4-.5-7 0-9 1.5zM12 6.5V19.5',
+  morcego: 'M12 9l-1.5-2.5L9.5 9C7 7 4 7 2 9c2 0 3 1.5 3.5 3 1-1 2.5-1 3.5 0 .8-.8 2-1 3-.2 1-.8 2.2-.6 3 .2 1-1 2.5-1 3.5 0 .5-1.5 1.5-3 3.5-3-2-2-5-2-7.5 0L13.5 6.5z',
+  cura: 'M12 3a9 9 0 1 0 .01 0M12 8v8M8 12h8',
+  bando: 'M6 9a2 2 0 1 0 .01 0M12 7a2 2 0 1 0 .01 0M18 9a2 2 0 1 0 .01 0M3 18c0-2 1.3-3.5 3-3.5s3 1.5 3 3.5M9 17c0-2.2 1.3-4 3-4s3 1.8 3 4M15 18c0-2 1.3-3.5 3-3.5s3 1.5 3 3.5',
+  // Matilha (2026-11-10): cabeça de lobo de orelhas em pé.
+  lobo: 'M5 3l3.5 5h7L19 3l1 9-3 5-5 4-5-4-3-5zM9.5 12h.01M14.5 12h.01M11 16h2',
+  // Mercado (2026-11-10): a barraca de toldo, comprar (saco entrando) e vender (moedas saindo).
+  mercado: 'M3 10l2-6h14l2 6M3 10a3 2.5 0 0 0 6 0a3 2.5 0 0 0 6 0a3 2.5 0 0 0 6 0M5 12.5V20h14v-7.5M10 20v-4h4v4',
+  comprar: 'M6 8h12l-1 12H7zM9 8V6a3 3 0 0 1 6 0v2M12 11v6M9.5 14.5L12 17l2.5-2.5',
+  vender: 'M6 8h12l-1 12H7zM9 8V6a3 3 0 0 1 6 0v2M12 17v-6M9.5 13.5L12 11l2.5 2.5',
   // Etapa 16: estações (a folha já existia) e o álbum de figurinhas.
   flor: 'M10 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0M9 6a3 3 0 1 0 6 0a3 3 0 1 0-6 0M9 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0M3 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0M15 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0',
   sol: 'M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1',

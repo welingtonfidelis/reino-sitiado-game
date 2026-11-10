@@ -108,6 +108,15 @@ export interface Unit {
   /** Fuga sozinho (2026-11-09): prédio onde o aldeão corre para se esconder e há quanto tempo está calmo. */
   hideIn?: number;
   hideT?: number;
+  /**
+   * Levar o trabalho (2026-11-10): segundos trabalhados desde a última viagem; a viagem em curso
+   * ('ida' até o castelo ou o celeiro, 'volta' até o serviço) e o que vai nos braços na ida.
+   */
+  workT?: number;
+  trip?: 'ida' | 'volta';
+  carry?: Res;
+  /** Ladrilho da entrega: o do castelo ou celeiro, ou um vizinho livre (cercado de prédios, não se chega nele). */
+  haulTo?: number;
 }
 
 export interface Monster {
@@ -146,7 +155,7 @@ export interface Monster {
 
 export type SimEvent =
   | { type: 'toast'; text: string; tone: 'good' | 'bad' | 'warn' | 'gold' | 'info' }
-  | { type: 'shot'; x1: number; y1: number; z1: number; x2: number; y2: number; z2: number }
+  | { type: 'shot'; x1: number; y1: number; z1: number; x2: number; y2: number; z2: number; fire?: boolean }
   | { type: 'built'; id: number }
   /** O prédio acabou de ser desmontado em (q, r) e vai ser remontado no lugar novo. */
   | { type: 'packed'; id: number; q: number; r: number }
@@ -165,9 +174,17 @@ export type SimEvent =
   | { type: 'heroLevel'; x: number; z: number; level: number }
   | { type: 'heroBack'; x: number; z: number }
   | { type: 'siege'; x1: number; z1: number; x2: number; z2: number }
-  | { type: 'death'; x: number; z: number; monster: boolean }
+  | { type: 'death'; x: number; z: number; monster: boolean; kind?: MonsterKind }
+  /** O roubo do acumulador voltou para o reino (2026-11-10, para a figurinha). */
+  | { type: 'recovered'; res: Res; n: number }
   | { type: 'upgrade'; level: number }
+  /** Torre ou muralha subiu de nível (2026-11-10). */
+  | { type: 'buildingUp'; id: number; level: number }
   | { type: 'waveStart'; wave: number }
+  /** Um aldeão entregou o que levava (2026-11-10): o ícone pula em cima de onde entregou. */
+  | { type: 'haul'; res: Res; x: number; z: number }
+  /** Um chefe saiu da fenda (2026-11-10): a trompa toca. */
+  | { type: 'boss'; kind: MonsterKind; x: number; z: number }
   | { type: 'waveEnd'; wave: number; gold: number }
   | { type: 'report' }
   | { type: 'lost'; wave: number };
@@ -180,6 +197,17 @@ export const WAVE_MODS: Record<WaveMod, { name: string; text: string }> = {
   blindados: { name: 'Blindados', text: 'A horda sente 25% menos de todo dano.' },
   enxame: { name: 'Enxame', text: 'Vêm 60% mais esqueletos.' },
   furia: { name: 'Fúria', text: 'A horda anda 30% mais rápido.' },
+};
+
+/**
+ * Ondas com cara própria (2026-11-10): de vez em quando a onda inteira vem de uma família só, com
+ * a mesma vida somada de uma onda comum. `icon` é o ícone grande do aviso.
+ */
+export type WaveTheme = 'matilha' | 'ossos' | 'orcs';
+export const WAVE_THEMES: Record<WaveTheme, { name: string; text: string; icon: string }> = {
+  matilha: { name: 'Matilha', text: 'Só lobisomens: rápidos e muitos, rodeiam a muralha.', icon: 'lobo' },
+  ossos: { name: 'Noite dos ossos', text: 'Só mortos-vivos: esqueletos, os de escudo e necromantes.', icon: 'caveira' },
+  orcs: { name: 'Bando de orcs', text: 'Só orcs: poucos, fortes e bons de derrubar muralha.', icon: 'machado' },
 };
 
 export interface World {
@@ -229,6 +257,8 @@ export interface World {
   report: Report | null;
   /** Modificadores da onda em andamento (Etapa 9). */
   waveMods: WaveMod[];
+  /** Família da onda de agora (2026-11-10), ou null numa onda comum. */
+  waveTheme: WaveTheme | null;
   /** Melhorias da forja (Etapa 5), de 0 a 3 cada. */
   forge: { armas: number; armaduras: number; flechas: number };
   /** Etapa 17: hexágonos de cada recurso que acabaram e ainda não foram repostos. */
@@ -361,6 +391,17 @@ export function castleCap(w: World): number {
   const c = castle(w);
   const lvl = c ? c.level : 1;
   return CONFIG.castleCap[Math.min(lvl, CONFIG.castleCap.length) - 1]!;
+}
+
+/** Nível da torre de arqueiros (2026-11-10): vida, alcance, fator das flechas e fogo. */
+export function towerLevel(b: Building) {
+  const L = CONFIG.towerLevels;
+  return L[Math.max(1, Math.min(b.level, L.length)) - 1]!;
+}
+
+/** Alcance da torre no nível dela (sem a Noite sem lua). */
+export function towerRange(b: Building): number {
+  return towerLevel(b).range;
 }
 
 /** Custo de construir (casas encarecem a cada nova). */
@@ -618,6 +659,7 @@ export function createWorld(seed = 1, R = CONFIG.mapRadius, mode: Mode = 'normal
     report: null,
     forge: { armas: 0, armaduras: 0, flechas: 0 },
     waveMods: [],
+    waveTheme: null,
     regrow: { forest: 0, rock: 0, ore: 0, crystal: 0 },
     land: 0,
     events: [],

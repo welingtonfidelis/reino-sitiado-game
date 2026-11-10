@@ -36,6 +36,7 @@ export function placeProblem(w: World, kind: BuildingKind, q: number, r: number,
     return null;
   }
   if (t.b >= 0 && t.b !== ignore) return 'Já tem algo aqui';
+  if (def.unique) for (const o of w.buildings.values()) if (o.kind === kind && o.id !== ignore) return `Já tem ${def.name.toLowerCase()} no reino`;
   for (const o of w.buildings.values()) {
     if (o.id !== ignore && o.moveTo && o.moveTo.q === q && o.moveTo.r === r) return 'Lugar guardado para uma mudança';
   }
@@ -82,8 +83,15 @@ export function build(w: World, kind: BuildingKind, q: number, r: number): strin
   return null;
 }
 
-/** Quanto volta ao destruir: metade do que custou (a casa, pelo preço da última). */
+/** Quanto volta ao destruir: metade do que custou (a casa, pelo preço da última; torre e muralha com as melhorias). */
 function paidFor(w: World, b: Building): Cost {
+  if (b.kind === 'torre' || b.kind === 'muralha') {
+    const out: Cost = { ...BUILDINGS[b.kind].cost };
+    const L = b.kind === 'torre' ? CONFIG.towerLevels : CONFIG.wallLevels;
+    for (let k = 1; k < Math.min(b.level, L.length); k++)
+      for (const [r, v] of Object.entries(L[k]!.cost) as [Res, number][]) out[r] = (out[r] ?? 0) + v;
+    return out;
+  }
   if (b.kind !== 'casa') return BUILDINGS[b.kind].cost;
   const k = Math.pow(CONFIG.houseGrowth, Math.max(0, w.housesBuilt - 1));
   const out: Cost = {};
@@ -114,7 +122,9 @@ export function repairCost(_w: World, b: Building): Cost {
   if (b.kind === 'castelo') return { pedra: Math.ceil(miss / 8), madeira: Math.ceil(miss / 16) };
   const share = (miss / b.maxHp) * CONFIG.repairShare;
   const out: Cost = {};
-  for (const [r, v] of Object.entries(BUILDINGS[b.kind].cost) as [Res, number][]) out[r] = Math.max(1, Math.ceil(v * share));
+  // Muralha de pedra se conserta com pedra (a paliçada, com madeira).
+  const base = b.kind === 'muralha' && b.level >= 2 ? CONFIG.wallLevels[1]!.cost : BUILDINGS[b.kind].cost;
+  for (const [r, v] of Object.entries(base) as [Res, number][]) out[r] = Math.max(1, Math.ceil(v * share));
   return out;
 }
 
@@ -556,5 +566,148 @@ export function buyHero(w: World, kind: HeroKind): string | null {
   u.name = UNITS[kind].name;
   w.events.push({ type: 'heroBack', x: u.x, z: u.z });
   w.events.push({ type: 'toast', text: `${UNITS[kind].name} chegou ao reino!`, tone: 'gold' });
+  return null;
+}
+
+// ------------------------------------------------------------------ torre e muralha (2026-11-10)
+
+/** Preço do próximo nível da torre, ou null no máximo. */
+export function towerUpgradeCost(_w: World, b: Building): Cost | null {
+  return CONFIG.towerLevels[b.level]?.cost ?? null;
+}
+
+export function towerUpgradeProblem(w: World, b: Building): string | null {
+  if (b.kind !== 'torre') return 'Só a torre de arqueiros';
+  const next = CONFIG.towerLevels[b.level];
+  if (!next) return 'Nível máximo';
+  if (b.moveTo || b.moved) return 'De mudança';
+  if (b.built < 1) return 'Ainda em obra';
+  if ((castle(w)?.level ?? 1) < next.castle) return `Precisa do castelo nível ${next.castle}`;
+  return missing(w, next.cost);
+}
+
+/** Sobe a torre um nível: a vida cresce junto (o estrago fica). */
+export function upgradeTower(w: World, id: number): string | null {
+  const b = w.buildings.get(id);
+  if (!b) return 'Não existe mais';
+  const why = towerUpgradeProblem(w, b);
+  if (why) return why;
+  const next = CONFIG.towerLevels[b.level]!;
+  pay(w, next.cost);
+  const add = next.hp - CONFIG.towerLevels[b.level - 1]!.hp;
+  b.level++;
+  b.maxHp += add;
+  b.hp += add;
+  w.dirty = true;
+  w.events.push({ type: 'buildingUp', id: b.id, level: b.level });
+  w.events.push({ type: 'toast', text: b.level === 3 ? 'Torre no nível 3: telhado novo e flechas de fogo.' : `Torre no nível ${b.level}: de pedra, alcança e fere mais.`, tone: 'gold' });
+  return null;
+}
+
+/** Trecho de paliçada que pode virar pedra. */
+function wallUpgradable(b: Building): boolean {
+  return b.kind === 'muralha' && b.level < CONFIG.wallLevels.length && b.built >= 1 && !b.moveTo && !b.moved;
+}
+
+export function wallUpgradeProblem(w: World, b: Building): string | null {
+  if (b.kind !== 'muralha') return 'Só muralha';
+  if (b.level >= CONFIG.wallLevels.length) return 'Já é de pedra';
+  if (b.moveTo || b.moved) return 'De mudança';
+  if (b.built < 1) return 'Ainda em obra';
+  return missing(w, CONFIG.wallLevels[b.level]!.cost);
+}
+
+function raiseWall(w: World, b: Building): void {
+  const next = CONFIG.wallLevels[b.level]!;
+  pay(w, next.cost);
+  const add = Math.round((next.hp - CONFIG.wallLevels[b.level - 1]!.hp) * w.mods.wallHp);
+  b.level++;
+  b.maxHp += add;
+  b.hp += add;
+  w.dirty = true;
+  w.events.push({ type: 'buildingUp', id: b.id, level: b.level });
+}
+
+/** Um trecho de paliçada vira pedra. */
+export function upgradeWall(w: World, id: number): string | null {
+  const b = w.buildings.get(id);
+  if (!b) return 'Não existe mais';
+  const why = wallUpgradeProblem(w, b);
+  if (why) return why;
+  raiseWall(w, b);
+  return null;
+}
+
+/** Quantos trechos de paliçada ainda podem virar pedra, e quanto custa todos. */
+export function wallsToUpgrade(w: World): { n: number; cost: Cost } {
+  let n = 0;
+  for (const b of w.buildings.values()) if (wallUpgradable(b)) n++;
+  const cost: Cost = {};
+  for (const [r, v] of Object.entries(CONFIG.wallLevels[1]!.cost) as [Res, number][]) cost[r] = v * n;
+  return { n, cost };
+}
+
+export function allWallsProblem(w: World): string | null {
+  const { n } = wallsToUpgrade(w);
+  if (n === 0) return 'Nenhuma paliçada pronta';
+  return missing(w, CONFIG.wallLevels[1]!.cost);
+}
+
+/**
+ * Toda paliçada pronta vira pedra, a começar pelas mais perto do trecho tocado (`from`), até o
+ * dinheiro acabar. Devolve quantas viraram.
+ */
+export function upgradeAllWalls(w: World, from = -1): number {
+  if (allWallsProblem(w)) return 0;
+  const o = w.buildings.get(from) ?? castle(w);
+  const list = [...w.buildings.values()].filter(wallUpgradable);
+  if (o) list.sort((a, b) => hexDist(a.q, a.r, o.q, o.r) - hexDist(b.q, b.r, o.q, o.r));
+  let n = 0;
+  for (const b of list) {
+    if (missing(w, CONFIG.wallLevels[b.level]!.cost)) break;
+    raiseWall(w, b);
+    n++;
+  }
+  if (n > 0) w.events.push({ type: 'toast', text: n === 1 ? 'Um trecho de muralha virou pedra.' : `${n} trechos de muralha viraram pedra.`, tone: 'gold' });
+  return n;
+}
+
+// ------------------------------------------------------------------ mercado (2026-11-10)
+
+export type TradeSide = 'comprar' | 'vender';
+export const TRADE_RES: Res[] = ['comida', 'madeira', 'pedra', 'ferro', 'cristal'];
+
+/** Lote de uma troca e o ouro que ela custa (comprar) ou rende (vender). */
+export function tradeDeal(res: Res, side: TradeSide): { n: number; ouro: number } {
+  const M = CONFIG.market;
+  const n = res === 'cristal' ? M.crystalLot : M.lot;
+  const price = M.price[res] ?? 1;
+  return { n, ouro: Math.max(1, Math.round(n * price * (side === 'vender' ? M.sell : 1))) };
+}
+
+export function marketOf(w: World): Building | undefined {
+  for (const b of w.buildings.values()) if (b.kind === 'mercado' && b.built >= 1 && !b.moveTo && !b.moved) return b;
+  return undefined;
+}
+
+export function tradeProblem(w: World, res: Res, side: TradeSide): string | null {
+  if (!marketOf(w)) return 'Precisa de um mercado pronto';
+  const d = tradeDeal(res, side);
+  if (side === 'comprar') return w.res.ouro < d.ouro ? 'Falta ouro' : null;
+  return w.res[res] < d.n ? `Falta ${RES_NAME[res]}` : null;
+}
+
+export function trade(w: World, res: Res, side: TradeSide): string | null {
+  const why = tradeProblem(w, res, side);
+  if (why) return why;
+  const d = tradeDeal(res, side);
+  if (side === 'comprar') {
+    w.res.ouro -= d.ouro;
+    w.res[res] += d.n;
+  } else {
+    w.res[res] -= d.n;
+    w.res.ouro += d.ouro;
+  }
+  w.flags.negociou = true;
   return null;
 }
