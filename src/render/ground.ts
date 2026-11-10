@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { HEX, hexToWorld, worldToHex } from '../sim/index.ts';
 import type { Terrain, World } from '../sim/index.ts';
 import { GROUND_SEASON, SEASON_U } from './season.ts';
+import { LIGHT_U } from './lights.ts';
 
 /** Tom por cima da textura (1 = como a textura) e quanto de solo aparece em cada terreno. */
 const LOOK: Record<Terrain, { tint: [number, number, number]; soil: number }> = {
@@ -198,6 +199,65 @@ const VILLAGE = (() => {
   return { canvas, tex, box: new THREE.Vector3(0, 0, 1) };
 })();
 
+/**
+ * Sombra de contato pintada (2026-11-10): o escurinho embaixo e em volta de prédio, árvore e rocha,
+ * no lugar da sombra de contato por pós-processamento (que pesava demais). Mapa visto de cima, como
+ * o da vila, só que com mais detalhe; refeito quando prédios ou terreno mudam.
+ */
+const SHADE_PX = 1024;
+const SHADE = (() => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = SHADE_PX;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.flipY = false;
+  tex.colorSpace = THREE.NoColorSpace;
+  return { canvas, tex };
+})();
+/** Poças de luz quente da noite (2026-11-10): postes, tochas, porta do castelo e casas acesas. */
+const LIGHT = (() => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = SHADE_PX;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.flipY = false;
+  tex.colorSpace = THREE.NoColorSpace;
+  return { canvas, tex };
+})();
+
+/** 1 liga a sombra de contato pintada; 0 volta ao chão de antes. */
+export const GROUND_U = { uShadeK: { value: 1 } };
+
+export interface ShadeSpot {
+  x: number;
+  z: number;
+  /** Raio em metros e força (0 a 1). */
+  r: number;
+  k: number;
+}
+
+export function paintShade(spots: ShadeSpot[], target: 'shade' | 'light' = 'shade'): void {
+  const map = target === 'shade' ? SHADE : LIGHT;
+  const g = map.canvas.getContext('2d');
+  if (!g) return;
+  const k = VILLAGE.box.z * SHADE_PX;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, SHADE_PX, SHADE_PX);
+  g.setTransform(k, 0, 0, k, -VILLAGE.box.x * k, -VILLAGE.box.y * k);
+  g.globalCompositeOperation = 'lighter';
+  for (const s of spots) {
+    const grad = g.createRadialGradient(s.x, s.z, 0, s.x, s.z, s.r);
+    grad.addColorStop(0, `rgba(255,255,255,${s.k})`);
+    grad.addColorStop(0.45, `rgba(255,255,255,${s.k * 0.7})`);
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.beginPath();
+    g.arc(s.x, s.z, s.r, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.globalCompositeOperation = 'source-over';
+  map.tex.needsUpdate = true;
+}
+
 /** Pinta os quintais (manchas redondas que se juntam) e as trilhas (linhas macias). */
 export function paintVillage(yards: { x: number; z: number }[], trails: { x: number; z: number }[][]): void {
   const g = VILLAGE.canvas.getContext('2d');
@@ -258,11 +318,15 @@ function groundMaterial(): THREE.MeshLambertMaterial {
     sh.uniforms.uClouds = SEASON_U.uClouds;
     sh.uniforms.uVillage = { value: VILLAGE.tex };
     sh.uniforms.uVillageBox = { value: VILLAGE.box };
+    sh.uniforms.uShade = { value: SHADE.tex };
+    sh.uniforms.uShadeK = GROUND_U.uShadeK;
+    sh.uniforms.uLight = { value: LIGHT.tex };
+    sh.uniforms.uNight = LIGHT_U.uNight;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float aSoil;\nvarying float vSoil;\nvarying vec2 vGround;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSoil = aSoil;\nvGround = (modelMatrix * vec4(position, 1.0)).xz;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform sampler2D uGrass;\nuniform sampler2D uSoil;\nuniform sampler2D uVillage;\nuniform vec3 uVillageBox;\nvarying float vSoil;\nvarying vec2 vGround;' + GROUND_SEASON.head)
+      .replace('#include <common>', '#include <common>\nuniform sampler2D uGrass;\nuniform sampler2D uSoil;\nuniform sampler2D uVillage;\nuniform sampler2D uShade;\nuniform float uShadeK;\nuniform sampler2D uLight;\nuniform float uNight;\nuniform vec3 uVillageBox;\nvarying float vSoil;\nvarying vec2 vGround;' + GROUND_SEASON.head)
       .replace(
         '#include <map_fragment>',
         `// Grama e solo pela posição no mundo (um quadro de textura a cada 3,5 m): não segue a grade.
@@ -273,9 +337,17 @@ function groundMaterial(): THREE.MeshLambertMaterial {
         float vil = smoothstep(0.2, 0.75, texture2D(uVillage, (vGround - uVillageBox.xy) * uVillageBox.z).r);
         s = max(s, vil);
         soil *= 1.0 + 0.1 * vil;
-        diffuseColor.rgb *= mix(grass, soil, s) * 1.25;`,
+        diffuseColor.rgb *= mix(grass, soil, s) * 1.25;
+        // Sombra de contato pintada (2026-11-10).
+        float shd = min(1.0, texture2D(uShade, (vGround - uVillageBox.xy) * uVillageBox.z).r);
+        diffuseColor.rgb *= 1.0 - 0.5 * shd * uShadeK;`,
       )
-      .replace('#include <color_fragment>', '#include <color_fragment>\n' + GROUND_SEASON.body);
+      .replace('#include <color_fragment>', '#include <color_fragment>\n' + GROUND_SEASON.body)
+      // Poça de luz quente à noite (postes, tochas, porta do castelo, casas acesas).
+      .replace(
+        '#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\n  totalEmissiveRadiance += vec3(1.0, 0.55, 0.2) * min(1.0, texture2D(uLight, (vGround - uVillageBox.xy) * uVillageBox.z).r) * uNight * 0.32;',
+      );
   };
   return m;
 }
@@ -290,14 +362,42 @@ void main() {
   vXZ = wp.xz;
   gl_Position = projectionMatrix * viewMatrix * wp;
 }`;
+/** Visual novo da água (protótipo de 2026-11-10): 1 liga, 0 volta à de antes. */
+export const WATER_U = { uNew: { value: 1 } };
+
 const WATER_FRAG = /* glsl */ `
 uniform float uTime;
+uniform float uNew;
 varying float vShore;
 varying vec2 vXZ;
+// Rede de luz no fundo do raso: dois senos que se dobram um no outro viram linhas finas e claras.
+float caustic(vec2 p, float t) {
+  float v = abs(sin(p.x + sin(p.y * 1.3 + t)) * sin(p.y + sin(p.x * 1.1 - t * 0.8)));
+  return pow(1.0 - v, 7.0);
+}
 void main() {
   // Contorno ondulado: a margem passa onde há metade de água, com um pouco de ruído.
   float edge = vShore + 0.06 * sin(vXZ.x * 3.3 + vXZ.y * 2.1) + 0.04 * sin(vXZ.y * 5.7 - vXZ.x * 1.3);
   if (edge < 0.42) discard;
+  if (uNew > 0.5) {
+    // Raso turquesa e fundo azul; luz correndo no fundo do raso; brilho do céu na superfície;
+    // espuma presa à margem e ondinhas que chegam nela.
+    float deepK = smoothstep(0.46, 1.0, edge);
+    vec3 col = mix(vec3(0.07, 0.4, 0.42), vec3(0.01, 0.075, 0.19), deepK);
+    vec2 p = vXZ * 2.2;
+    float ca = caustic(p, uTime * 0.9) + caustic(p * 1.37 + 4.1, -uTime * 0.7) * 0.7;
+    col += vec3(0.45, 0.8, 0.75) * ca * (1.0 - deepK) * 0.32;
+    float sh = sin(vXZ.x * 2.7 + uTime * 1.3) * sin(vXZ.y * 3.1 - uTime * 0.9) + sin((vXZ.x + vXZ.y) * 1.6 + uTime * 0.7) * 0.5;
+    col += smoothstep(0.95, 1.4, sh) * vec3(0.12, 0.16, 0.18);
+    float shore = 1.0 - smoothstep(0.42, 0.485, edge);
+    float rings = smoothstep(0.78, 0.98, sin(edge * 46.0 - uTime * 1.8 + sin(vXZ.x * 1.7 + vXZ.y) * 0.9));
+    float wave = rings * (1.0 - smoothstep(0.47, 0.64, edge));
+    col = mix(col, vec3(0.86, 0.93, 0.95), max(shore * 0.9, wave * 0.55));
+    gl_FragColor = vec4(col, mix(0.72, 0.94, deepK));
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+    return;
+  }
   float depth = smoothstep(0.42, 0.95, edge);
   // Cores em espaço linear (a saída passa para sRGB e clareia).
   vec3 deep = vec3(0.012, 0.07, 0.13);
@@ -309,6 +409,7 @@ void main() {
   float foam = 1.0 - smoothstep(0.42, 0.47, edge);
   c = mix(c, vec3(0.62, 0.72, 0.7), foam * (0.6 + 0.2 * sin(uTime * 2.0 + vXZ.x * 4.0)));
   gl_FragColor = vec4(c, 0.9);
+  #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
 
@@ -403,7 +504,7 @@ export function buildGround(w: World): Ground {
     wg.setAttribute('aShore', new THREE.Float32BufferAttribute(wshore, 1));
     water = new THREE.Mesh(
       wg,
-      new THREE.ShaderMaterial({ vertexShader: WATER_VERT, fragmentShader: WATER_FRAG, transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 } } }),
+      new THREE.ShaderMaterial({ vertexShader: WATER_VERT, fragmentShader: WATER_FRAG, transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 }, uNew: WATER_U.uNew } }),
     );
     water.renderOrder = 2;
   }

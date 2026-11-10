@@ -985,6 +985,19 @@ Cada arquivo do KayKit traz a sua cópia da imagem de cores, mesmo quando é a m
 
 O visual não muda. O resto da conta da placa (134 itens) são as folhas de efeito do pixelfx, a sombra, os balões e, a maioria, a textura de 12×12 com a pose do esqueleto de cada boneco (minúscula). Ainda pesam: 1,1 milhão de triângulos (as árvores são a maior parte) e uns 330 desenhos por quadro.
 
+### Visual novo (depois da análise do What the Sea Keeps 0.3)
+
+O usuário mostrou o What the Sea Keeps 0.3 (ilha de hexágonos feita com o Claude, Meshy, Suno e GPT). A beleza dele vem quase toda da luz, da água e do chão, e isso dá para fazer no Three.js sem trocar a arte do KayKit:
+
+- **Luz de cinema** (`render/grade.ts`, só nos gráficos normais): o ajuste de tom ACES do Three seguido de um acerto de cor (mais cor, claros quentes, sombras frias), tudo dentro do desenho de cada material, como o "CustomToneMapping" do Three. Os efeitos do pixelfx e os balões ficam fora dele, como eram. As bordas mais escuras já vinham da camada `.vignette`. A sombra do sol ficou mais macia.
+- **Sombra de contato pintada** (`paintShade` em `ground.ts`): um escurinho macio no chão embaixo de cada prédio, árvore, rocha e veio, num mapa visto de cima de 1024 px, repintado só quando prédios ou terreno mudam.
+- **Água nova** (`ground.ts`): raso turquesa e fundo azul, rede de luz correndo no fundo do raso, brilho na superfície, espuma presa à margem e ondinhas chegando nela.
+- **Chão vivo** (`render/meadow.ts`): tufos de grama em leque e canteiros de flores de sete cores, balançando ao vento, fora de prédio, quintal, trilha, pátio do castelo e água. Seguem a estação: grama branca e baixa na neve, flores só na primavera e no verão (poucas no outono). No leve, um terço da grama.
+- **Luzes da noite** (`render/lights.ts`), no lugar das bolinhas laranja soltas no ar (o usuário achou estranho no iPhone): as janelas das casas, do moinho, da serraria, da taverna, do mercado, da capela, da torre do mago, da forja e do castelo brilham à noite (umas 70% das casas acendem, sorteio fixo pela posição). A arte do KayKit pinta cada parte com uma faixa de uma paleta 8×4; o vidro é a faixa (6, 1) e a janela do castelo a (3, 0), que também é o ferro dos canhões, das pedras da catapulta e do carrinho: por isso só os modelos da lista ganham o material aceso. Postes de madeira com lanterna (o `post_lantern` do Halloween Bits, na coleção local) vão nos hexágonos livres encostados nas casas e nos prédios da vila (as trilhas da vila apertada têm um metro e pouco) e dois na porta do castelo, um a cada 3,4 m, no máximo 40; o vidro da lanterna (faixa 2, 3) e a chama das tochas acendem. No chão, uma poça de luz quente pintada (como a sombra de contato) embaixo de cada poste, das tochas da torre de nível 3, do piche, da porta do castelo e da frente das casas acesas. Nada disso é luz de verdade do motor: não pesa.
+- `?visual=antigo` desliga tudo, para comparar; no console, `visual(false)` e `visual(true)`.
+
+A primeira versão usava pós-processamento de verdade (sombra de contato GTAO, bloom e acerto de cor numa passada à parte) e ficou pesada: o usuário sentiu no Mac. Medido em tela retina (2560×1600), ia de 12 para 60 ms por quadro (38 só com as passadas, sem a sombra de contato). Trocada pelas versões acima, que não fazem passada a mais: na mesma medida, uns 8,9 ms antes e 8,3 depois, dentro do ruído. Falta medir no iPhone e no tablet.
+
 ### Robô
 
 O robô aprendeu a subir as torres (da onda 8, com pedra sobrando) e a usar o mercado (da onda 10: ouro sobrando vira ferro; comida, se faltar). `ROBO_NIVEIS=0` e `ROBO_MERCADO=0` desligam isso. 12 sementes, até a onda 60:
@@ -1076,6 +1089,6 @@ Tudo do KayKit (Kay Lousberg, CC0), copiado da coleção local por `npm run art`
 | Ícone (2026-11-09) | castelo de telhado dourado e estandartes (Medieval), fotografados para o ícone |
 | Inimigos novos (2026-11-09) | Skeleton_Warrior, Skeleton_Axe e Skeleton_Shield_Small_A (Skeletons); Vampire e a espada (Mystery Monthly 5); Hoarder e 4GTN_Forgotten (Mystery Monthly 6); Helper_A, Helper_B e a bengala doce (Mystery Monthly 5, Helpers); o retrato do Sábio sai do Lorekeeper (Mystery Monthly 6) |
 | Tropas novas (2026-11-09) | tenda azul e torre de canhão, elmo de chifres (Medieval); spear_A (Fantasy Weapons); shotgun (Adventurers); o lanceiro é o Knight em bronze e o anão o Engineer |
-| Melhorias de 2026-11-10 | torre de pedra (a base de torre) com tochas e estandartes, mercado de toldo, saco e carrinho de mão (Medieval); pedras e minério no carrinho (Resource Bits); retratos do Livro do Sábio feitos com os personagens do jogo |
+| Melhorias de 2026-11-10 | torre de pedra (a base de torre) com tochas e estandartes, mercado de toldo, saco e carrinho de mão (Medieval); pedras e minério no carrinho (Resource Bits); retratos do Livro do Sábio feitos com os personagens do jogo; poste com lanterna das ruas (Halloween Bits) |
 
 Os efeitos vêm do pixelfx (MIT); detalhes na seção 6 e em `LICENSES.md`.

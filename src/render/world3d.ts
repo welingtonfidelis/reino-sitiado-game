@@ -5,14 +5,17 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BUILDINGS, CONFIG, CROPS, DIRS, HEX, MONSTERS, cropOf, farmStage, hexToWorld, isHero, openRifts, resourceDir, stage, tileAt } from '../sim/index.ts';
+import { BUILDINGS, CONFIG, CROPS, DIRS, HEX, MONSTERS, castle, cropOf, farmStage, hexToWorld, isHero, openRifts, resourceDir, stage, tileAt, worldToHex } from '../sim/index.ts';
 import type { Building, BuildingKind, Crop, MonsterKind, Res, SimEvent, UnitKind, World } from '../sim/index.ts';
 import type { Art, CharKey, StaticKey, StaticModel, StaticPart } from './assets.ts';
 import { CharView } from './chars.ts';
-import { buildGround, paintVillage } from './ground.ts';
+import { GROUND_U, WATER_U, buildGround, paintShade, paintVillage } from './ground.ts';
+import type { ShadeSpot } from './ground.ts';
 import { Bubbles } from './bubbles.ts';
 import type { BubbleIcon } from './bubbles.ts';
-import { LINKED, planVillage } from './village.ts';
+import { planVillage } from './village.ts';
+import { MEADOW_U, Meadow } from './meadow.ts';
+import { LIGHT_U, houseLit, litFlame, litWindows } from './lights.ts';
 import type { Home } from './village.ts';
 import { SEASON_U, SeasonLook, Weather, leafy, snowy, weatherOf } from './season.ts';
 import type { QualityLook } from './quality.ts';
@@ -244,22 +247,23 @@ function dayLight(time: number): { night: number; glow: number; dawn: boolean } 
   return { night, glow, dawn: ph > 0.8 };
 }
 
-/** Bolinha de luz macia (janela e tocha à noite). */
-function glowTexture(): THREE.Texture {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const g = c.getContext('2d')!;
-  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grad.addColorStop(0, 'rgba(255,255,255,1)');
-  grad.addColorStop(0.25, 'rgba(255,240,200,0.75)');
-  grad.addColorStop(1, 'rgba(255,200,120,0)');
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 64, 64);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
 const SMOKE_MID = new THREE.Color('#7d756d');
+/** Poste com lanterna (Halloween Bits): 3,3 m no modelo, uns 1,3 m na vila. */
+const LAMP_SCALE = 0.4;
+/** Modelos de janela acesa e as faixas da paleta que acendem; `true`: todas (o castelo). */
+const LIT_WINDOWS: [StaticKey, [number, number][], boolean][] = [
+  ['casaA', [[6, 1]], false],
+  ['casaB', [[6, 1]], false],
+  ['moinho', [[6, 1]], false],
+  ['taverna', [[6, 1]], true],
+  ['mercado', [[6, 1]], true],
+  ['capela', [[6, 1]], true],
+  ['torreMago', [[6, 1]], true],
+  ['forja', [[6, 1]], true],
+  ['serraria', [[6, 1]], false],
+  ['castelo', [[3, 0]], true],
+  ['casteloOuro', [[3, 0]], true],
+];
 const SMOKE_DARK = new THREE.Color('#3f3a36');
 const towerLook = (b: Building) => TOWER_LOOK[Math.max(1, Math.min(b.level, TOWER_LOOK.length)) - 1]!;
 const CORNERS: [number, number][] = [
@@ -588,7 +592,6 @@ export class World3D {
   private smoke: { x: number; y: number; z: number; t: number; life: number; s: number; dark: number; drift: number }[] = [];
   private smokeT = new Map<number, number>();
   private smokeMesh!: THREE.InstancedMesh;
-  private glows!: THREE.Points;
   private portals: number[] = [];
   private ground: THREE.Mesh | null = null;
   private grid: THREE.LineSegments | null = null;
@@ -611,6 +614,7 @@ export class World3D {
   dpr = 1;
   /** Bichinhos e sombra das nuvens (desligados nos gráficos leves). */
   private extras = true;
+  private flowerK = 1;
 
   /** Gráficos normais ou leves: sombra do sol, partículas, bichinhos e nuvens. */
   setQuality(look: QualityLook): void {
@@ -618,7 +622,25 @@ export class World3D {
     this.weather.density = look.weather;
     this.extras = look.extras;
     SEASON_U.uClouds.value = look.extras ? 1 : 0;
+    this.meadowDensity = look.meadow;
+    this.ver = -1;
   }
+
+  /**
+   * Visual novo (2026-11-10): grama e flores, água nova, sombra de contato pintada no chão e sombra
+   * do sol mais macia. O ajuste de tom com acerto de cor fica no main (render/grade.ts).
+   */
+  setNewLook(on: boolean): void {
+    this.newLook = on;
+    this.meadow.visible = on;
+    WATER_U.uNew.value = on ? 1 : 0;
+    GROUND_U.uShadeK.value = on ? 1 : 0;
+    this.sun.shadow.radius = on ? 3.5 : 1;
+    this.ver = -1;
+  }
+  private newLook = true;
+  private meadowDensity = 1;
+  private readonly meadow: Meadow;
 
   /** Centro da vista (o tempo cai em volta dele). */
   readonly focus = { x: 0, z: 0 };
@@ -659,6 +681,7 @@ export class World3D {
       }
     }
     this.weather = new Weather(scene);
+    this.meadow = new Meadow(scene);
     this.bubbles = new Bubbles(scene);
     const orbGeo = new THREE.SphereGeometry(0.11, 10, 8);
     this.orbs = new THREE.InstancedMesh(orbGeo, new THREE.MeshBasicMaterial({ color: '#b48cff' }), 64);
@@ -681,14 +704,6 @@ export class World3D {
     this.smokeMesh.frustumCulled = false;
     this.smokeMesh.setColorAt(0, new THREE.Color('#ffffff'));
     scene.add(this.smokeMesh);
-    this.glows = new THREE.Points(
-      new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(600 * 3), 3)),
-      new THREE.PointsMaterial({ map: glowTexture(), color: '#ffb24a', size: 30, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }),
-    );
-    this.glows.geometry.setDrawRange(0, 0);
-    this.glows.frustumCulled = false;
-    this.glows.renderOrder = 7;
-    scene.add(this.glows);
     // Cor por ponto (2026-11-10): o rastro da forja e o das flechas de fogo na mesma malha.
     this.trail.setColorAt(0, new THREE.Color('#ffffff'));
     scene.add(this.trail);
@@ -700,6 +715,21 @@ export class World3D {
     this.palisadePost = new Instanced(scene, palisadePostModel(), 700, true, false);
     for (const set of [this.palisade, this.palisadePost]) for (const m of set.meshes) snowy(m.material as THREE.Material);
     big('flecha', 400, false);
+    // Luzes da noite (2026-11-10): janelas acesas só nos modelos da lista (a faixa da janela do
+    // castelo é a mesma do ferro dos canhões), lanterna dos postes e chama das tochas.
+    big('lampiao', 80);
+    for (const [k, cells, always] of LIT_WINDOWS) {
+      for (const m of this.sets.get(k)!.meshes) {
+        const mat = m.material as THREE.MeshLambertMaterial;
+        if (mat.map?.name === 'hexagons_medieval') m.material = litWindows(mat, cells, always);
+      }
+    }
+    for (const m of this.sets.get('lampiao')!.meshes) m.material = litFlame(m.material as THREE.Material, 'lampiao', [[2, 3]]);
+    for (const m of this.sets.get('tocha')!.meshes) m.material = litFlame(m.material as THREE.Material, 'tocha');
+    for (const m of this.pitch.meshes) {
+      const mat = m.material as THREE.MeshLambertMaterial;
+      if (mat.map?.name === 'dungeon_texture') m.material = litFlame(mat, 'piche');
+    }
     this.bars = new Bars(scene);
 
     const hemi = new THREE.HemisphereLight('#f4f6ff', '#6a5a44', 1.35);
@@ -863,7 +893,7 @@ export class World3D {
   syncStatic(w: World): void {
     if (w.ver === this.ver) return;
     this.ver = w.ver;
-    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casteloOuro', 'estandarte', 'casaA', 'casaB', 'fazenda', 'moinho', 'feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'acampamento', 'polvora', 'catapulta', 'poco', 'taverna', 'mercado', 'barril', 'caixa', 'balde', 'arvoreE', 'arvoreF', 'toras', 'torasB', 'tocha'];
+    const keys: StaticKey[] = ['rochaA', 'rochaB', 'rochaC', 'rochaD', 'arvoreA', 'arvoreB', 'arvoreC', 'arvoreD', 'montanhaA', 'montanhaB', 'montanhaC', 'morro', 'minerio', 'pedraA', 'pedraC', 'ruina', 'castelo', 'casteloOuro', 'estandarte', 'casaA', 'casaB', 'fazenda', 'moinho', 'feno', 'saco', 'carrinho', 'pedraCortada', 'blocos', 'blocosB', 'lascas', 'lascasB', 'caixote', 'serraria', 'pedreira', 'mina', 'torre', 'quartel', 'campo', 'obra', 'portao', 'bandeira', 'muro', 'poste', 'torreMago', 'capela', 'estabulo', 'forja', 'oficina', 'acampamento', 'polvora', 'catapulta', 'poco', 'taverna', 'mercado', 'barril', 'caixa', 'balde', 'arvoreE', 'arvoreF', 'toras', 'torasB', 'tocha', 'lampiao'];
     // Etapa 17: o terreno mudou (recurso acabou ou brotou): refaz o chão antes de pintar a vila.
     if (w.land !== this.land) this.rebuildGround(w);
     for (const k of keys) this.sets.get(k)!.begin();
@@ -920,10 +950,12 @@ export class World3D {
     }
     // Vila: casas viradas para a trilha, quintal com enfeites, poço, taverna e mercado.
     const village = planVillage(w);
+    if (this.newLook && this.meadowDensity > 0) this.meadow.build(w, village, this.meadowDensity);
+    if (this.newLook) this.shadeGround(w, village);
     for (const v of village.pieces) this.place(v.key, v.x, 0, v.z, v.rot, v.scale, v.id);
     // Portas das casas: onde os elfos do inverno passeiam.
     this.doors = [...village.homes.values()].map((h) => ({ x: h.x + Math.sin(h.rot) * 0.95, z: h.z + Math.cos(h.rot) * 0.95 }));
-    this.placeGlows(w, village);
+    if (this.newLook) this.placeLights(w, village);
     paintVillage(village.yards, village.trails);
     this.movers.clear();
     this.wallsMoving = false;
@@ -1127,38 +1159,112 @@ export class World3D {
   }
 
   /**
-   * Luzes da noite (2026-11-10): janela acesa na frente de cada casa e de cada prédio da vila,
-   * quatro no castelo e as tochas da torre de nível 3 e do piche.
+   * Sombra de contato pintada no chão (2026-11-10): um escurinho macio embaixo de cada prédio,
+   * árvore, rocha e veio. Só repinta quando muda o que conta (o castelo crescendo e o broto
+   * nascendo chamam a sincronização várias vezes por segundo).
    */
-  private placeGlows(w: World, village: ReturnType<typeof planVillage>): void {
-    const pos = this.glows.geometry.getAttribute('position') as THREE.BufferAttribute;
-    let n = 0;
-    const put = (x: number, y: number, z: number) => {
-      if (n < pos.count) pos.setXYZ(n++, x, y, z);
+  private shadeKey = '';
+  private shadeGround(w: World, village: ReturnType<typeof planVillage>): void {
+    const spots: ShadeSpot[] = [];
+    let key = `${w.land}|${this.castleDrawn.level}`;
+    for (const b of w.buildings.values()) {
+      if (b.kind === 'piche' || b.kind === 'estacas' || b.kind === 'fazenda') continue;
+      const home = village.homes.get(b.id);
+      const p = home ?? hexToWorld(b.q, b.r);
+      const r = b.kind === 'castelo' ? 2.7 * this.castleDrawn.scale : b.kind === 'muralha' || b.kind === 'portao' ? 0.95 : b.kind === 'torre' ? 0.75 + 0.15 * b.level : home ? 1.15 : 1.2;
+      const k = b.built < 1 ? 0.35 : b.kind === 'castelo' ? 0.8 : 0.62;
+      spots.push({ x: p.x, z: p.z, r, k });
+      key += `|${b.id}:${p.x.toFixed(1)},${p.z.toFixed(1)},${r.toFixed(2)},${k}`;
+    }
+    for (const t of w.list) {
+      const r = t.terrain === 'forest' ? 1.3 : t.terrain === 'rock' ? 1.35 : t.terrain === 'ore' || t.terrain === 'crystal' ? 0.85 : 0;
+      if (!r) continue;
+      const p = hexToWorld(t.q, t.r);
+      spots.push({ x: p.x, z: p.z, r, k: t.terrain === 'forest' ? 0.5 : t.terrain === 'rock' ? 0.55 : 0.3 });
+    }
+    if (key === this.shadeKey) return;
+    this.shadeKey = key;
+    paintShade(spots);
+  }
+
+  /**
+   * Luzes da noite (2026-11-10): postes com lanterna nas ruas da vila e dois na porta do castelo, e as poças de luz quente no chão (postes, tochas da torre de nível 3, piche, porta
+   * do castelo e a frente das casas de janela acesa). Repinta as poças só quando algo muda.
+   */
+  private lightKey = '';
+  private placeLights(w: World, village: ReturnType<typeof planVillage>): void {
+    const lamps: { x: number; z: number; rot: number }[] = [];
+    const free = (x: number, z: number) => {
+      const h = worldToHex(x, z);
+      const t = tileAt(w, h.q, h.r);
+      if (!t || t.b >= 0 || t.terrain === 'water' || t.terrain === 'rock' || t.terrain === 'rift') return false;
+      for (const l of lamps) if ((l.x - x) ** 2 + (l.z - z) ** 2 < 3.4 * 3.4) return false;
+      for (const hm of village.homes.values()) if ((hm.x - x) ** 2 + (hm.z - z) ** 2 < 1.1 * 1.1) return false;
+      return true;
     };
-    for (const h of village.homes.values()) put(h.x + Math.sin(h.rot) * 0.42, 0.42, h.z + Math.cos(h.rot) * 0.42);
+    const c = castle(w);
+    if (c) {
+      const p = hexToWorld(c.q, c.r);
+      for (const sx of [-1, 1]) {
+        const x = p.x + sx * 1.15 * this.castleDrawn.scale;
+        const z = p.z + 1.9 * this.castleDrawn.scale;
+        if (free(x, z)) lamps.push({ x, z, rot: Math.atan2(-sx, 0.4) });
+      }
+    }
+    // Ruas: hexágonos livres encostados nas casas, nos prédios da vila e no castelo (na vila
+    // apertada as trilhas têm um metro e pouco, e nelas não cabia poste). O poste fica do lado das
+    // casas, com a lanterna virada para o meio da rua; um a cada 3,4 m, no máximo 40.
+    const villageB = new Set<number>([...village.homes.keys(), ...village.turns.keys()]);
+    if (c) villageB.add(c.id);
+    const cand: { x: number; z: number; dx: number; dz: number; n: number; d: number }[] = [];
+    for (const t of w.list) {
+      if (t.b >= 0 || t.terrain !== 'grass' || t.ruin) continue;
+      const p = hexToWorld(t.q, t.r);
+      let n = 0;
+      let dx = 0;
+      let dz = 0;
+      for (const [dq, dr] of DIRS) {
+        const nb = tileAt(w, t.q + dq, t.r + dr);
+        if (!nb || nb.b < 0 || !villageB.has(nb.b)) continue;
+        const o = hexToWorld(nb.q, nb.r);
+        dx += o.x - p.x;
+        dz += o.z - p.z;
+        n++;
+      }
+      if (!n) continue;
+      const l = Math.hypot(dx, dz) || 1;
+      cand.push({ x: p.x, z: p.z, dx: dx / l, dz: dz / l, n, d: Math.hypot(p.x, p.z) });
+    }
+    cand.sort((a, b) => b.n - a.n || a.d - b.d);
+    for (const k of cand) {
+      if (lamps.length >= 40) break;
+      const x = k.x + k.dx * 0.5;
+      const z = k.z + k.dz * 0.5;
+      if (!free(x, z)) continue;
+      lamps.push({ x, z, rot: Math.atan2(-k.dx, -k.dz) });
+    }
+    for (const l of lamps) this.place('lampiao', l.x, 0, l.z, l.rot, LAMP_SCALE);
+    // Poças de luz.
+    const spots: ShadeSpot[] = [];
+    for (const l of lamps) spots.push({ x: l.x + Math.sin(l.rot) * 0.5, z: l.z + Math.cos(l.rot) * 0.5, r: 2.1, k: 0.85 });
+    if (c) {
+      const p = hexToWorld(c.q, c.r);
+      spots.push({ x: p.x, z: p.z + 1.6 * this.castleDrawn.scale, r: 2.4, k: 0.6 });
+    }
+    for (const hm of village.homes.values()) {
+      if (!houseLit(hm.x, hm.z)) continue;
+      spots.push({ x: hm.x + Math.sin(hm.rot) * 0.95, z: hm.z + Math.cos(hm.rot) * 0.95, r: 1.25, k: 0.5 });
+    }
     for (const b of w.buildings.values()) {
       if (b.built < 1 || b.moveTo) continue;
       const p = hexToWorld(b.q, b.r);
-      if (b.kind === 'castelo') {
-        const s = this.castleDrawn.scale;
-        for (const [ox, oy, oz] of [[0, 1.1, 1.05], [-0.62, 1.7, 0.75], [0.62, 1.7, 0.75], [0, 2.6, 0.55]] as const) put(p.x + ox * s, oy * s, p.z + oz * s);
-      } else if (b.kind === 'torre' && b.level >= 3) {
-        const L = towerLook(b);
-        const rot = village.turns.get(b.id) ?? ((b.id * 7) % 6) * (Math.PI / 3);
-        for (const k of [0, 2]) {
-          const a = rot + Math.PI / 4 + (k * Math.PI) / 2;
-          put(p.x + Math.sin(a) * 0.36 * L.scale, (L.floor + 0.3) * L.scale, p.z + Math.cos(a) * 0.36 * L.scale);
-        }
-      } else if (b.kind === 'piche') {
-        put(p.x - 0.75, 0.55, p.z - 0.45);
-      } else if (LINKED.has(b.kind) && b.kind !== 'casa') {
-        const rot = village.turns.get(b.id) ?? 0;
-        put(p.x + Math.sin(rot) * 0.6, 0.45, p.z + Math.cos(rot) * 0.6);
-      }
+      if (b.kind === 'torre' && b.level >= 3) spots.push({ x: p.x, z: p.z, r: 2.0, k: 0.6 });
+      else if (b.kind === 'piche') spots.push({ x: p.x - 0.75, z: p.z - 0.45, r: 1.3, k: 0.55 });
     }
-    this.glows.geometry.setDrawRange(0, n);
-    pos.needsUpdate = true;
+    const key = spots.map((s) => `${s.x.toFixed(1)},${s.z.toFixed(1)},${s.r}`).join('|');
+    if (key === this.lightKey) return;
+    this.lightKey = key;
+    paintShade(spots, 'light');
   }
 
   /** Solta fumaça do prédio ferido no ritmo do estrago (0 leve, 1 metade, 2 quase caindo). */
@@ -1713,17 +1819,19 @@ export class World3D {
     // Estação (Etapa 16): cores andando devagar para a nova, o tempo caindo e a chuva escurecendo.
     this.look.update(this.season, fxDt);
     SEASON_U.uTime.value = this.time;
+    // Chão vivo: o vento corre e as flores seguem a estação (somem no inverno).
+    MEADOW_U.uTime.value = this.time;
+    const fk = [1, 0.85, 0.35, 0][this.season] ?? 1;
+    this.flowerK += (fk - this.flowerK) * Math.min(1, fxDt * 0.6);
+    MEADOW_U.uFlowers.value = this.flowerK;
     const sky = weatherOf(this.season, w.wave, w.waveState !== 'calm', w.seed);
     this.rain += ((sky === 'chuva' ? 1 : 0) - this.rain) * Math.min(1, fxDt * 0.8);
     this.weather.update(sky, fxDt, this.focus.x, this.focus.z, this.pxPerMeter * this.dpr);
     const dim = (1 - 0.65 * this.night) * (1 - 0.3 * this.rain);
     this.sun.intensity = 1.9 * this.look.sunK * dim;
     this.sun.color.copy(this.look.sun).lerp(day.dawn ? DAWN : DUSK, day.glow * 0.55).lerp(MOON, this.night * 0.55);
-    // Janelas e tochas acesas: brilham com a noite (o tamanho acompanha o zoom).
-    const gm = this.glows.material as THREE.PointsMaterial;
-    gm.opacity = Math.min(1, Math.max(0, (this.night - 0.12) / 0.45));
-    gm.size = 1.1 * this.pxPerMeter * this.dpr;
-    this.glows.visible = gm.opacity > 0.01;
+    // Janelas, lanternas, tochas e poças de luz acendem com a noite (só no visual novo).
+    LIGHT_U.uNight.value = this.newLook ? Math.min(1, Math.max(0, (this.night - 0.12) / 0.45)) : 0;
     this.hemi.intensity = 1.35 * (1 - 0.45 * this.night) * (1 - 0.15 * this.rain);
     this.hemi.color.setRGB(0.96 - 0.4 * this.night, 0.97 - 0.32 * this.night, 1);
     if (fx) {

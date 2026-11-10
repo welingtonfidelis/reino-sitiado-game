@@ -131,6 +131,10 @@ export const ART: [string, string][] = [
   [`KayKit Dungeon Pack 1.1/Assets/gltf/torch_lit.gltf`, 'props/torch_lit.gltf'],
   [`KayKit Dungeon Pack 1.1/Assets/gltf/torch_lit.bin`, 'props/torch_lit.bin'],
   [`KayKit Dungeon Pack 1.1/Assets/gltf/dungeon_texture.png`, 'props/dungeon_texture.png'],
+  // Luzes da vila (2026-11-10): o poste de madeira com lanterna pendurada, nas trilhas.
+  [`KayKit Halloween Bits 1.0/Assets/gltf/post_lantern.gltf`, 'props/post_lantern.gltf'],
+  [`KayKit Halloween Bits 1.0/Assets/gltf/post_lantern.bin`, 'props/post_lantern.bin'],
+  [`KayKit Halloween Bits 1.0/Assets/gltf/halloweenbits_texture.png`, 'props/halloweenbits_texture.png'],
   // Elfos que passeiam pela vila no inverno (2026-11-09), de bengala doce na mão.
   [`${MM5}/6 - December 2024 - Helpers/characters/Helper_A.glb`, 'chars/Helper_A.glb'],
   [`${MM5}/6 - December 2024 - Helpers/characters/Helper_B.glb`, 'chars/Helper_B.glb'],

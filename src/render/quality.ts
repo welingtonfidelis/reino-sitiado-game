@@ -18,11 +18,15 @@ export interface QualityLook {
   extras: boolean;
   /** Quadros por segundo no máximo (0 = o que a tela der). */
   fps: number;
+  /** Luz de cinema (2026-11-10): ajuste de tom e acerto de cor no próprio desenho (render/grade.ts). */
+  cinema: boolean;
+  /** Grama e flores no chão (2026-11-10): fração da densidade cheia. */
+  meadow: number;
 }
 
 export const QUALITY: Record<Quality, QualityLook> = {
-  normal: { dpr: 2, shadows: true, antialias: true, weather: 1, extras: true, fps: 0 },
-  leve: { dpr: 1, shadows: false, antialias: false, weather: 0.35, extras: false, fps: 30 },
+  normal: { dpr: 2, shadows: true, antialias: true, weather: 1, extras: true, fps: 0, cinema: true, meadow: 1 },
+  leve: { dpr: 1, shadows: false, antialias: false, weather: 0.35, extras: false, fps: 30, cinema: false, meadow: 0.35 },
 };
 
 const KEY = 'reino.graficos';

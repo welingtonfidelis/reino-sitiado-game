@@ -18,6 +18,8 @@ export const STATIC_MODELS = {
   // Fosso de piche (2026-11-09): caldeirão de piche e tocha acesa na beira da poça.
   caldeirao: 'props/Cauldron.gltf',
   tocha: 'props/torch_lit.gltf',
+  // Luzes da vila (2026-11-10): poste de madeira com lanterna pendurada (Halloween Bits).
+  lampiao: 'props/post_lantern.gltf',
   polvora: 'medieval/building_tower_cannon_blue.gltf',
   estandarte: 'medieval/banner_blue_full.gltf',
   casaA: 'medieval/building_home_A_blue.gltf',

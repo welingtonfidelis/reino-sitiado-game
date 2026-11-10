@@ -14,6 +14,7 @@ import { Music } from './audio/music.ts';
 import type { Sfx } from './audio/sound.ts';
 import { App } from './ui/App.tsx';
 import { QUALITY, readQuality } from './render/quality.ts';
+import { installGrade } from './render/grade.ts';
 import type { Quality } from './render/quality.ts';
 
 const params = new URLSearchParams(location.search);
@@ -42,10 +43,26 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color('#1d1914');
 
 const cam = new IsoCamera(canvas);
+/**
+ * Visual novo (2026-11-10): grama, flores, água nova e sombra de contato pintada no chão sempre;
+ * nos gráficos normais, também o ajuste de tom com acerto de cor (render/grade.ts). Tudo no próprio
+ * desenho, sem pós-processamento (a primeira versão, com ele, ia de 12 a 60 ms por quadro no Mac).
+ * ?visual=antigo desliga tudo, para comparar; no console, visual(false) e visual(true).
+ */
+let newLook = params.get('visual') !== 'antigo';
+installGrade();
 const resize = () => {
   renderer.setSize(innerWidth, innerHeight, false);
   cam.resize(innerWidth, innerHeight);
 };
+function draw(): void {
+  const tm = newLook && QUALITY[game.quality].cinema ? THREE.CustomToneMapping : THREE.NoToneMapping;
+  if (renderer.toneMapping !== tm) {
+    renderer.toneMapping = tm;
+    renderer.toneMappingExposure = tm === THREE.CustomToneMapping ? 1.08 : 1;
+  }
+  renderer.render(scene, cam.camera);
+}
 addEventListener('resize', resize);
 resize();
 
@@ -61,6 +78,11 @@ const game = modeParam === 'normal' || modeParam === 'facil' ? new Game(seed, mo
 const view = new World3D(scene, art);
 view.fx = await FxLayer.load(scene, import.meta.env.BASE_URL + 'assets/fx/');
 view.buildTerrain(game.world);
+function setLook(on: boolean): void {
+  newLook = on;
+  view.setNewLook(on);
+}
+setLook(newLook);
 
 // Atalhos de teste: ?onda=N começa perto da onda N com recursos; ?rapido encurta a espera.
 const startWave = Number(params.get('onda'));
@@ -224,7 +246,7 @@ function frame(now: number): void {
     if (b) view.showRing(b.q, b.r, '#e9b949', b.kind === 'torre' ? towerRange(b) : b.kind === 'castelo' ? CONFIG.castle.range : 0);
     else view.hideRing();
   }
-  renderer.render(scene, cam.camera);
+  draw();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -238,8 +260,10 @@ Object.assign(window, {
   view,
   cam,
   hexToWorld,
+  visual: (on: boolean) => setLook(on),
+  draw,
   snap: async (name: string) => {
-    renderer.render(scene, cam.camera);
+    draw();
     await fetch(`/__snap?name=${encodeURIComponent(name)}`, { method: 'POST', body: canvas.toDataURL('image/png') });
   },
 });

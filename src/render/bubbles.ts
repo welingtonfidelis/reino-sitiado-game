@@ -179,7 +179,7 @@ export class Bubbles {
   private mat(icon: BubbleIcon): THREE.SpriteMaterial {
     let m = this.mats.get(icon);
     if (!m) {
-      m = new THREE.SpriteMaterial({ map: draw(icon), depthTest: false, transparent: true });
+      m = new THREE.SpriteMaterial({ map: draw(icon), depthTest: false, transparent: true, toneMapped: false });
       this.mats.set(icon, m);
     }
     return m;
