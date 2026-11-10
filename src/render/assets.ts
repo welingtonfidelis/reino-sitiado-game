@@ -258,13 +258,67 @@ function goldenArmor(silver: THREE.Texture, tone: [number, number, number, numbe
 
 const matCache = new Map<string, THREE.Material>();
 
+/**
+ * Uma textura por imagem (2026-11-10). Cada arquivo do KayKit traz a sua cópia da paleta, mesmo
+ * quando é a mesma figura: a do pack medieval chegava a 52 cópias de 1024×1024 na placa de vídeo
+ * (uns 5,6 MB cada; perto de 440 MB sobrando no total). Agora a primeira de cada imagem vale para
+ * todos, e a cópia é jogada fora antes de subir para a placa. A imagem é reconhecida pelo nome,
+ * pelo tamanho e por uma amostra dos pixels (dois packs podem usar o mesmo nome).
+ */
+const texCache = new Map<string, THREE.Texture>();
+let sampler: CanvasRenderingContext2D | null = null;
+
+function imageKey(t: THREE.Texture): string | null {
+  const img = (t.source?.data ?? t.image) as (CanvasImageSource & { width: number; height: number }) | undefined;
+  if (!img || !img.width || !img.height) return null;
+  sampler ??= (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 16;
+    return c.getContext('2d', { willReadFrequently: true });
+  })();
+  if (!sampler) return null;
+  sampler.clearRect(0, 0, 16, 16);
+  sampler.drawImage(img, 0, 0, 16, 16);
+  const px = sampler.getImageData(0, 0, 16, 16).data;
+  let h = 0;
+  for (let i = 0; i < px.length; i++) h = (Math.imul(h, 31) + px[i]!) >>> 0;
+  return `${t.name}|${img.width}x${img.height}|${t.flipY}|${t.colorSpace}|${t.wrapS},${t.wrapT},${t.magFilter},${t.minFilter}|${h.toString(36)}`;
+}
+
+/** Imagem já vista (pelo `source` da textura): a mesma figura pode vir em mais de uma textura do arquivo. */
+const bySource = new Map<string, THREE.Texture>();
+
+function sharedTexture(t: THREE.Texture): THREE.Texture {
+  // Textura feita aqui (bronze, ouro) já é única: fica como está.
+  if (t instanceof THREE.CanvasTexture) return t;
+  const done = bySource.get(t.source.uuid);
+  if (done) return done;
+  const key = imageKey(t);
+  if (!key) return t;
+  const first = texCache.get(key) ?? t;
+  texCache.set(key, first);
+  bySource.set(t.source.uuid, first);
+  if (first !== t) {
+    // A cópia nunca chega à placa: solta a figura dela.
+    t.dispose();
+    (t.source.data as { close?: () => void } | undefined)?.close?.();
+  }
+  return first;
+}
+
+/** Quantas imagens diferentes ficaram (para medir). */
+export function sharedTextureCount(): number {
+  return texCache.size;
+}
+
 /** Lambert com a mesma textura: mais barato que o PBR do glTF e sem precisar de ambiente. */
 function lambertOf(m: THREE.Material): THREE.Material {
   const src = m as THREE.MeshStandardMaterial;
-  const key = src.map?.uuid ?? src.color?.getHexString() ?? m.uuid;
+  const map = src.map ? sharedTexture(src.map) : null;
+  const key = map?.uuid ?? src.color?.getHexString() ?? m.uuid;
   let out = matCache.get(key);
   if (!out) {
-    out = new THREE.MeshLambertMaterial({ map: src.map ?? null, color: src.map ? 0xffffff : src.color });
+    out = new THREE.MeshLambertMaterial({ map, color: map ? 0xffffff : src.color });
     matCache.set(key, out);
   }
   return out;

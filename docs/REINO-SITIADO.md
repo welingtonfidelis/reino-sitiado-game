@@ -973,6 +973,18 @@ O Livro do Sábio fica no ⋯, embaixo do álbum. Um cartão por monstro com a f
 
 O passo da simulação tinha 1.900 linhas e foi separado sem mudar nada (o robô caiu nas mesmas ondas, semente por semente): `common.ts` (passo, avisos, distâncias, andar, monstro mais perto), `buildings.ts`, `economy.ts`, `people.ts` (empregos, recrutas, fuga e agora a entrega), `troops.ts`, `heroes.ts`, `combat.ts`, `waves.ts`, `horde.ts` e `defenses.ts`. O `step.ts` ficou só com a ordem do passo e reexporta o que os outros usavam.
 
+### Texturas sem cópia
+
+Cada arquivo do KayKit traz a sua cópia da imagem de cores, mesmo quando é a mesma: a paleta do pack medieval ia 52 vezes para a placa de vídeo, a dos recursos e a dos esqueletos 7 vezes cada, e assim por diante. Cada uma tem 1024×1024 e ocupa uns 5,6 MB lá (mesmo com o arquivo de 15 KB). Agora o carregamento da arte (`sharedTexture` em `assets.ts`) reconhece a imagem pelo nome, tamanho, ajustes e uma amostra dos pixels, e todos os modelos usam a primeira; a cópia é solta antes de subir. Medido na onda 19 da partida do robô:
+
+| | Antes | Depois |
+| --- | --- | --- |
+| Texturas dos modelos na cena | 101 | 24 |
+| Texturas de 1024×1024 na placa de vídeo | ~95 | 17 |
+| Memória dessas texturas | ~530 MB | ~95 MB |
+
+O visual não muda. O resto da conta da placa (134 itens) são as folhas de efeito do pixelfx, a sombra, os balões e, a maioria, a textura de 12×12 com a pose do esqueleto de cada boneco (minúscula). Ainda pesam: 1,1 milhão de triângulos (as árvores são a maior parte) e uns 330 desenhos por quadro.
+
 ### Robô
 
 O robô aprendeu a subir as torres (da onda 8, com pedra sobrando) e a usar o mercado (da onda 10: ouro sobrando vira ferro; comida, se faltar). `ROBO_NIVEIS=0` e `ROBO_MERCADO=0` desligam isso. 12 sementes, até a onda 60:
