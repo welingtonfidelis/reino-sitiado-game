@@ -286,6 +286,14 @@ export const CONFIG = {
     goldPerWave: 5,
   },
   monsterAggro: 1.6,
+  /**
+   * Horda sem fila (2026-11-09): cada monstro anda numa faixa própria do caminho (desvio de até
+   * `lane` m do centro do ladrilho, mais um balanço de `sway` m), se afasta dos vizinhos a menos de
+   * `sep` m e sai da fenda em bandos de `packMin` a `packMax`, com `packGap` s entre os do bando.
+   * Também escolhe, entre os vizinhos livres que chegam mais perto do castelo, um caminho
+   * paralelo pelo id: a horda vira uma faixa larga em vez de um fio.
+   */
+  horde: { lane: 0.75, sway: 0.18, sep: 0.62, packMin: 3, packMax: 6, packGap: 0.12, spawnJitter: 1.6 },
   /** Altura de voo do morcego. */
   flyHeight: 1.8,
   /** Chefes: um golem a cada 15 ondas, em rodízio: gelo, ossos e musgo (desde 2026-11-09). */

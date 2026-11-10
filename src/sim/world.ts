@@ -130,6 +130,13 @@ export interface Monster {
   owner: number;
   /** Etapa 14: preso por raízes ou atordoado (s). */
   stunT?: number;
+  /**
+   * Horda sem fila (2026-11-09): tempo quase parado andando; enquanto `recenterT` corre ele volta
+   * ao meio do ladrilho, e enquanto `laneOffT` corre anda pelo meio (sem faixa própria).
+   */
+  stuckT?: number;
+  recenterT?: number;
+  laneOffT?: number;
   /** Acumulador (2026-11-09): o que leva na mochila, quanto tempo tem para fugir e a fenda de onde veio. */
   loot?: { res: Res; n: number };
   fleeT?: number;

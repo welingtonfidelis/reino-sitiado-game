@@ -896,6 +896,29 @@ O que mudou:
 - **Robô** (12 sementes, raio 22, até a onda 80): média 27,6 (antes do socorro, 22,6). Duas partidas passaram do muro da onda 30 e foram até a 60 e a 68. Morrem mais tropas por onda, porque elas saem mais para lutar. Em 12 partidas até a onda 60, nenhuma luta passou de 4 minutos.
 - **Testes:** o soldado sem ordem ajuda e o com ordem fica; o anão vai até a briga; e a dica do portão com um anel de muralha fechado.
 
+### Arte nova do piche e das estacas (2026-11-09)
+
+O usuário pediu propostas melhores para as duas armadilhas. A folha das propostas está em `reports/armadilhas-propostas.png` (fora do git): quatro de piche e quatro de estacas. Ele escolheu o P2 e o E1.
+- **Piche (P2):** poça grande e irregular com borda de terra escura, bolhas e dois arcos de brilho molhado, o caldeirão da bruxa (Mystery Monthly 5) na beira e a tocha acesa do Dungeon espetada do outro lado, que explica o "acender". O fogo do piche aceso continua o mesmo. O fosso agora faz sombra, por causa do caldeirão e da tocha. O giro continua pelo id.
+- **Estacas (E1):** três fileiras de estacas de madeira (casca, ponta lascada clara e uma volta de corda), inclinadas para o lado de onde a horda vem. O giro sai do campo de fluxo (`trapAngle` em `world3d.ts`): a ponta aponta para fora, contra o caminho do castelo.
+- **Onde está:** `pitchModel(art)` e `spikesModel()` em `world3d.ts`; o caldeirão e a tocha em `public/assets/kaykit/props/`.
+
+### Horda sem fila indiana (2026-11-09)
+
+O usuário notou que os inimigos andavam em fila organizada. Eram duas causas:
+- Todo monstro mirava o centro exato do próximo ladrilho do campo de fluxo e seguia a mesma corrente de ladrilhos.
+- Saíam da fenda um por um, em intervalos iguais.
+
+O que mudou (`CONFIG.horde`):
+- **Faixa própria:** cada monstro mira um ponto do próximo ladrilho deslocado até 0,75 m do centro, com direção e tamanho tirados do id (sem mexer no sorteio da partida), e balança devagar de lado (0,18 m). Ladrilho com muralha ou prédio continua mirado pelo centro, para o golpe sair igual (`laneOffset`).
+- **Caminhos paralelos:** entre os vizinhos livres que chegam mais perto do castelo, cada monstro escolhe um pelo id e pelo ladrilho (`stepTile`). Todo passo desce no campo de fluxo, então ninguém se perde, e a horda vira uma faixa larga em vez de um fio.
+- **Mais espaço:** os monstros se afastam dos vizinhos a menos de 0,62 m (era 0,5).
+- **Bandos:** saem da fenda em bandos de 3 a 6 (o tamanho muda a cada onda), quase juntos e da mesma fenda. O intervalo entre bandos guarda o ritmo médio de antes. Os bandos se revezam entre as fendas abertas.
+- **Não empacar:** a faixa própria às vezes mirava do outro lado da quina de uma rocha, e o monstro ficava andando sem sair do lugar. A onda não acabava. Agora quem fica 0,8 s quase parado volta ao meio do ladrilho e anda uns 5 s pelo meio do caminho.
+- **Custo:** com 95 monstros andando, 0,03 ms por passo da simulação.
+- **Robô** (12 sementes, até a onda 80): média 25,8 (antes, 27,6). A horda espalhada é um pouco mais difícil de segurar só com torres juntas. Em 12 partidas até a onda 50, nenhuma luta passou de 4 minutos.
+- Fotos de antes e depois em `reports/horda-antes.png` e `reports/horda-depois.png` (fora do git).
+
 ## 25. Arquitetura## 25. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
@@ -950,6 +973,8 @@ O que mudou:
 | — | Tropas novas: lanceiro espartano (Acampamento) e anão de espingarda (Torre de pólvora) (seção 24) | Pronto em 2026-11-09. Visto no navegador do Mac (bronze, crista, lança, elmo de chifres, os dois prédios e o tiro); falta jogar no tablet e no iPhone. |
 | — | Mapa de raio 22 (16 nos gráficos leves) e duas fendas (seção 24) | Pronto em 2026-11-09. Visto no navegador do Mac (o mapa inteiro com as duas fendas); falta jogar no tablet e no iPhone. |
 | — | Socorro das tropas sem ordem, tropa que não empaca sem caminho e a dica do portão (seção 24) | Pronto em 2026-11-09. Medido com o robô e nos testes; falta jogar no tablet e no iPhone. |
+| — | Arte nova do piche (poça, caldeirão e tocha) e das estacas (três fileiras viradas para a horda) (seção 24) | Pronto em 2026-11-09. Visto no navegador do Mac (piche apagado e aceso, estacas no caminho da fenda); falta jogar no tablet e no iPhone. |
+| — | Horda sem fila: faixa própria, caminhos paralelos, bandos e o monstro que não empaca na quina (seção 24) | Pronto em 2026-11-09. Visto no navegador do Mac (antes e depois na mesma onda); falta jogar no tablet e no iPhone. |
 
 ## 27. Arte e licenças
 

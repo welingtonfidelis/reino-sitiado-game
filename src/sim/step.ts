@@ -4,7 +4,7 @@
  */
 import { BUILDINGS, CONFIG, MODES, MONSTERS, UNITS, isHero } from './config.ts';
 import type { BuildingKind, HeroKind, Mode, MonsterDef, MonsterKind, Res, UnitKind } from './config.ts';
-import { hexDist, hexToWorld, worldToHex } from './hex.ts';
+import { DIRS, hexDist, hexToWorld, worldToHex } from './hex.ts';
 import { allyPath, computeFlow, computeReach } from './path.ts';
 import { BLESSING_EVERY, BLESSING_IDS, emptyStats, epitaph } from './blessings.ts';
 import { addUnit, castle, castleCap, castleDoor, housing, isExtractor, population, resourceDir, sourceOf, tileAt, workers } from './world.ts';
@@ -1297,9 +1297,11 @@ export function sideName(q: number, r: number): string {
   return SIDES[(Math.round(a / (Math.PI / 4)) + 8) % 8]!;
 }
 
-function spawnMonster(w: World, kind: MonsterKind): void {
+function spawnMonster(w: World, kind: MonsterKind, pack = -1): void {
   const n = openRifts(w.wave, w.mode);
-  const rift = w.tiles[w.rifts[Math.floor(w.rand() * n)]!]!;
+  // O bando inteiro sai da mesma fenda; os bandos se revezam entre as fendas abertas.
+  const pick = Math.floor(w.rand() * n);
+  const rift = w.tiles[w.rifts[pack >= 0 ? (pack + w.wave) % n : pick]!]!;
   const p = hexToWorld(rift.q, rift.r);
   const def = MONSTERS[kind];
   const hp = def.hp * monsterHpMul(w.wave, w.mode, !!def.boss);
@@ -1308,8 +1310,8 @@ function spawnMonster(w: World, kind: MonsterKind): void {
     homeZ: p.z,
     id: w.nextId++,
     kind,
-    x: p.x + (w.rand() - 0.5) * 1.2,
-    z: p.z + (w.rand() - 0.5) * 1.2,
+    x: p.x + (w.rand() - 0.5) * CONFIG.horde.spawnJitter,
+    z: p.z + (w.rand() - 0.5) * CONFIG.horde.spawnJitter,
     hp,
     maxHp: hp,
     speed: def.speed * (0.9 + w.rand() * 0.2) * (w.waveMods.includes('furia') ? CONFIG.waveMods.fury : 1),
@@ -1431,9 +1433,15 @@ function waves(w: World): void {
   if (w.waveState === 'spawning') {
     w.spawnT -= DT;
     const every = CONFIG.waves.spawnSpread / Math.max(1, w.spawnQueue.length + 1) + CONFIG.waves.spawnGap;
+    // Em bandos (2026-11-09): o tamanho do bando muda a cada onda; os do mesmo bando saem quase
+    // juntos e da mesma fenda, e o intervalo entre bandos guarda o ritmo médio de antes.
+    const H = CONFIG.horde;
+    const G = H.packMin + (w.wave % (H.packMax - H.packMin + 1));
     while (w.spawnT <= 0 && w.spawnQueue.length > 0) {
-      spawnMonster(w, w.spawnQueue.shift()!);
-      w.spawnT += Math.min(0.6, every);
+      const left = w.spawnQueue.length;
+      spawnMonster(w, w.spawnQueue.shift()!, Math.floor(left / G));
+      const gap = Math.min(0.6, every);
+      w.spawnT += (left - 1) % G === 0 ? Math.max(gap, gap * G - H.packGap * (G - 1)) : H.packGap;
     }
     if (w.spawnQueue.length === 0) w.waveState = 'attack';
     return;
@@ -1622,18 +1630,31 @@ function monstersStep(w: World): void {
       // 2) Segue o campo de fluxo; se o próximo ladrilho tem prédio, bate nele.
       const ti = tileIndexAt(w, m.x, m.z);
       const here = ti >= 0 ? w.tiles[ti]! : null;
-      const next = ti >= 0 ? w.flow[ti]! : -1;
+      const next = ti >= 0 ? stepTile(w, m, ti) : -1;
       let target: Building | undefined;
       if (here && here.b >= 0 && !isTrap(w.buildings.get(here.b))) target = w.buildings.get(here.b);
-      if (!target && next >= 0) {
-        const nt = w.tiles[next]!;
-        const c = hexToWorld(nt.q, nt.r);
-        if (nt.b >= 0) {
-          const b = w.buildings.get(nt.b);
-          if (b && !isTrap(b) && dist(m.x, m.z, c.x, c.z) < 1.0 + CONFIG.monsterReach * 0.6) target = b;
-        }
+      // Empacado na quina de uma rocha (a faixa própria mirava do outro lado dela): volta ao meio
+      // do ladrilho e anda uns segundos pelo meio do caminho.
+      if ((m.laneOffT ?? 0) > 0) m.laneOffT = (m.laneOffT ?? 0) - DT;
+      if (!target && here && (m.recenterT ?? 0) > 0) {
+        m.recenterT = (m.recenterT ?? 0) - DT;
+        const c = hexToWorld(here.q, here.r);
         tx = c.x;
         tz = c.z;
+        moving = true;
+      } else if (!target && next >= 0) {
+        const nt = w.tiles[next]!;
+        const c = hexToWorld(nt.q, nt.r);
+        let wall = false;
+        if (nt.b >= 0) {
+          const b = w.buildings.get(nt.b);
+          wall = !!b && !isTrap(b);
+          if (b && !isTrap(b) && dist(m.x, m.z, c.x, c.z) < 1.0 + CONFIG.monsterReach * 0.6) target = b;
+        }
+        // Chão livre: cada um mira a sua faixa do ladrilho, não o centro (sem fila indiana).
+        const [ox, oz] = wall || (m.laneOffT ?? 0) > 0 ? [0, 0] : laneOffset(w, m);
+        tx = c.x + ox;
+        tz = c.z + oz;
         moving = true;
       } else if (!target) {
         const c = castle(w);
@@ -1641,8 +1662,9 @@ function monstersStep(w: World): void {
           const p = center(c);
           if (dist(m.x, m.z, p.x, p.z) < 1.0 + CONFIG.monsterReach) target = c;
           else {
-            tx = p.x;
-            tz = p.z;
+            const [ox, oz] = (m.laneOffT ?? 0) > 0 ? [0, 0] : laneOffset(w, m);
+            tx = p.x + ox;
+            tz = p.z + oz;
             moving = true;
           }
         }
@@ -1672,6 +1694,42 @@ function monstersStep(w: World): void {
   }
 }
 
+/**
+ * Próximo ladrilho do monstro (2026-11-09): entre os vizinhos livres que chegam mais perto do
+ * castelo, um escolhido pelo id e pelo ladrilho (fica o mesmo enquanto ele está ali). Todo passo
+ * desce no campo de fluxo, então ninguém se perde; sem vizinho livre assim, vale o campo de fluxo.
+ */
+function stepTile(w: World, m: Monster, ti: number): number {
+  const best = w.flow[ti]!;
+  if (best < 0) return best;
+  const here = w.flowDist[ti]!;
+  const t = w.tiles[ti]!;
+  const opts: number[] = [];
+  for (const [dq, dr] of DIRS) {
+    const n = tileAt(w, t.q + dq, t.r + dr);
+    if (!n || n.terrain === 'rock' || n.terrain === 'water') continue;
+    if (n.b >= 0 && !isTrap(w.buildings.get(n.b))) continue;
+    if (w.flowDist[n.i]! < here - 0.5) opts.push(n.i);
+  }
+  if (opts.length < 2) return opts[0] ?? best;
+  const h = Math.sin(m.id * 91.345 + ti * 17.13) * 24634.6345;
+  return opts[Math.floor((h - Math.floor(h)) * opts.length)]!;
+}
+
+/**
+ * Faixa do monstro no caminho (2026-11-09): um desvio fixo pelo id (direção e tamanho sorteados
+ * de um jeito que não mexe no sorteio da partida) e um balanço lento de lado, cada um no seu ritmo.
+ */
+function laneOffset(w: World, m: Monster): [number, number] {
+  const frac = (v: number) => v - Math.floor(v);
+  const f1 = frac(Math.sin(m.id * 12.9898) * 43758.5453);
+  const f2 = frac(Math.sin(m.id * 78.233) * 12345.6789);
+  const a = f1 * Math.PI * 2;
+  const r = CONFIG.horde.lane * (0.35 + 0.65 * f2);
+  const sway = CONFIG.horde.sway * Math.sin(w.time * 1.1 + m.id * 1.7);
+  return [Math.cos(a) * r + Math.sin(a) * sway, Math.sin(a) * r - Math.cos(a) * sway];
+}
+
 /** Anda um passo na direção de (tx, tz): piche, separação dos vizinhos e escorregar pela borda. */
 function stepToward(w: World, m: Monster, tx: number, tz: number, ms: Monster[], speedMul = 1): void {
   {
@@ -1691,8 +1749,9 @@ function stepToward(w: World, m: Monster, tx: number, tz: number, ms: Monster[],
       const ox = m.x - o.x;
       const oz = m.z - o.z;
       const od = ox * ox + oz * oz;
-      if (od < 0.25 && od > 1e-6) {
-        const k = (0.5 - Math.sqrt(od)) * 2.5;
+      const sep = CONFIG.horde.sep;
+      if (od < sep * sep && od > 1e-6) {
+        const k = (sep - Math.sqrt(od)) * 2.5;
         vx += (ox / Math.sqrt(od)) * k;
         vz += (oz / Math.sqrt(od)) * k;
       }
@@ -1701,6 +1760,8 @@ function stepToward(w: World, m: Monster, tx: number, tz: number, ms: Monster[],
     const nz = m.z + vz * DT;
     const ti = tileIndexAt(w, nx, nz);
     const cur = tileIndexAt(w, m.x, m.z);
+    const x0 = m.x;
+    const z0 = m.z;
     if (ti !== cur && blockedFor(w, ti)) {
       // Não entra em ladrilho ocupado: escorrega pela borda.
       if (!blockedFor(w, tileIndexAt(w, nx, m.z))) m.x = nx;
@@ -1710,6 +1771,14 @@ function stepToward(w: World, m: Monster, tx: number, tz: number, ms: Monster[],
       m.z = nz;
     }
     m.facing = Math.atan2(vx, vz);
+    // Quase parado tentando andar: depois de 0,8 s volta ao meio do ladrilho e anda pelo meio.
+    if (Math.hypot(m.x - x0, m.z - z0) < sp * DT * 0.25) m.stuckT = (m.stuckT ?? 0) + DT;
+    else if (m.stuckT) m.stuckT = Math.max(0, m.stuckT - DT * 2);
+    if ((m.stuckT ?? 0) > 0.8) {
+      m.stuckT = 0;
+      m.recenterT = 1.2;
+      m.laneOffT = 5;
+    }
   }
 }
 

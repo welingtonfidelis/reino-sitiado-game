@@ -160,6 +160,20 @@ function idlePose(kind: UnitKind, id: number, t: number): Pose {
   return phase < 2.5 ? 'wave' : 'idle';
 }
 
+/**
+ * Giro das armadilhas: as estacas apontam para o lado de onde a horda vem (o contrário do campo
+ * de fluxo, que leva ao castelo); o piche gira pelo id, para os fossos não ficarem iguais.
+ */
+function trapAngle(w: World, b: Building): number {
+  if (b.kind !== 'estacas') return b.id * 0.7;
+  const next = w.flow[w.grid.idx(b.q, b.r)] ?? -1;
+  if (next < 0) return b.id * 0.7;
+  const a = hexToWorld(b.q, b.r);
+  const n = w.tiles[next]!;
+  const c = hexToWorld(n.q, n.r);
+  return Math.atan2(a.x - c.x, a.z - c.z);
+}
+
 /** Plantação: ângulo das fileiras, apontando para o celeiro vizinho. */
 function farmAngle(w: World, b: Building): number {
   const p = hexToWorld(b.q, b.r);
@@ -209,26 +223,88 @@ const PLATFORM: [number, number][] = [
 
 const TOP: Partial<Record<BuildingKind, number>> = { acampamento: 1.3, polvora: 2.0, catapulta: 1.6, piche: 0.3, estacas: 0.6, castelo: 4.1, torre: 2.6, quartel: 1.7, campo: 1.8, muralha: 1.2, portao: 1.4, torreMago: 2.4, capela: 1.9, estabulo: 1.3, forja: 1.4, oficina: 1.3 };
 
-/** Fosso de piche (Etapa 9): mancha escura e lustrosa no chão. */
-function pitchModel(): StaticModel {
-  const parts: THREE.BufferGeometry[] = [new THREE.CylinderGeometry(0.62, 0.68, 0.04, 20).translate(0, 0.02, 0)];
-  for (const [x, z, r] of [[0.3, 0.2, 0.09], [-0.25, -0.3, 0.07], [-0.4, 0.25, 0.06]] as const) parts.push(new THREE.SphereGeometry(r, 8, 6).scale(1, 0.5, 1).translate(x, 0.04, z));
-  const geometry = mergeGeometries(parts.map((g) => g.toNonIndexed()))!;
-  return { parts: [{ geometry, material: new THREE.MeshPhongMaterial({ color: '#2a2018', specular: '#8a7a60', shininess: 60 }) }], box: new THREE.Box3(new THREE.Vector3(-0.86, 0, -0.86), new THREE.Vector3(0.86, 0.1, 0.86)) };
+/**
+ * Fosso de piche (proposta P2, 2026-11-09): poça grande e irregular com borda de terra escura,
+ * bolhas e um brilho de coisa molhada, o caldeirão de piche na beira e a tocha que acende.
+ */
+const TAR = new THREE.MeshPhongMaterial({ color: '#16110c', specular: '#b8a888', shininess: 90 });
+const TAR_EDGE = new THREE.MeshLambertMaterial({ color: '#3a2a1c', flatShading: true });
+const TAR_GLINT = new THREE.MeshBasicMaterial({ color: '#8a7a66', transparent: true, opacity: 0.55, depthWrite: false });
+
+/** Mancha irregular, chata, com a borda arredondada. */
+function blobGeo(r: number, seed: number, y: number): THREE.BufferGeometry {
+  const sh = new THREE.Shape();
+  const n = 28;
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const k = r * (1 + 0.1 * Math.sin(3 * a + seed) + 0.07 * Math.sin(5 * a + seed * 2.1));
+    if (i) sh.lineTo(Math.cos(a) * k, Math.sin(a) * k);
+    else sh.moveTo(Math.cos(a) * k, Math.sin(a) * k);
+  }
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.035, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.03, bevelSegments: 2 });
+  g.rotateX(Math.PI / 2);
+  g.translate(0, y + 0.035, 0);
+  return g;
 }
 
-/** Estacas (Etapa 9): uma roda de pontas de madeira inclinadas para fora. */
+function pitchModel(art: Art): StaticModel {
+  const R = 0.72;
+  const seed = 0.4;
+  const bubbles = ([[0.3, 0.25, 0.08], [-0.2, 0.3, 0.06], [0.1, -0.35, 0.05], [-0.38, -0.1, 0.05]] as const).map(([x, z, r]) =>
+    new THREE.SphereGeometry(r, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).translate(x, 0.075, z),
+  );
+  const glints = [
+    [seed, 0.55],
+    [seed + 2.4, 0.3],
+  ].map(([a0, rr]) => new THREE.RingGeometry(R * rr!, R * rr! + 0.03, 16, 1, a0, 1.1).rotateX(-Math.PI / 2).translate(0, 0.095, 0));
+  const parts: StaticPart[] = [
+    { geometry: merge([blobGeo(R * 1.08, seed, 0)]), material: TAR_EDGE },
+    { geometry: merge([blobGeo(R, seed, 0.02), ...bubbles]), material: TAR },
+    { geometry: merge(glints), material: TAR_GLINT },
+  ];
+  // Caldeirão de piche (da bruxa) e a tocha acesa (do Dungeon), na beira da poça.
+  const place = (m: StaticModel, x: number, y: number, z: number, s: number) => {
+    const mat = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion(), new THREE.Vector3(s, s, s));
+    for (const p of m.parts) parts.push({ geometry: p.geometry.clone().applyMatrix4(mat), material: p.material });
+  };
+  place(art.statics.caldeirao, 0.55, 0, -0.62, 0.42);
+  place(art.statics.tocha, -0.75, 0.25, -0.45, 0.62);
+  return { parts, box: new THREE.Box3(new THREE.Vector3(-0.95, 0, -0.95), new THREE.Vector3(0.95, 0.75, 0.95)) };
+}
+
+/**
+ * Estacas (proposta E1, 2026-11-09): três fileiras de estacas de madeira de verdade (casca,
+ * ponta lascada clara e uma volta de corda), inclinadas para o lado de onde a horda vem (+Z).
+ */
 function spikesModel(): StaticModel {
-  const parts: THREE.BufferGeometry[] = [];
-  for (let k = 0; k < 9; k++) {
-    const a = (k / 9) * Math.PI * 2;
-    const r = k % 2 ? 0.55 : 0.3;
-    const g = new THREE.ConeGeometry(0.06, 0.6, 5).translate(0, 0.3, 0);
-    g.rotateZ(0.45).rotateY(-a).translate(Math.cos(a) * r, 0, Math.sin(a) * r);
-    parts.push(g.toNonIndexed());
-  }
-  const geometry = mergeGeometries(parts)!;
-  return { parts: [{ geometry, material: new THREE.MeshLambertMaterial({ color: '#8a6238', flatShading: true }) }], box: new THREE.Box3(new THREE.Vector3(-0.7, 0, -0.7), new THREE.Vector3(0.7, 0.6, 0.7)) };
+  const rows = [
+    [-0.66, 0.38], [-0.33, 0.45], [0, 0.48], [0.33, 0.45], [0.66, 0.38],
+    [-0.5, 0.0], [-0.17, 0.05], [0.17, 0.05], [0.5, 0.0],
+    [-0.33, -0.4], [0, -0.42], [0.33, -0.4],
+  ] as const;
+  const bark: THREE.BufferGeometry[] = [];
+  const tip: THREE.BufferGeometry[] = [];
+  const rope: THREE.BufferGeometry[] = [];
+  rows.forEach(([x, z], i) => {
+    const h = 0.62 + (i % 3) * 0.07;
+    const r = 0.05;
+    const m = new THREE.Matrix4().compose(
+      new THREE.Vector3(x, 0, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0.25, i % 2 ? 0.2 : -0.2, ((i % 3) - 1) * 0.08)),
+      new THREE.Vector3(1, 1, 1),
+    );
+    bark.push(new THREE.CylinderGeometry(r, r * 1.05, h * 0.72, 6).translate(0, h * 0.36, 0).applyMatrix4(m));
+    tip.push(new THREE.ConeGeometry(r, h * 0.28, 6).translate(0, h * 0.86, 0).applyMatrix4(m));
+    rope.push(new THREE.CylinderGeometry(r * 1.18, r * 1.18, 0.04, 6).translate(0, h * 0.4, 0).applyMatrix4(m));
+  });
+  return {
+    parts: [
+      { geometry: merge(bark), material: lambert('#7a4e2c') },
+      { geometry: merge(tip), material: lambert('#d8b07a') },
+      { geometry: merge(rope), material: lambert('#c9a25a') },
+    ],
+    box: new THREE.Box3(new THREE.Vector3(-0.8, 0, -0.6), new THREE.Vector3(0.8, 0.85, 0.75)),
+  };
 }
 
 /**
@@ -442,7 +518,7 @@ export class World3D {
     big('estandarte', 8);
     this.crystals = new Instanced(scene, crystalModel(), 200, true, false);
     for (const c of CROPS) this.farms.set(c, new Instanced(scene, cropModel(c), 60, true, true));
-    this.pitch = new Instanced(scene, pitchModel(), 120, false, true);
+    this.pitch = new Instanced(scene, pitchModel(art), 120, true, true);
     this.spikes = new Instanced(scene, spikesModel(), 160, true, false);
     big('catapulta', 100);
     big('pedraCerco', 40, false);
@@ -740,7 +816,7 @@ export class World3D {
       // Prédio ligado às ruas: porta para a trilha; os outros giram pelo id.
       const rot = b.kind === 'castelo' ? 0 : village.turns.get(b.id) ?? ((b.id * 7) % 6) * sixth;
       if (b.kind === 'piche' || b.kind === 'estacas') {
-        this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), b.id * 0.7);
+        this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), trapAngle(w, b));
         this.tmp.compose(this.p.set(p.x, 0, p.z), this.q, this.s.setScalar(1));
         (b.kind === 'piche' ? this.pitch : this.spikes).push(this.tmp, b.id);
         continue;
@@ -904,7 +980,7 @@ export class World3D {
     const p = hexToWorld(b.q, b.r);
     const fromSet = (set: Instanced): StaticPart[] => set.meshes.map((m) => ({ geometry: m.geometry, material: m.material as THREE.Material }));
     if (home) return { parts: this.art.statics[home.model].parts, x: home.x, z: home.z, rot: home.rot, scale: home.scale };
-    if (b.kind === 'piche' || b.kind === 'estacas') return { parts: fromSet(b.kind === 'piche' ? this.pitch : this.spikes), x: p.x, z: p.z, rot: b.id * 0.7, scale: 1 };
+    if (b.kind === 'piche' || b.kind === 'estacas') return { parts: fromSet(b.kind === 'piche' ? this.pitch : this.spikes), x: p.x, z: p.z, rot: trapAngle(w, b), scale: 1 };
     if (b.kind === 'fazenda') return { parts: fromSet(this.farms.get(cropOf(w, b))!), x: p.x, z: p.z, rot: -farmAngle(w, b), scale: 1 };
     const rot = ((b.id * 7) % 6) * (Math.PI / 3);
     if (b.kind === 'celeiro') return { parts: this.art.statics.moinho.parts, x: p.x, z: p.z, rot, scale: 1 };

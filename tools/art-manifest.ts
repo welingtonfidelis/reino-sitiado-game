@@ -124,6 +124,13 @@ export const ART: [string, string][] = [
   [`${ADV}/Assets/gltf/shotgun.gltf`, 'weapons/shotgun.gltf'],
   [`${ADV}/Assets/gltf/shotgun.bin`, 'weapons/shotgun.bin'],
   [`${ADV}/Assets/gltf/engineer_texture.png`, 'weapons/engineer_texture.png'],
+  // Fosso de piche (2026-11-09, proposta P2): o caldeirão da bruxa e a tocha acesa do Dungeon.
+  [`${MM5}/5 - November 2024 - Witch/assets/gltf/Cauldron.gltf`, 'props/Cauldron.gltf'],
+  [`${MM5}/5 - November 2024 - Witch/assets/gltf/Cauldron.bin`, 'props/Cauldron.bin'],
+  [`${MM5}/5 - November 2024 - Witch/assets/gltf/witch_texture_A.png`, 'props/witch_texture_A.png'],
+  [`KayKit Dungeon Pack 1.1/Assets/gltf/torch_lit.gltf`, 'props/torch_lit.gltf'],
+  [`KayKit Dungeon Pack 1.1/Assets/gltf/torch_lit.bin`, 'props/torch_lit.bin'],
+  [`KayKit Dungeon Pack 1.1/Assets/gltf/dungeon_texture.png`, 'props/dungeon_texture.png'],
   // Elfos que passeiam pela vila no inverno (2026-11-09), de bengala doce na mão.
   [`${MM5}/6 - December 2024 - Helpers/characters/Helper_A.glb`, 'chars/Helper_A.glb'],
   [`${MM5}/6 - December 2024 - Helpers/characters/Helper_B.glb`, 'chars/Helper_B.glb'],
