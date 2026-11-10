@@ -619,6 +619,11 @@ export class World3D {
   /** Gráficos normais ou leves: sombra do sol, partículas, bichinhos e nuvens. */
   setQuality(look: QualityLook): void {
     this.sun.castShadow = look.shadows;
+    if (this.sun.shadow.mapSize.x !== look.shadowMap) {
+      this.sun.shadow.mapSize.set(look.shadowMap, look.shadowMap);
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null;
+    }
     this.weather.density = look.weather;
     this.extras = look.extras;
     SEASON_U.uClouds.value = look.extras ? 1 : 0;

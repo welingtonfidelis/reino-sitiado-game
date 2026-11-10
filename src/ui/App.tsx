@@ -8,6 +8,8 @@ import { MODES, MODE_NAMES, SEASON_ICON, SEASON_NAME, BUILDINGS, RES_ORDER, cast
 import type { BlessingId, Category, Mode, MonsterKind, Res, UnitKind } from '../sim/index.ts';
 import { FALL_TIME, Game, readGameMode } from '../game/game.ts';
 import type { IsoCamera } from '../render/camera.ts';
+import { QUALITY_NAME, QUALITY_ORDER } from '../render/quality.ts';
+import type { Quality } from '../render/quality.ts';
 import { Icon, RES_LABEL, costText, short } from './common.tsx';
 import { BuildFan, RadialMenu } from './Radial.tsx';
 import { STICKERS } from '../game/album.ts';
@@ -294,6 +296,13 @@ function BookView({ game, onClose }: { game: Game; onClose: () => void }) {
   );
 }
 
+/** O que cada nível de gráfico muda (2026-11-10), embaixo do nome no ⋯. */
+const GFX_HINT: Record<Quality, string> = {
+  baixo: 'roda melhor, mapa menor, sem sombra',
+  medio: 'equilíbrio, com sombra e cor de cinema',
+  alto: 'mais bonito, grama cheia',
+};
+
 /** O Sábio (2026-11-09): retrato no canto e a dica em figuras; tocar fecha. */
 function Guide({ game }: { game: Game }) {
   const t = game.tip;
@@ -420,11 +429,20 @@ function MoreMenu({ game, onClose, onAlbum, onBook }: { game: Game; onClose: () 
           <Icon name={game.music && game.sound ? 'musica' : 'semMusica'} />
           {game.music ? 'Música ligada' : 'Música desligada'}
         </button>
-        <button class="more-row" onClick={() => game.setQuality(game.quality === 'leve' ? 'normal' : 'leve')}>
-          <Icon name={game.quality === 'leve' ? 'pena' : 'brilho'} />
-          <span>{game.quality === 'leve' ? 'Gráficos leves' : 'Gráficos normais'}</span>
-          <small class="more-hint">{game.quality === 'leve' ? 'roda melhor, mapa menor' : 'mais bonito, mapa maior'}</small>
-        </button>
+        <div class="more-row static gfx-row" role="group" aria-label="Gráficos">
+          <Icon name={game.quality === 'baixo' ? 'pena' : 'brilho'} />
+          <span class="gfx-label">
+            Gráficos
+            <small class="more-hint">{GFX_HINT[game.quality]}</small>
+          </span>
+          <span class="gfx-seg">
+            {QUALITY_ORDER.map((q) => (
+              <button key={q} class={q === game.quality ? 'on' : ''} aria-pressed={q === game.quality} onClick={() => game.setQuality(q)}>
+                {QUALITY_NAME[q]}
+              </button>
+            ))}
+          </span>
+        </div>
         <label class="more-row">
           <input type="checkbox" checked={game.autoReport} onChange={(e) => game.setAutoReport((e.target as HTMLInputElement).checked)} />
           Relatório a cada onda vencida

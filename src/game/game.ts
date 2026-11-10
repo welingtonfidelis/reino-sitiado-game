@@ -44,7 +44,7 @@ import type { BlessingId, BuildingKind, ForgeLine, HeroKind, Mode as GameMode, R
 import { Album } from './album.ts';
 import { Bestiary } from './bestiary.ts';
 import type { Sticker } from './album.ts';
-import { readQuality, writeQuality } from '../render/quality.ts';
+import { QUALITY, readQuality, writeQuality } from '../render/quality.ts';
 import { markTip, pickTip } from './guide.ts';
 import type { Tip } from './guide.ts';
 import type { Quality } from '../render/quality.ts';
@@ -121,7 +121,7 @@ export class Game {
   sound = readPref('reino.som', true);
   /** Música ambiente ligada? (Etapa 16; só toca com o som ligado) */
   music = readPref('reino.musica', true);
-  /** Gráficos normais ou leves (tablet de entrada); guardado no navegador. */
+  /** Gráficos baixo, médio ou alto (2026-11-10); guardado no navegador. */
   quality: Quality = readQuality();
   /** O Sábio (2026-11-09): dicas em figuras; ligado ou não (preferência do navegador). */
   guide = readPref('reino.guia', true);
@@ -699,9 +699,9 @@ export class Game {
   }
 }
 
-/** Raio do mapa da partida nova: o grande no normal, o de antes nos gráficos leves (2026-11-09). */
+/** Raio do mapa da partida nova: o grande no médio e no alto, o de antes no baixo (2026-11-09). */
 function mapRadius(q: Quality): number {
-  return q === 'leve' ? CONFIG.mapRadiusLight : CONFIG.mapRadius;
+  return QUALITY[q].smallMap ? CONFIG.mapRadiusLight : CONFIG.mapRadius;
 }
 
 /** Preferências do jogador (só neste navegador; se o armazenamento falhar, vale o padrão). */

@@ -32,7 +32,7 @@ render(
   ui,
 );
 
-// Gráficos leves (tablet de entrada): o antisserrilhado só se escolhe ao abrir; o resto troca na hora.
+// Gráficos (baixo, médio, alto): o antisserrilhado só se escolhe ao abrir; o resto troca na hora.
 const startLook = QUALITY[readQuality()];
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: startLook.antialias, preserveDrawingBuffer: params.has('snap') });
 renderer.setPixelRatio(Math.min(devicePixelRatio, startLook.dpr));
@@ -174,7 +174,7 @@ function applyQuality(q: Quality): void {
   view.setQuality(look);
 }
 function frame(now: number): void {
-  // Nos gráficos leves, no máximo 30 quadros por segundo (a folga de 2 ms evita pular quadro à toa).
+  // No gráfico baixo, no máximo 30 quadros por segundo (a folga de 2 ms evita pular quadro à toa).
   const cap = QUALITY[game.quality].fps;
   if (cap && now - last < 1000 / cap - 2) {
     requestAnimationFrame(frame);

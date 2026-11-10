@@ -1847,3 +1847,38 @@ button.chip {
     height: 112px;
   }
 }
+
+/* Gráficos em três níveis (2026-11-10): botões lado a lado no ⋯. */
+.gfx-row {
+  flex-wrap: wrap;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.gfx-label {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.gfx-seg {
+  display: flex;
+  gap: 4px;
+}
+.gfx-seg button {
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.gfx-seg button.on {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #1d1914;
+  font-weight: 600;
+}
