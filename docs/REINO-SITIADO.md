@@ -919,7 +919,7 @@ O que mudou (`CONFIG.horde`):
 - **Robô** (12 sementes, até a onda 80): média 25,8 (antes, 27,6). A horda espalhada é um pouco mais difícil de segurar só com torres juntas. Em 12 partidas até a onda 50, nenhuma luta passou de 4 minutos.
 - Fotos de antes e depois em `reports/horda-antes.png` e `reports/horda-depois.png` (fora do git).
 
-## 25. Arquitetura## 25. Arquitetura
+## 25. Arquitetura
 
 - `src/sim/`: simulação pura, 20 passos por segundo, sem DOM.
   - `hex.ts`: coordenadas axiais e conversão para o mundo; um hexágono tem 2 m de lado a lado.
