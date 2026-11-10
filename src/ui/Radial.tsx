@@ -409,7 +409,8 @@ function forgeActs(game: Game): Act[] {
       id: line,
       slot: i,
       icon,
-      label: `${name} ${lvl}/3`,
+      // A forja tem 5 níveis desde o rebalanceamento (2026-11-09); o rótulo dizia /3.
+      label: `${name} ${lvl}/${CONFIG.forge.cost.length}`,
       tone: '' as Tone,
       hint: cost ? `${name} nível ${lvl + 1} · ${costText(cost)}. ${text} por nível.` : `${name} no nível máximo. ${text} por nível.`,
       why: forgeProblem(w, line),

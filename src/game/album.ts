@@ -68,7 +68,7 @@ const RULES: Rule[] = [
   { id: 'catapulta', icon: 'catapulta', color: '#a5743f', name: 'Catapulta', hint: 'Construir uma catapulta.', check: ({ w }) => built(w, 'catapulta') >= 1 },
   { id: 'magia', icon: 'estrela', color: '#9a6ad8', name: 'Magia', hint: 'Construir a torre do mago.', check: ({ w }) => built(w, 'torreMago') >= 1 },
   { id: 'cavalos', icon: 'ferradura', color: '#b08a5a', name: 'Cavalaria', hint: 'Construir o estábulo.', check: ({ w }) => built(w, 'estabulo') >= 1 },
-  { id: 'forja', icon: 'bigorna', color: '#d06a3a', name: 'Ferreiro', hint: 'Melhorar uma coisa da forja até o fim (3 vezes).', check: ({ w }) => Object.values(w.forge).some((n) => n >= 3) },
+  { id: 'forja', icon: 'bigorna', color: '#d06a3a', name: 'Ferreiro', hint: 'Melhorar uma coisa da forja até o nível 3.', check: ({ w }) => Object.values(w.forge).some((n) => n >= 3) },
   { id: 'castelo4', icon: 'castelo', color: '#4f7fc4', name: 'Castelo grande', hint: 'Levar o castelo ao nível 4.', check: ({ w }) => (castle(w)?.level ?? 1) >= 4 },
   { id: 'exercito', icon: 'espadas', color: '#c0504a', name: 'Exército', hint: 'Ter 20 tropas ao mesmo tempo.', check: ({ w }) => troops(w) >= 20 },
   { id: 'ouro', icon: 'ouro', color: '#e9b949', name: 'Cofre cheio', hint: 'Juntar 1000 de ouro.', check: ({ w }) => w.res.ouro >= 1000 },
