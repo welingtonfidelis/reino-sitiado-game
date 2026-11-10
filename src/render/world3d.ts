@@ -1452,9 +1452,6 @@ export class World3D {
         const p = castleAt();
         if (p) fx.play('moedas', p.x, 4.3, p.z);
         if (p) this.startParty(p.x, p.z, e.wave % CONFIG.bossEvery === 0);
-      } else if (e.type === 'haul') {
-        // Entregou: o ícone do recurso pula em cima de onde entregou.
-        this.bubbles.flash(LOOT_ICON[e.res], e.x, e.res === 'comida' ? 1.9 : 3.2, e.z, this.time, 1.4);
       } else if (e.type === 'buildingUp') {
         // Torre ou muralha subiu de nível (2026-11-10): poeira e brilho.
         const b = w.buildings.get(e.id);

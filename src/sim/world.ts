@@ -181,7 +181,7 @@ export type SimEvent =
   /** Torre ou muralha subiu de nível (2026-11-10). */
   | { type: 'buildingUp'; id: number; level: number }
   | { type: 'waveStart'; wave: number }
-  /** Um aldeão entregou o que levava (2026-11-10): o ícone pula em cima de onde entregou. */
+  /** Um aldeão entregou o que levava (2026-11-10). */
   | { type: 'haul'; res: Res; x: number; z: number }
   /** Um chefe saiu da fenda (2026-11-10): a trompa toca. */
   | { type: 'boss'; kind: MonsterKind; x: number; z: number }

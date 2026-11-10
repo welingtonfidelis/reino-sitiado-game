@@ -955,7 +955,7 @@ O fogo dos prédios abaixo da metade da vida já existia. Agora a fumaça começ
 
 ### Aldeões levam o trabalho
 
-A cada 22 s de serviço (mais um pouco pelo id), um dos trabalhadores da serraria, da pedreira, da mina ou da plantação leva o que tirou: tora no ombro, saco nas costas, ou carrinho de mão com pedra ou minério. A madeira, a pedra, o ferro e o cristal vão ao castelo; a comida, ao celeiro mais perto. Na entrega, o ícone do recurso pula em cima do castelo ou do celeiro. Só um por prédio de cada vez, e só se o destino estiver a até 9 hexágonos; perto da horda, ninguém sai. A produção conta a viagem como serviço: o que muda é o que se vê (e que o aldeão na estrada pode precisar fugir).
+A cada 22 s de serviço (mais um pouco pelo id), um dos trabalhadores da serraria, da pedreira, da mina ou da plantação leva o que tirou: tora no ombro, saco nas costas, ou carrinho de mão com pedra ou minério. A madeira, a pedra, o ferro e o cristal vão ao castelo; a comida, ao celeiro mais perto. A entrega não tem balão em cima do castelo ou do celeiro (o usuário tirou: o aldeão carregando já mostra). Só um por prédio de cada vez, e só se o destino estiver a até 9 hexágonos; perto da horda, ninguém sai. A produção conta a viagem como serviço: o que muda é o que se vê (e que o aldeão na estrada pode precisar fugir).
 
 O castelo cercado de casas não tinha caminho a pé até o hexágono dele, e nisso o Recolher também falhava: o aldeão ficava parado onde estava. Agora quem leva ou se recolhe vai até a porta, o próprio castelo ou o vizinho dele que tiver caminho (casa encostada também serve).
 
