@@ -7,6 +7,15 @@ deixe os trabalhadores chegarem conforme houver casa, comida e teto, treine sold
 arqueiros e resista às hordas que saem das fendas na beira do mapa. Até a Etapa 19 o
 projeto se chamava "Reino Sitiado" (por isso o endereço e a pasta guardam esse nome).
 
+![A vila em volta do castelo, com torres, casas, plantações e flores](docs/prints/vila.jpg)
+
+| | |
+| --- | --- |
+| ![A horda saindo da floresta rumo às torres](docs/prints/horda.jpg) | ![A vila à noite, com janelas acesas e postes de lanterna](docs/prints/noite.jpg) |
+| ![A vila no inverno, coberta de neve, com as trilhas à vista](docs/prints/inverno.jpg) | ![O reino no outono, com a pedreira e a floresta vermelha](docs/prints/outono.jpg) |
+
+Prints tirados do próprio jogo, numa partida já crescida (pasta `docs/prints/`).
+
 ```bash
 npm install
 npm run art   # arte da coleção KayKit local
